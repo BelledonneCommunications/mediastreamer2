@@ -100,8 +100,7 @@
             ms_error("Failed to bind GL context");
             return;
         }
-        
-        if (!NSEqualRects(prevBounds, [self bounds])) {
+        if (!CGRectEqualToRect(prevBounds, [self bounds])) {
             glBindRenderbuffer(GL_RENDERBUFFER, colorRenderBuffer);
             CAEAGLLayer* layer = (CAEAGLLayer*)self.layer;
             
