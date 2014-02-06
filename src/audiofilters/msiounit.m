@@ -18,6 +18,14 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
+
+#include <Foundation/NSError.h>
+#include <Foundation/NSValue.h>
+#include <Foundation/NSNotification.h>
+#include <Foundation/NSDictionary.h>
+#include <AVFoundation/AVAudioSession.h>
+#include <UIKit/UIDevice.h>
+
 #include <AudioToolbox/AudioToolbox.h>
 #include "mediastreamer2/mssndcard.h"
 #include "mediastreamer2/msfilter.h"
@@ -120,8 +128,13 @@ typedef  struct au_filter_read_data au_filter_read_data_t;
 typedef  struct au_filter_write_data au_filter_write_data_t;
 
 
+@class AudioInterruptHandler;
+
 typedef  struct  au_card {
 	AudioUnit	io_unit;
+
+    AudioInterruptHandler* interrupt_handler;
+
 	ms_mutex_t	mutex;
 	unsigned int	rate;
 	unsigned int	bits;
@@ -133,6 +146,7 @@ typedef  struct  au_card {
 	bool_t audio_session_configured;
 	bool_t read_started;
 	bool_t write_started;
+    bool_t interrupted;
 	au_filter_read_data_t* read_data;
 	au_filter_write_data_t* write_data;
 	MSSndCard* ms_snd_card;
@@ -162,6 +176,47 @@ struct au_filter_write_data{
 };
 
 static void  stop_audio_unit (au_card_t* d);
+
+
+/* Interruption handler */
+@interface AudioInterruptHandler : NSObject
+{
+    au_card_t *au;
+}
+-(AudioInterruptHandler*)initWithAu:(au_card_t*)audioUnit;
+
+-(void)interrupHandler:(NSNotification*)notif;
+
+@end
+
+@implementation AudioInterruptHandler
+
+-(AudioInterruptHandler*)initWithAu:(au_card_t *)audioUnit{
+    [super init];
+    self->au = audioUnit;
+    return self;
+}
+
+-(void)interrupHandler:(NSNotification *)notif{
+    NSDictionary *interuptionDict = notif.userInfo;
+    NSInteger interuptionType = [[interuptionDict objectForKey:AVAudioSessionInterruptionTypeKey] integerValue];
+
+    if (interuptionType == AVAudioSessionInterruptionTypeBegan) {
+        if( au != NULL ){
+            ms_message("msiounit: interruption begin au=%p", au);
+            // stop the reader
+            au->interrupted = TRUE;
+            if( au->read_data ) stop_audio_unit(au);
+        }
+    }
+    else if (interuptionType == AVAudioSessionInterruptionTypeEnded) {
+        ms_message("msiounit: interruption end au=%p", au);
+        au->interrupted = FALSE;
+    }
+}
+
+@end
+
 
 
 /*
@@ -207,17 +262,7 @@ static void create_io_unit (AudioUnit* au) {
 	check_au_unit_result(auresult,"AudioComponentInstanceNew");
 	ms_message("AudioUnit created.");
 }
-/* the interruption listener is not reliable, it can be overriden by other parts of the application */
-/* as a result, we do nothing with it*/
-static void au_interruption_listener (void     *inClientData, UInt32   inInterruptionState){
-/*
-	if (inInterruptionState==kAudioSessionBeginInterruption){
-		CFRunLoopPerformBlock(CFRunLoopGetMain(), kCFRunLoopCommonModes, ^(void) {
-			stop_audio_unit((au_card_t*)inClientData);
-		});
-	}
-*/
-}
+
 
 static void au_init(MSSndCard *card){
 	ms_debug("au_init");
@@ -235,13 +280,30 @@ static void au_init(MSSndCard *card){
 	card->preferred_sample_rate=44100;
 	card->capabilities|=MS_SND_CARD_CAP_BUILTIN_ECHO_CANCELLER;
 	ms_mutex_init(&d->mutex,NULL);
-	AudioSessionInitialize(NULL, NULL, au_interruption_listener, d);
+	AudioSessionInitialize(NULL, NULL, NULL, d);
+
+    if( [[[UIDevice currentDevice] systemVersion] doubleValue] >= 6 ){
+        d->interrupt_handler = [[AudioInterruptHandler alloc] initWithAu:d];
+        [[NSNotificationCenter defaultCenter] addObserver:d->interrupt_handler
+                                                 selector:@selector(interrupHandler:)
+                                                     name:AVAudioSessionInterruptionNotification
+                                                   object:[AVAudioSession sharedInstance]];
+    }
+
 	card->data=d;
 }
 
 static void au_uninit(MSSndCard *card){
 	au_card_t *d=(au_card_t*)card->data;
-	stop_audio_unit(d);
+
+    if( [[[UIDevice currentDevice] systemVersion] doubleValue] >= 6 ){
+        if( d->interrupt_handler ){
+            [[NSNotificationCenter defaultCenter] removeObserver:d->interrupt_handler];
+            [d->interrupt_handler release];
+            d->interrupt_handler = nil;
+        }
+    }
+    stop_audio_unit(d);
 	ms_mutex_destroy(&d->mutex);
 	ms_free(d);
 }
@@ -381,7 +443,7 @@ static void configure_audio_session (au_card_t* d,uint64_t time) {
 	UInt32 audioCategory;
 	UInt32 doSetProperty      = 1;
 	UInt32 audioCategorySize=sizeof(audioCategory);
-	bool_t changed;
+	bool_t changed = false;
 	
 	if (!d->is_fast){
 		
@@ -424,7 +486,7 @@ static void configure_audio_session (au_card_t* d,uint64_t time) {
 
 static bool_t  start_audio_unit (au_filter_base_t* d,uint64_t time) {
 	au_card_t* card=d->card;
-	if (!d->card->io_unit_started && (d->card->last_failed_iounit_start_time == 0 || (time - d->card->last_failed_iounit_start_time)>100)) {
+	if (card->io_unit && !d->card->io_unit_started && (d->card->last_failed_iounit_start_time == 0 || (time - d->card->last_failed_iounit_start_time)>100)) {
 		OSStatus auresult;
 		
 		check_au_unit_result(AudioUnitInitialize(card->io_unit),"AudioUnitInitialize");
@@ -477,7 +539,7 @@ static bool_t  start_audio_unit (au_filter_base_t* d,uint64_t time) {
 		
 		auresult=AudioOutputUnitStart(card->io_unit);
 		check_au_unit_result(auresult,"AudioOutputUnitStart");
-		card->io_unit_started = (auresult ==0);
+		card->io_unit_started = (auresult == 0);
 		if (!card->io_unit_started) {
 			ms_message("AudioUnit could not be started, current hw output latency [%f] input [%f] iobuf[%f] sample rate [%f]",hwoutputlatency,hwinputlatency,hwiobuf,hwsamplerate);
 			d->card->last_failed_iounit_start_time=time;
@@ -518,7 +580,7 @@ static void stop_audio_unit (au_card_t* d) {
 	d->rate=0; /*uninit*/
 }
 
-static void check_audio_unit(au_card_t* card){
+static void check_shutdown_timer(au_card_t* card){
 	if (card->shutdown_timer){
 		CFRunLoopRemoveTimer(CFRunLoopGetMain(), card->shutdown_timer,kCFRunLoopCommonModes);
 		CFRunLoopTimerInvalidate(card->shutdown_timer);
@@ -534,7 +596,7 @@ static void au_read_preprocess(MSFilter *f){
 	au_filter_read_data_t *d= (au_filter_read_data_t*)f->data;
 	au_card_t* card=d->base.card;
 
-	check_audio_unit(card);
+	check_shutdown_timer(card);
 	
 	configure_audio_session(card, f->ticker->time);
 	
@@ -586,8 +648,13 @@ static void au_read_postprocess(MSFilter *f){
 
 static void au_read_process(MSFilter *f){
 	au_filter_read_data_t *d=(au_filter_read_data_t*)f->data;
+    au_card_t* card=((au_filter_base_t*)d)->card;
 	mblk_t *m;
 
+    if( card->interrupted ) {
+        ms_debug("card is interrupted -> skip");
+        return;
+    }
 	if (!(d->base.card->read_started=d->base.card->io_unit_started)) {
 		//make sure audio unit is started
 		start_audio_unit((au_filter_base_t*)d,f->ticker->time);
@@ -610,7 +677,7 @@ static void au_write_preprocess(MSFilter *f){
 	au_filter_write_data_t *d= (au_filter_write_data_t*)f->data;
 	au_card_t* card=d->base.card;
 	
-	check_audio_unit(card);
+	check_shutdown_timer(card);
 	
 	if (card->io_unit_started) {
 		ms_message("AudioUnit already started");
