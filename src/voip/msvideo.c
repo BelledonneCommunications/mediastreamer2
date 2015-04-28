@@ -788,7 +788,7 @@ bool_t ms_video_update_average_fps(MSAverageFPS* afps, uint32_t current_time) {
 	afps->last_frame_time=current_time;
 
 	if ((current_time - afps->last_print_time > 5000) && afps->mean_inter_frame!=0){
-		ms_message(afps->context, 1/afps->mean_inter_frame);
+		ms_debug(afps->context, 1/afps->mean_inter_frame);
 		afps->last_print_time = current_time;
 		return TRUE;
 	}
