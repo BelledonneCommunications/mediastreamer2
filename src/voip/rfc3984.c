@@ -25,21 +25,21 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define TYPE_STAP_A 24  /*single time aggregation packet  0x18*/
 
 
-static inline void nal_header_init(uint8_t *h, uint8_t nri, uint8_t type){
+static MS2_INLINE void nal_header_init(uint8_t *h, uint8_t nri, uint8_t type){
 	*h=((nri&0x3)<<5) | (type & ((1<<5)-1));
 }
 
-static inline uint8_t nal_header_get_type(const uint8_t *h){
+static MS2_INLINE uint8_t nal_header_get_type(const uint8_t *h){
 	return (*h) & ((1<<5)-1);
 }
 
-static inline uint8_t nal_header_get_nri(const uint8_t *h){
+static MS2_INLINE uint8_t nal_header_get_nri(const uint8_t *h){
 	return ((*h) >> 5) & 0x3;
 }
 
 Rfc3984Context *rfc3984_new(void){
-	Rfc3984Context *ctx=ms_new(Rfc3984Context,1);
-	rfc3984_init (ctx);
+	Rfc3984Context *ctx=ms_new0(Rfc3984Context,1);
+	rfc3984_init(ctx);
 	return ctx;
 }
 
@@ -61,9 +61,10 @@ void rfc3984_set_max_payload_size(Rfc3984Context *ctx, int size){
 	ctx->maxsz=size;
 }
 
-static void send_packet(MSQueue *rtpq, uint32_t ts, mblk_t *m, bool_t marker){
+static void send_packet(Rfc3984Context *ctx, MSQueue *rtpq, uint32_t ts, mblk_t *m, bool_t marker){
 	mblk_set_timestamp_info(m,ts);
 	mblk_set_marker_info(m,marker);
+	mblk_set_cseq(m, ctx->ref_cseq++);
 	ms_queue_put(rtpq,m);
 }
 
@@ -105,7 +106,7 @@ static mblk_t *prepend_fu_indicator_and_header(mblk_t *m, uint8_t indicator,
 	return h;
 }
 
-static void frag_nalu_and_send(MSQueue *rtpq, uint32_t ts, mblk_t *nalu, bool_t marker, int maxsize){
+static void frag_nalu_and_send(Rfc3984Context *ctx, MSQueue *rtpq, uint32_t ts, mblk_t *nalu, bool_t marker, int maxsize){
 	mblk_t *m;
 	int payload_max_size=maxsize-2;/*minus FUA header*/
 	uint8_t fu_indicator;
@@ -119,12 +120,12 @@ static void frag_nalu_and_send(MSQueue *rtpq, uint32_t ts, mblk_t *nalu, bool_t 
 		nalu->b_rptr+=payload_max_size;
 		m->b_wptr=nalu->b_rptr;
 		m=prepend_fu_indicator_and_header(m,fu_indicator,start,FALSE,type);
-		send_packet(rtpq,ts,m,FALSE);
+		send_packet(ctx, rtpq,ts,m,FALSE);
 		start=FALSE;
 	}
 	/*send last packet */
 	m=prepend_fu_indicator_and_header(nalu,fu_indicator,FALSE,TRUE,type);
-	send_packet(rtpq,ts,m,marker);
+	send_packet(ctx, rtpq,ts,m,marker);
 }
 
 static void rfc3984_pack_mode_0(Rfc3984Context *ctx, MSQueue *naluq, MSQueue *rtpq, uint32_t ts){
@@ -137,7 +138,7 @@ static void rfc3984_pack_mode_0(Rfc3984Context *ctx, MSQueue *naluq, MSQueue *rt
 		if (size>ctx->maxsz){
 			ms_warning("This H264 packet does not fit into mtu: size=%i",size);
 		}
-		send_packet(rtpq,ts,m,end);
+		send_packet(ctx, rtpq,ts,m,end);
 	}
 }
 
@@ -162,7 +163,7 @@ static void rfc3984_pack_mode_1(Rfc3984Context *ctx, MSQueue *naluq, MSQueue *rt
 						ms_debug("Sending STAP-A");
 					}else
 						ms_debug("Sending previous msg as single NAL");
-					send_packet(rtpq,ts,prevm,FALSE);
+					send_packet(ctx, rtpq,ts,prevm,FALSE);
 					prevm=NULL;
 					prevsz=0;
 				}
@@ -177,25 +178,25 @@ static void rfc3984_pack_mode_1(Rfc3984Context *ctx, MSQueue *naluq, MSQueue *rt
 				/*send as single nal or FU-A*/
 				if (sz>ctx->maxsz){
 					ms_debug("Sending FU-A packets");
-					frag_nalu_and_send(rtpq,ts,m,end, ctx->maxsz);
+					frag_nalu_and_send(ctx, rtpq,ts,m,end, ctx->maxsz);
 				}else{
 					ms_debug("Sending Single NAL");
-					send_packet(rtpq,ts,m,end);
+					send_packet(ctx, rtpq,ts,m,end);
 				}
 			}
 		}else{
 			if (sz>ctx->maxsz){
 				ms_debug("Sending FU-A packets");
-				frag_nalu_and_send(rtpq,ts,m,end, ctx->maxsz);
+				frag_nalu_and_send(ctx, rtpq,ts,m,end, ctx->maxsz);
 			}else{
 				ms_debug("Sending Single NAL");
-				send_packet(rtpq,ts,m,end);
+				send_packet(ctx, rtpq,ts,m,end);
 			}
 		}
 	}
 	if (prevm){
 		ms_debug("Sending Single NAL (2)");
-		send_packet(rtpq,ts,prevm,TRUE);
+		send_packet(ctx, rtpq,ts,prevm,TRUE);
 	}
 }
 
@@ -209,6 +210,7 @@ static mblk_t * aggregate_fua(Rfc3984Context *ctx, mblk_t *im){
 	start=fu_header>>7;
 	end=(fu_header>>6)&0x1;
 	if (start){
+		mblk_t *new_header;
 		nri=nal_header_get_nri(im->b_rptr);
 		if (ctx->m!=NULL){
 			ms_error("receiving FU-A start while previous FU-A is not "
@@ -216,9 +218,14 @@ static mblk_t * aggregate_fua(Rfc3984Context *ctx, mblk_t *im){
 			freemsg(ctx->m);
 			ctx->m=NULL;
 		}
-		im->b_rptr++;
-		nal_header_init(im->b_rptr,nri,type);
-		ctx->m=im;
+		im->b_rptr+=2; /*skip the nal header and the fu header*/
+		new_header=allocb(1,0); /* allocate small fragment to put the correct nal header, this is to avoid to write on the buffer
+					which can break processing of other users of the buffers */
+		nal_header_init(new_header->b_wptr,nri,type);
+		new_header->b_wptr++;
+		mblk_meta_copy(im,new_header);
+		concatb(new_header,im);
+		ctx->m=new_header;
 	}else{
 		if (ctx->m!=NULL){
 			im->b_rptr+=2;
@@ -237,24 +244,42 @@ static mblk_t * aggregate_fua(Rfc3984Context *ctx, mblk_t *im){
 }
 
 /*process incoming rtp data and output NALUs, whenever possible*/
-void rfc3984_unpack(Rfc3984Context *ctx, mblk_t *im, MSQueue *out){
+int rfc3984_unpack(Rfc3984Context *ctx, mblk_t *im, MSQueue *out){
 	uint8_t type=nal_header_get_type(im->b_rptr);
 	uint8_t *p;
 	int marker = mblk_get_marker_info(im);
 	uint32_t ts=mblk_get_timestamp_info(im);
+	uint16_t cseq=mblk_get_cseq(im);
+	int res = 0;
 
 	if (ctx->last_ts!=ts){
 		/*a new frame is arriving, in case the marker bit was not set in previous frame, output it now*/
 		/* unless this is a FU-A (workarond some other apps bugs)*/
 		ctx->last_ts=ts;
 		if (ctx->m==NULL){
+			bool_t out_without_marker = FALSE;
 			while(!ms_queue_empty(&ctx->q)){
 				ms_queue_put(out,ms_queue_get(&ctx->q));
+				out_without_marker = TRUE;
+				res = -1;
 			}
+			if (out_without_marker) ms_warning("Incomplete H264 frame (missing marker bit)");
 		}
 	}
 
 	if (im->b_cont) msgpullup(im,-1);
+
+	if (!ctx->initialized_ref_cseq) {
+		ctx->initialized_ref_cseq = TRUE;
+		ctx->ref_cseq = cseq;
+	} else {
+		ctx->ref_cseq++;
+		if (ctx->ref_cseq != cseq) {
+			ms_message("sequence inconsistency detected (diff=%i)",(int)(cseq - ctx->ref_cseq));
+			ctx->ref_cseq = cseq;
+			res = -1;
+		}
+	}
 
 	if (type==TYPE_STAP_A){
 		/*split into nalus*/
@@ -303,6 +328,8 @@ void rfc3984_unpack(Rfc3984Context *ctx, mblk_t *im, MSQueue *out){
 			ms_queue_put(out,ms_queue_get(&ctx->q));
 		}
 	}
+
+	return res;
 }
 
 

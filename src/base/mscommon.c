@@ -17,37 +17,17 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
-#ifdef HAVE_CONFIG_H
-#include "mediastreamer-config.h"
-#include "gitversion.h"
-#else
-#   ifndef MEDIASTREAMER_VERSION
-#   define MEDIASTREAMER_VERSION "unknown"
-#   endif
-#	ifndef GIT_VERSION
-#	define GIT_VERSION "unknown"
-#	endif
-#endif
+
 
 #include "mediastreamer2/mscommon.h"
 #include "mediastreamer2/mscodecutils.h"
 #include "mediastreamer2/msfilter.h"
 
-#include "basedescs.h"
-
 #if !defined(_WIN32_WCE)
 #include <sys/types.h>
 #endif
-#ifndef WIN32
+#ifndef _WIN32
 #include <dirent.h>
-#else
-#ifndef PACKAGE_PLUGINS_DIR
-#if defined(WIN32) || defined(_WIN32_WCE)
-#define PACKAGE_PLUGINS_DIR "lib\\mediastreamer\\plugins\\"
-#else
-#define PACKAGE_PLUGINS_DIR "."
-#endif
-#endif
 #endif
 #ifdef HAVE_DLOPEN
 #include <dlfcn.h>
@@ -61,30 +41,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <sys/syspage.h>
 #endif
 
-#ifdef ANDROID
-#include <android/log.h>
-#endif
-
-#if defined(WIN32) && !defined(_WIN32_WCE)
-static MSList *ms_plugins_loaded_list;
-#endif
-
-static char *plugins_dir = NULL;
-
-static unsigned int cpu_count = 1;
-
 unsigned int ms_get_cpu_count() {
-	return cpu_count;
+	return ms_factory_get_cpu_count(ms_factory_get_fallback());
 }
 
 void ms_set_cpu_count(unsigned int c) {
-	ms_message("CPU count set to %d", c);
-	cpu_count = c;
+	ms_factory_set_cpu_count(ms_factory_get_fallback(),c);
 }
 
 MSList *ms_list_new(void *data){
-	MSList *new_elem=(MSList *)ms_new(MSList,1);
-	new_elem->prev=new_elem->next=NULL;
+	MSList *new_elem=(MSList *)ms_new0(MSList,1);
 	new_elem->data=data;
 	return new_elem;
 }
@@ -122,17 +88,21 @@ MSList * ms_list_concat(MSList *first, MSList *second){
 	return first;
 }
 
-MSList * ms_list_free(MSList *list){
-	MSList *elem = list;
+MSList * ms_list_free_with_data(MSList *list, void (*freefunc)(void*)){
+	MSList *elem;
 	MSList *tmp;
-	if (list==NULL) return NULL;
-	while(elem->next!=NULL) {
-		tmp = elem;
-		elem = elem->next;
-		ms_free(tmp);
+
+	for (elem=list;elem!=NULL;){
+		tmp=elem->next;
+		if (freefunc) freefunc(elem->data);
+		ms_free(elem);
+		elem=tmp;
 	}
-	ms_free(elem);
 	return NULL;
+}
+
+MSList * ms_list_free(MSList *elem){
+	return ms_list_free_with_data(elem,NULL);
 }
 
 MSList * ms_list_remove(MSList *first, void *data){
@@ -143,6 +113,19 @@ MSList * ms_list_remove(MSList *first, void *data){
 		ms_warning("ms_list_remove: no element with %p data was in the list", data);
 		return first;
 	}
+}
+
+MSList * ms_list_remove_custom(MSList *first, MSCompareFunc compare_func, const void *user_data) {
+	MSList *cur;
+	MSList *elem = first;
+	while (elem != NULL) {
+		cur = elem;
+		elem = elem->next;
+		if (compare_func(cur->data, user_data) == 0) {
+			first = ms_list_remove(first, cur->data);
+		}
+	}
+	return first;
 }
 
 int ms_list_size(const MSList *first){
@@ -280,288 +263,100 @@ MSList *ms_list_copy(const MSList *list){
 	return copy;
 }
 
+MSList *ms_list_copy_with_data(const MSList *list, void *(*copyfunc)(void *)){
+	MSList *copy=NULL;
+	const MSList *iter;
+	for(iter=list;iter!=NULL;iter=ms_list_next(iter)){
+		copy=ms_list_append(copy,copyfunc(iter->data));
+	}
+	return copy;
+}
 
-#ifndef PLUGINS_EXT
-	#define PLUGINS_EXT ".so"
-#endif
-typedef void (*init_func_t)(void);
+char * ms_tags_list_as_string(const MSList *list) {
+	char *tags_str = NULL;
+	const MSList *elem = list;
+	while (elem != NULL) {
+		char *elem_str = (char *)elem->data;
+		if (tags_str == NULL) {
+			tags_str = ms_strdup(elem_str);
+		} else {
+			char *old = tags_str;
+			tags_str = ms_strdup_printf("%s,%s", old, elem_str);
+			ms_free(old);
+		}
+		elem = elem->next;
+	}
+	return tags_str;
+}
+
+bool_t ms_tags_list_contains_tag(const MSList *list, const char *tag) {
+	const MSList *elem = list;
+	while (elem != NULL) {
+		char *tag_from_list = (char *)elem->data;
+		if (strcasecmp(tag, tag_from_list) == 0)
+			return TRUE;
+		elem = elem->next;
+	}
+	return FALSE;
+}
 
 int ms_load_plugins(const char *dir){
-	int num=0;
-#if defined(WIN32) && !defined(_WIN32_WCE)
-	WIN32_FIND_DATA FileData;
-	HANDLE hSearch;
-	char szDirPath[1024];
-	char szPluginFile[1024];
-	BOOL fFinished = FALSE;
-	const char *tmp=getenv("DEBUG");
-	BOOL debug=(tmp!=NULL && atoi(tmp)==1);
-	snprintf(szDirPath, sizeof(szDirPath), "%s", dir);
-
-	// Start searching for .dll files in the current directory.
-
-	snprintf(szDirPath, sizeof(szDirPath), "%s\\*.dll", dir);
-	hSearch = FindFirstFile(szDirPath, &FileData);
-	if (hSearch == INVALID_HANDLE_VALUE)
-	{
-		ms_message("no plugin (*.dll) found in %s.", szDirPath);
-		return 0;
-	}
-	snprintf(szDirPath, sizeof(szDirPath), "%s", dir);
-
-	while (!fFinished)
-	{
-		/* load library */
-		HINSTANCE os_handle;
-		UINT em=0;
-		if (!debug) em = SetErrorMode (SEM_FAILCRITICALERRORS);
-
-		snprintf(szPluginFile, sizeof(szPluginFile), "%s\\%s", szDirPath, FileData.cFileName);
-		os_handle = LoadLibraryEx (szPluginFile, NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
-		if (os_handle==NULL)
-		{
-			ms_message("Fail to load plugin %s with altered search path: error %i",szPluginFile,(int)GetLastError());
-			os_handle = LoadLibraryEx (szPluginFile, NULL, 0);
-		}
-		if (!debug) SetErrorMode (em);
-		if (os_handle==NULL)
-			ms_error("Fail to load plugin %s", szPluginFile);
-		else{
-			init_func_t initroutine;
-			char szPluginName[256];
-			char szMethodName[256];
-			char *minus;
-			snprintf(szPluginName, 256, "%s", FileData.cFileName);
-			/*on mingw, dll names might be libsomething-3.dll. We must skip the -X.dll stuff*/
-			minus=strchr(szPluginName,'-');
-			if (minus) *minus='\0';
-			else szPluginName[strlen(szPluginName)-4]='\0'; /*remove .dll*/
-			snprintf(szMethodName, 256, "%s_init", szPluginName);
-			initroutine = (init_func_t) GetProcAddress (os_handle, szMethodName);
-				if (initroutine!=NULL){
-					initroutine();
-					ms_message("Plugin loaded (%s)", szPluginFile);
-					// Add this new loaded plugin to the list (useful for FreeLibrary at the end)
-					ms_plugins_loaded_list=ms_list_append(ms_plugins_loaded_list,os_handle);
-					num++;
-				}else{
-					ms_warning("Could not locate init routine of plugin %s. Should be %s",
-					szPluginFile, szMethodName);
-				}
-		}
-		if (!FindNextFile(hSearch, &FileData)) {
-			if (GetLastError() == ERROR_NO_MORE_FILES){
-				fFinished = TRUE;
-			}
-			else
-			{
-				ms_error("couldn't find next plugin dll.");
-				fFinished = TRUE;
-			}
-		}
-	}
-	/* Close the search handle. */
-	FindClose(hSearch);
-
-#elif HAVE_DLOPEN
-	char plugin_name[64];
-	DIR *ds;
-	MSList *loaded_plugins = NULL;
-	struct dirent *de;
-	char *ext;
-	char *fullpath;
-	ds=opendir(dir);
-	if (ds==NULL){
-		ms_message("Cannot open directory %s: %s",dir,strerror(errno));
-		return -1;
-	}
-	while( (de=readdir(ds))!=NULL){
-		if (
-#ifndef __QNX__
-			(de->d_type==DT_REG || de->d_type==DT_UNKNOWN || de->d_type==DT_LNK) &&
-#endif
-			(ext=strstr(de->d_name,PLUGINS_EXT))!=NULL) {
-			void *handle;
-			snprintf(plugin_name, MIN(sizeof(plugin_name), ext - de->d_name + 1), "%s", de->d_name);
-			if (ms_list_find_custom(loaded_plugins, (MSCompareFunc)strcmp, plugin_name) != NULL) continue;
-			loaded_plugins = ms_list_append(loaded_plugins, ms_strdup(plugin_name));
-			fullpath=ms_strdup_printf("%s/%s",dir,de->d_name);
-			ms_message("Loading plugin %s...",fullpath);
-
-			if ( (handle=dlopen(fullpath,RTLD_NOW))==NULL){
-				ms_warning("Fail to load plugin %s : %s",fullpath,dlerror());
-			}else {
-				char *initroutine_name=ms_malloc0(strlen(de->d_name)+10);
-				char *p;
-				void *initroutine=NULL;
-				strcpy(initroutine_name,de->d_name);
-				p=strstr(initroutine_name,PLUGINS_EXT);
-				if (p!=NULL){
-					strcpy(p,"_init");
-					initroutine=dlsym(handle,initroutine_name);
-				}
-
-#ifdef __APPLE__
-				if (initroutine==NULL){
-					/* on macosx: library name are libxxxx.1.2.3.dylib */
-					/* -> MUST remove the .1.2.3 */
-					p=strstr(initroutine_name,".");
-					if (p!=NULL)
-					{
-						strcpy(p,"_init");
-						initroutine=dlsym(handle,initroutine_name);
-					}
-				}
-#endif
-
-				if (initroutine!=NULL){
-					init_func_t func=(init_func_t)initroutine;
-					func();
-					ms_message("Plugin loaded (%s)", fullpath);
-					num++;
-				}else{
-					ms_warning("Could not locate init routine of plugin %s",de->d_name);
-				}
-				ms_free(initroutine_name);
-			}
-			ms_free(fullpath);
-		}
-	}
-	ms_list_for_each(loaded_plugins, ms_free);
-	ms_list_free(loaded_plugins);
-	closedir(ds);
-#else
-	ms_warning("no loadable plugin support: plugins cannot be loaded.");
-	num=-1;
-#endif
-	return num;
+	return ms_factory_load_plugins(ms_factory_get_fallback(),dir);
 }
-static int ms_plugins_ref=0;
-void ms_unload_plugins(){
-#if defined(WIN32) && !defined(_WIN32_WCE)
-	MSList *elem;
-#endif
-	if (--ms_plugins_ref >0 ) {
-		ms_message ("Skiping ms_unload_plugins, still [%i] ref",ms_plugins_ref);
-		return;
-	}
-
-#if defined(WIN32) && !defined(_WIN32_WCE)
-
-
-	for(elem=ms_plugins_loaded_list;elem!=NULL;elem=elem->next)
-	{
-		HINSTANCE handle=(HINSTANCE )elem->data;
-        FreeLibrary(handle) ;
-	}
-
-	ms_plugins_loaded_list = ms_list_free(ms_plugins_loaded_list);
-#endif
-}
-
-#ifdef ANDROID
-#define LOG_DOMAIN "mediastreamer"
-static void ms_android_log_handler(OrtpLogLevel lev, const char *fmt, va_list args){
-	int prio;
-	switch(lev){
-	case ORTP_DEBUG:	prio = ANDROID_LOG_DEBUG;	break;
-	case ORTP_MESSAGE:	prio = ANDROID_LOG_INFO;	break;
-	case ORTP_WARNING:	prio = ANDROID_LOG_WARN;	break;
-	case ORTP_ERROR:	prio = ANDROID_LOG_ERROR;	break;
-	case ORTP_FATAL:	prio = ANDROID_LOG_FATAL;	break;
-	default:		prio = ANDROID_LOG_DEFAULT;	break;
-	}
-	__android_log_vprint(prio, LOG_DOMAIN, fmt, args);
-}
-#endif
 
 static int ms_base_ref=0;
+static int ms_plugins_ref=0;
 
 void ms_base_init(){
-	int i;
-	long num_cpu=1;
-#ifdef WIN32
-	SYSTEM_INFO sysinfo;
-#endif
-
-	if (ms_base_ref++ >0 ) {
+	ms_base_ref++;
+	if ( ms_base_ref>1 ) {
 		ms_message ("Skiping ms_base_init, because [%i] ref",ms_base_ref);
 		return;
 	}
-
-#if defined(ENABLE_NLS)
-	bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
-#endif
-
-#if !defined(_WIN32_WCE)
-	if (getenv("MEDIASTREAMER_DEBUG")!=NULL){
-		ortp_set_log_level_mask(ORTP_DEBUG|ORTP_MESSAGE|ORTP_WARNING|ORTP_ERROR|ORTP_FATAL);
-	}
-#endif
-//#ifdef ANDROID
-//	ortp_set_log_level_mask(ORTP_MESSAGE|ORTP_WARNING|ORTP_ERROR|ORTP_FATAL);
-//	ortp_set_log_handler(ms_android_log_handler);
-//#endif
-	ms_message("Mediastreamer2 " MEDIASTREAMER_VERSION " (git: " GIT_VERSION ") starting.");
-	/* register builtin MSFilter's */
-	for (i=0;ms_base_filter_descs[i]!=NULL;i++){
-		ms_filter_register(ms_base_filter_descs[i]);
-	}
-	
-#ifdef WIN32 /*fixme to be tested*/
-	GetSystemInfo( &sysinfo );
-
-	num_cpu = sysinfo.dwNumberOfProcessors;
-#elif __APPLE__ || __linux
-	num_cpu = sysconf( _SC_NPROCESSORS_ONLN );
-#elif __QNX__
-	num_cpu = _syspage_ptr->num_cpu;
-#else
-#warning "There is no code that detects the number of CPU for this platform."
-#endif
-	ms_set_cpu_count(num_cpu);
-	ms_message("ms_base_init() done");
+	ms_factory_create_fallback();
+	ms_factory_get_fallback();
 }
 
 void ms_base_exit(){
-	if (--ms_base_ref >0 ) {
+	--ms_base_ref;
+	if ( ms_base_ref>0 ) {
 		ms_message ("Skiping ms_base_exit, still [%i] ref",ms_base_ref);
 		return;
 	}
-	ms_filter_unregister_all();
-	ms_unload_plugins();
+	ms_factory_destroy(ms_factory_get_fallback());
 }
 
-
-
 void ms_plugins_init(void) {
-	if (ms_plugins_ref++ >0 ) {
+	ms_plugins_ref++;
+	if ( ms_plugins_ref>1 ) {
 		ms_message ("Skiping ms_plugins_init, because [%i] ref",ms_plugins_ref);
 		return;
 	}
-	if (plugins_dir == NULL) {
-#ifdef PACKAGE_PLUGINS_DIR
-		plugins_dir = ms_strdup(PACKAGE_PLUGINS_DIR);
-#else
-		plugins_dir = ms_strdup("");
-#endif
+	ms_factory_init_plugins(ms_factory_get_fallback());
+}
+
+void ms_plugins_exit(void) {
+	--ms_plugins_ref;
+	if ( ms_plugins_ref>0 ) {
+		ms_message ("Skiping ms_plugins_exit, still [%i] ref",ms_plugins_ref);
+		return;
 	}
-	if (strlen(plugins_dir) > 0) {
-		ms_message("Loading ms plugins from [%s]",plugins_dir);
-		ms_load_plugins(plugins_dir);
-	}
+	ms_factory_uninit_plugins(ms_factory_get_fallback());
 }
 
 void ms_set_plugins_dir(const char *path) {
-	if (plugins_dir != NULL) {
-		ms_free(plugins_dir);
-	}
-	plugins_dir = ms_strdup(path);
+	ms_factory_set_plugins_dir(ms_factory_get_fallback(),path);
 }
 
 void ms_sleep(int seconds){
-#ifdef WIN32
+#ifdef _WIN32
+#ifdef MS2_WINDOWS_DESKTOP
 	Sleep(seconds*1000);
+#else
+	HANDLE sleepEvent = CreateEventEx(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
+	if (!sleepEvent) return;
+	WaitForSingleObjectEx(sleepEvent, seconds * 1000, FALSE);
+#endif
 #else
 	struct timespec ts,rem;
 	int err;
@@ -575,8 +370,14 @@ void ms_sleep(int seconds){
 }
 
 void ms_usleep(uint64_t usec){
-#ifdef WIN32
+#ifdef _WIN32
+#ifdef MS2_WINDOWS_DESKTOP
 	Sleep((DWORD)(usec/1000));
+#else
+	HANDLE sleepEvent = CreateEventEx(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
+	if (!sleepEvent) return;
+	WaitForSingleObjectEx(sleepEvent, usec / 1000, FALSE);
+#endif
 #else
 	struct timespec ts,rem;
 	int err;
@@ -589,17 +390,12 @@ void ms_usleep(uint64_t usec){
 #endif
 }
 
-#define DEFAULT_MAX_PAYLOAD_SIZE 1440
-
-static int max_payload_size=DEFAULT_MAX_PAYLOAD_SIZE;
-
 int ms_get_payload_max_size(){
-	return max_payload_size;
+	return ms_factory_get_payload_max_size(ms_factory_get_fallback());
 }
 
 void ms_set_payload_max_size(int size){
-	if (size<=0) size=DEFAULT_MAX_PAYLOAD_SIZE;
-	max_payload_size=size;
+	ms_factory_set_payload_max_size(ms_factory_get_fallback(),size);
 }
 
 extern void _android_key_cleanup(void*);
@@ -630,7 +426,7 @@ unsigned long ms_concealer_context_get_total_number_of_plc(MSConcealerContext* o
 }
 
 MSConcealerContext* ms_concealer_context_new(unsigned int max_plc_time){
-	MSConcealerContext *obj=(MSConcealerContext *) ms_new(MSConcealerContext,1);
+	MSConcealerContext *obj=(MSConcealerContext *) ms_new0(MSConcealerContext,1);
 	obj->sample_time=-1;
 	obj->plc_start_time=-1;
 	obj->total_number_for_plc=0;
@@ -657,10 +453,10 @@ int ms_concealer_inc_sample_time(MSConcealerContext* obj, uint64_t current_time,
 }
 
 unsigned int ms_concealer_context_is_concealement_required(MSConcealerContext* obj,uint64_t current_time) {
-	
+
 	if(obj->sample_time == -1) return 0; /*no valid value*/
 
-	if (obj->sample_time < current_time){
+	if (obj->sample_time <= current_time){
 		int plc_duration;
 		if (obj->plc_start_time==-1)
 			obj->plc_start_time=obj->sample_time;
@@ -691,7 +487,7 @@ unsigned long ms_concealer_ts_context_get_total_number_of_plc(MSConcealerTsConte
 }
 
 MSConcealerTsContext* ms_concealer_ts_context_new(unsigned int max_plc_ts){
-	MSConcealerTsContext *obj=(MSConcealerTsContext *) ms_new(MSConcealerTsContext,1);
+	MSConcealerTsContext *obj=(MSConcealerTsContext *) ms_new0(MSConcealerTsContext,1);
 	obj->sample_ts=-1;
 	obj->plc_start_ts=-1;
 	obj->total_number_for_plc=0;
@@ -719,7 +515,7 @@ int ms_concealer_ts_context_inc_sample_ts(MSConcealerTsContext* obj, uint64_t cu
 
 unsigned int ms_concealer_ts_context_is_concealement_required(MSConcealerTsContext* obj, uint64_t current_ts) {
 	if(obj->sample_ts == -1) return 0; /*no valid value*/
-	
+
 	if (obj->sample_ts < current_ts){
 		int plc_duration;
 		if (obj->plc_start_ts==-1)
@@ -735,6 +531,37 @@ unsigned int ms_concealer_ts_context_is_concealement_required(MSConcealerTsConte
 		}
 	}
 	return 0;
+}
+
+char *ms_load_file_content(FILE *f, size_t *nbytes){
+	size_t bufsize=2048;
+	size_t step=bufsize;
+	size_t pos=0;
+	size_t count;
+	char *buffer=ms_malloc(bufsize+1);
+	
+	while((count=fread(buffer+pos, 1, step, f))>0){
+		pos+=count;
+		if (pos+step>=bufsize){
+			bufsize*=2;
+			buffer=ms_realloc(buffer, bufsize+1);
+		}
+	}
+	if (nbytes) *nbytes=pos;
+	buffer[pos]='\0';
+	return buffer;
+}
+
+char *ms_load_path_content(const char *path, size_t *nbytes){
+	FILE *f=fopen(path,"rb");
+	char *buffer;
+	if (!f) {
+		ms_error("ms_load_file_content(): could not open [%s]",path);
+		return NULL;
+	}
+	buffer=ms_load_file_content(f, nbytes);
+	fclose(f);
+	return buffer;
 }
 
 /*** plc context end***/

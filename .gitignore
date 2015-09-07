@@ -38,3 +38,15 @@ libs
 tools/test_x11window
 tools/tones
 
+tester/mediastreamer2_tester
+src/gitversion.h
+help/doc/
+tester/recorded_hello8000-1s.wav
+tester/recorded_hello16000-1s.wav
+*.vcxproj.*
+tools/msaudiocmp
+tester/dtmfgen_file.raw
+tester/sounds/recorded_hello16000-1s.wav
+tools/pcap_playback
+git-clang-format.diff
+tools/mkvstream

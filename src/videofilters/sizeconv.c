@@ -43,7 +43,7 @@ typedef struct SizeConvState{
 For now it only supports QCIF->CIF, QVGA->CIF and CIF->CIF (does nothing in this case)*/
 
 static void size_conv_init(MSFilter *f){
-	SizeConvState *s=(SizeConvState *)ms_new(SizeConvState,1);
+	SizeConvState *s=ms_new0(SizeConvState,1);
 	s->target_vsize.width = MS_VIDEO_SIZE_CIF_W;
 	s->target_vsize.height = MS_VIDEO_SIZE_CIF_H;
 	s->in_vsize.width=0;
@@ -154,12 +154,17 @@ static void size_conv_process(MSFilter *f){
 				mblk_t *om=size_conv_alloc_mblk(s);
 				if (ms_scaler_process(sws_ctx,inbuf.planes,inbuf.strides,s->outbuf.planes, s->outbuf.strides)<0){
 					ms_error("MSSizeConv: error in ms_scaler_process().");
+					freemsg(om);
+				}else{
+					ms_queue_put(f->outputs[0],om);
 				}
-				ms_queue_put(f->outputs[0],om);
 				freemsg(im);
 			}
 			s->frame_count++;
-		}else freemsg(im);
+		}else{
+			ms_warning("size_conv_process(): bad buffer.");
+			freemsg(im);
+		}
 	}
 
 	ms_filter_unlock(f);

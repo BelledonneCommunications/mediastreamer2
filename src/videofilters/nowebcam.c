@@ -44,7 +44,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <sys/stat.h>
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <fcntl.h>
 #include <sys/types.h>
 #include <io.h>
@@ -53,15 +53,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #endif
 
 static mblk_t *jpeg2yuv(uint8_t *jpgbuf, int bufsize, MSVideoSize *reqsize){
-#ifndef NO_FFMPEG
+#if !defined(NO_FFMPEG) && !TARGET_OS_IPHONE /* this code must never be used for iOS */
 	AVCodecContext av_context;
 	int got_picture=0;
-	AVFrame orig;
 	mblk_t *ret;
 	struct SwsContext *sws_ctx;
 	AVPacket pkt;
 	MSPicture dest;
 	AVCodec *codec=avcodec_find_decoder(CODEC_ID_MJPEG);
+	AVFrame* orig = av_frame_alloc();
 
 	if (codec==NULL){
 		ms_error("Could not find MJPEG decoder in ffmpeg.");
@@ -77,8 +77,7 @@ static mblk_t *jpeg2yuv(uint8_t *jpgbuf, int bufsize, MSVideoSize *reqsize){
 	pkt.data=jpgbuf;
 	pkt.size=bufsize;
 
-	memset(&orig, 0, sizeof(orig));
-	if (avcodec_decode_video2(&av_context,&orig,&got_picture,&pkt) < 0) {
+	if (avcodec_decode_video2(&av_context,orig,&got_picture,&pkt) < 0) {
 		ms_error("jpeg2yuv: avcodec_decode_video failed");
 		avcodec_close(&av_context);
 		return NULL;
@@ -96,10 +95,10 @@ static mblk_t *jpeg2yuv(uint8_t *jpgbuf, int bufsize, MSVideoSize *reqsize){
 		return NULL;
 	}
 
-#if LIBSWSCALE_VERSION_INT >= AV_VERSION_INT(0,9,0)	
-	if (sws_scale(sws_ctx,(const uint8_t* const *)orig.data,orig.linesize,0,av_context.height,dest.planes,dest.strides)<0){
+#if LIBSWSCALE_VERSION_INT >= AV_VERSION_INT(0,9,0)
+	if (sws_scale(sws_ctx,(const uint8_t* const *)orig->data,orig->linesize,0,av_context.height,dest.planes,dest.strides)<0){
 #else
-	if (sws_scale(sws_ctx,(uint8_t**)orig.data,orig.linesize,0,av_context.height,dest.planes,dest.strides)<0){
+	if (sws_scale(sws_ctx,(uint8_t**)orig->data,orig->linesize,0,av_context.height,dest.planes,dest.strides)<0){
 #endif
 		ms_error("jpeg2yuv: ms_sws_scale() failed.");
 		sws_freeContext(sws_ctx);
@@ -108,13 +107,14 @@ static mblk_t *jpeg2yuv(uint8_t *jpgbuf, int bufsize, MSVideoSize *reqsize){
 		return NULL;
 	}
 	sws_freeContext(sws_ctx);
+	av_frame_free(&orig);
 	avcodec_close(&av_context);
 	return ret;
 #elif TARGET_OS_IPHONE
 	MSPicture dest;
 	CGDataProviderRef dataProvider = CGDataProviderCreateWithData(NULL, jpgbuf, bufsize, NULL);
 	// use the data provider to get a CGImage; release the data provider
-	CGImageRef image = CGImageCreateWithJPEGDataProvider(dataProvider, NULL, FALSE, 
+	CGImageRef image = CGImageCreateWithJPEGDataProvider(dataProvider, NULL, FALSE,
 						kCGRenderingIntentDefault);
 						CGDataProviderRelease(dataProvider);
 	reqsize->width = CGImageGetWidth(image);
@@ -138,7 +138,7 @@ static mblk_t *jpeg2yuv(uint8_t *jpgbuf, int bufsize, MSVideoSize *reqsize){
 			uint8_t b = tmp[y * reqsize->width * 4 + x * 4 + 2];
 
 			// Y
-			*dest.planes[0]++ = (uint8_t)((0.257 * r) + (0.504 * g) + (0.098 * b) + 16);		
+			*dest.planes[0]++ = (uint8_t)((0.257 * r) + (0.504 * g) + (0.098 * b) + 16);
 
 			// U/V subsampling
 			if ((y % 2==0) && (x%2==0)) {
@@ -169,23 +169,24 @@ static mblk_t *jpeg2yuv(uint8_t *jpgbuf, int bufsize, MSVideoSize *reqsize){
 
 
 
-mblk_t *ms_load_jpeg_as_yuv(const char *jpgpath, MSVideoSize *reqsize){
-#if defined(WIN32)
+static mblk_t *_ms_load_jpeg_as_yuv(const char *jpgpath, MSVideoSize *reqsize){
+#if defined(_WIN32)
 	mblk_t *m=NULL;
 	DWORD st_sizel;
 	DWORD st_sizeh;
 	uint8_t *jpgbuf;
 	DWORD err;
 	HANDLE fd;
-	
 #ifdef UNICODE
 	WCHAR wUnicode[1024];
 	MultiByteToWideChar(CP_UTF8, 0, jpgpath, -1, wUnicode, 1024);
-	fd = CreateFile(wUnicode, GENERIC_READ, FILE_SHARE_READ, NULL,
-        OPEN_EXISTING, 0, NULL);
 #else
-	fd = CreateFile(jpgpath, GENERIC_READ, FILE_SHARE_READ, NULL,
-        OPEN_EXISTING, 0, NULL);
+	const char *wUnicode = jpgpath;
+#endif
+#ifndef MS2_WINDOWS_DESKTOP
+	fd = CreateFile2(wUnicode, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, NULL);
+#else
+	fd = CreateFile(wUnicode, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
 #endif
 	if (fd==INVALID_HANDLE_VALUE){
 		ms_error("Failed to open %s",jpgpath);
@@ -193,7 +194,16 @@ mblk_t *ms_load_jpeg_as_yuv(const char *jpgpath, MSVideoSize *reqsize){
 	}
 	st_sizel=0;
 	st_sizeh=0;
+#ifndef MS2_WINDOWS_DESKTOP
+	{
+		WIN32_FILE_ATTRIBUTE_DATA attr_data;
+		GetFileAttributesEx(wUnicode, GetFileExInfoStandard, &attr_data);
+		st_sizel = attr_data.nFileSizeLow;
+		st_sizeh = attr_data.nFileSizeHigh;
+	}
+#else
 	st_sizel = GetFileSize(fd, &st_sizeh);
+#endif
 	if (st_sizeh>0 || st_sizel<=0)
 	{
 		CloseHandle(fd);
@@ -208,8 +218,8 @@ mblk_t *ms_load_jpeg_as_yuv(const char *jpgpath, MSVideoSize *reqsize){
 		return NULL;
 	}
 	err=0;
-	ReadFile(fd, jpgbuf, st_sizel, &err, NULL) ;            
-	
+	ReadFile(fd, jpgbuf, st_sizel, &err, NULL) ;
+
 	if (err!=st_sizel){
 		  ms_error("Could not read as much as wanted !");
 	}
@@ -266,6 +276,51 @@ mblk_t *ms_load_jpeg_as_yuv(const char *jpgpath, MSVideoSize *reqsize){
 #endif
 }
 
+#ifdef MS2_WINDOWS_UNIVERSAL
+typedef mblk_t * (*jpeg2yuv_routine_t)(const char *, MSVideoSize *);
+
+mblk_t * _ms_winrt_load_jpeg_as_yuv(const char *jpgpath, MSVideoSize *reqsize) {
+	mblk_t *result = NULL;
+	HMODULE h = LoadPackagedLibrary(L"mswinrtjpeg2yuv.dll", 0);
+	if (h == NULL) {
+		ms_error("Cannot load mswinrtjpeg2yuv.dll to convert jpeg file to YUV");
+	}
+	else {
+		jpeg2yuv_routine_t routine = (jpeg2yuv_routine_t)GetProcAddress(h, "winrtjpeg2yuv");
+		if (routine == NULL) {
+			ms_error("Cannot find winrtjpeg2yuv routine in mswinrtjpeg2yuv.dll");
+		}
+		else {
+			result = routine(jpgpath, reqsize);
+		}
+	}
+	return result;
+}
+#endif
+
+static mblk_t * generate_black_yuv_frame(MSVideoSize *reqsize) {
+	MSPicture dest;
+	mblk_t *m = ms_yuv_buf_alloc(&dest, reqsize->width, reqsize->height);
+	int ysize = dest.w * dest.h;
+	int usize = ysize / 4;
+	memset(dest.planes[0], 16, ysize);
+	memset(dest.planes[1], 128, usize);
+	memset(dest.planes[2], 128, usize);
+	return m;
+}
+
+mblk_t *ms_load_jpeg_as_yuv(const char *jpgpath, MSVideoSize *reqsize) {
+	mblk_t *m = NULL;
+	if (jpgpath != NULL) {
+#ifdef MS2_WINDOWS_UNIVERSAL
+		m = _ms_winrt_load_jpeg_as_yuv(jpgpath, reqsize);
+#else
+		m = _ms_load_jpeg_as_yuv(jpgpath, reqsize);
+#endif
+	}
+	if (m == NULL) m = generate_black_yuv_frame(reqsize);
+	return m;
+}
 
 
 #ifndef PACKAGE_DATA_DIR
@@ -327,8 +382,8 @@ void static_image_uninit(MSFilter *f){
 
 void static_image_preprocess(MSFilter *f){
 	SIData *d=(SIData*)f->data;
-	if (d->pic==NULL && d->nowebcamimage){
-		d->pic=ms_load_jpeg_as_yuv(d->nowebcamimage,&d->vsize);
+	if (d->pic==NULL) {
+		d->pic = ms_load_jpeg_as_yuv(d->nowebcamimage, &d->vsize);
 	}
 }
 
@@ -395,12 +450,12 @@ static int static_image_set_image(MSFilter *f, void *arg){
 	SIData *d=(SIData*)f->data;
 	const char *image = (const char *)arg;
 	ms_filter_lock(f);
-	
+
 	if (d->nowebcamimage) {
 		ms_free(d->nowebcamimage);
 		d->nowebcamimage=NULL;
 	}
-	
+
 	if (image!=NULL && image[0]!='\0')
 		d->nowebcamimage=ms_strdup(image);
 
@@ -449,7 +504,7 @@ static void static_image_detect(MSWebCamManager *obj);
 
 static void static_image_cam_init(MSWebCam *cam){
 	cam->name=ms_strdup("Static picture");
-	
+
 	if (def_image==NULL)
 		def_image=ms_strdup(def_image_path);
 }

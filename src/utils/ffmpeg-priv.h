@@ -29,6 +29,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "mediastreamer-config.h"
 #endif
 
+#ifdef __clang__
+/*in case of compile with -g static inline can produce this type of warning*/
+#pragma GCC diagnostic ignored "-Wunused-function"
+#endif
+
+
 #include <ortp/port.h>
 
 #if defined(HAVE_LIBAVCODEC_AVCODEC_H)
@@ -43,7 +49,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #  include <libswscale/swscale.h>
 #endif
 
-#if HAVE_LIBAVCODEC_AVCODEC_H
+#if defined(HAVE_LIBAVCODEC_AVCODEC_H)
 #if LIBAVCODEC_VERSION_INT <= AV_VERSION_INT(52,24,0)
 /*should work as long as nobody uses avformat.h*/
 typedef struct AVPacket{
@@ -60,13 +66,20 @@ static inline int avcodec_decode_video2(AVCodecContext *avctx, AVFrame *picture,
 	return avcodec_decode_video(avctx,picture, got_picture_ptr,avpkt->data,avpkt->size);
 }
 #endif
-
-#if (LIBAVCODEC_VERSION_MAJOR >= 56)
+#if HAVE_AVCODEC_OLD_CODEC_IDS 
 #include <libavcodec/old_codec_ids.h>
 #endif
 
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(54,25,0)
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(54,25,0) 
+/*CODEC_ID_* and CodecID have been deprecated for a long time and this release removes it altogether. Please use AV_CODEC_ID_* and AVCodecID instead.*/
 #define CodecID AVCodecID
+#ifndef HAVE_AVCODEC_OLD_CODEC_IDS
+	#define CODEC_ID_H264 AV_CODEC_ID_H264 
+	#define CODEC_ID_H263 AV_CODEC_ID_H263 
+	#define CODEC_ID_H263P AV_CODEC_ID_H263P 
+	#define CODEC_ID_MPEG4 AV_CODEC_ID_MPEG4 
+	#define CODEC_ID_MJPEG AV_CODEC_ID_MJPEG 
+#endif
 #endif
 
 #ifndef HAVE_FUN_avcodec_encode_video2
@@ -81,6 +94,43 @@ AVCodecContext *avcodec_alloc_context3(AVCodec *codec);
 #ifndef HAVE_FUN_avcodec_open2 /**/
 int avcodec_open2 (AVCodecContext *avctx, const AVCodec *codec, /*AVDictionary*/ void **options);
 #endif
+
+#ifndef HAVE_FUN_av_frame_alloc
+AVFrame* av_frame_alloc (void);
+#elif LIBAVCODEC_VERSION_INT < AV_VERSION_INT(55,45,101)
+#define av_frame_alloc avcodec_alloc_frame
+/*http://git.videolan.org/?p=ffmpeg.git;a=blob;f=doc/APIchanges
+ 2013-12-11 - 29c83d2 / b9fb59d,409a143 / 9431356,44967ab / d7b3ee9 - lavc 55.45.101 / 55.28.1 - avcodec.h
+   av_frame_alloc(), av_frame_unref() and av_frame_free() now can and should be
+   used instead of avcodec_alloc_frame(), avcodec_get_frame_defaults() and
+   avcodec_free_frame() respectively. The latter three functions are deprecated.
+*jehan: previous version (55.39.100 at least) might be buggy */
+#endif
+
+#ifndef HAVE_FUN_av_frame_free
+void av_frame_free (AVFrame** frame);
+#elif LIBAVCODEC_VERSION_INT < AV_VERSION_INT(55,45,101)
+#define av_frame_free avcodec_free_frame
+/*http://git.videolan.org/?p=ffmpeg.git;a=blob;f=doc/APIchanges
+ 2013-12-11 - 29c83d2 / b9fb59d,409a143 / 9431356,44967ab / d7b3ee9 - lavc 55.45.101 / 55.28.1 - avcodec.h
+   av_frame_alloc(), av_frame_unref() and av_frame_free() now can and should be
+   used instead of avcodec_alloc_frame(), avcodec_get_frame_defaults() and
+   avcodec_free_frame() respectively. The latter three functions are deprecated.
+*jehan: previous version (55.39.100 at least) might be buggy */
+#endif
+
+#ifndef HAVE_FUN_av_frame_unref
+void av_frame_unref (AVFrame *frame);
+#elif LIBAVCODEC_VERSION_INT < AV_VERSION_INT(55,45,101)
+#define av_frame_unref avcodec_get_frame_defaults
+/*http://git.videolan.org/?p=ffmpeg.git;a=blob;f=doc/APIchanges
+ 2013-12-11 - 29c83d2 / b9fb59d,409a143 / 9431356,44967ab / d7b3ee9 - lavc 55.45.101 / 55.28.1 - avcodec.h
+   av_frame_alloc(), av_frame_unref() and av_frame_free() now can and should be
+   used instead of avcodec_alloc_frame(), avcodec_get_frame_defaults() and
+   avcodec_free_frame() respectively. The latter three functions are deprecated.
+ *jehan: previous version (55.39.100 at least) might be buggy */
+#endif
+
 
 #endif /*iHAVE_LIBAVCODEC_AVCODEC_H*/
 #endif /* FFMPEG_PRIV_H */

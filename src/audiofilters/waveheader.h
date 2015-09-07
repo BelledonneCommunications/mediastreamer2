@@ -33,6 +33,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #	ifndef W_OK
 #		define W_OK 0x6
 #	endif
+#   ifndef F_OK
+#       define F_OK 0x0
+#   endif
 
 #	ifndef S_IRUSR
 #	define S_IRUSR S_IREAD
@@ -59,7 +62,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifdef swap16
 #else
 /* all integer in wav header must be read in least endian order */
-static inline uint16_t swap16(uint16_t a)
+static MS2_INLINE uint16_t swap16(uint16_t a)
 {
 	return ((a & 0xFF) << 8) | ((a & 0xFF00) >> 8);
 }
@@ -67,7 +70,7 @@ static inline uint16_t swap16(uint16_t a)
 
 #ifdef swap32
 #else
-static inline uint32_t swap32(uint32_t a)
+static MS2_INLINE uint32_t swap32(uint32_t a)
 {
 	return ((a & 0xFF) << 24) | ((a & 0xFF00) << 8) | 
 		((a & 0xFF0000) >> 8) | ((a & 0xFF000000) >> 24);
@@ -117,7 +120,15 @@ typedef struct _wave_header_t
 	data_t data_chunk;
 } wave_header_t;
 
+#ifndef WIN32
+#define WAVE_FORMAT_PCM			0x0001
+#define WAVE_FORMAT_IEEE_FLOAT	0x0003
+#define WAVE_FORMAT_ALAW		0x0006
+#define WAVE_FORMAT_MULAW		0x0007
+#define WAVE_FORMAT_EXTENSIBLE	0xFFFE
+#endif
 
+#define wave_header_get_format_type(header)	le_uint16((header)->format_chunk.type)
 #define wave_header_get_rate(header)		le_uint32((header)->format_chunk.rate)
 #define wave_header_get_channel(header)		le_uint16((header)->format_chunk.channel)
 #define wave_header_get_bpsmpl(header) \

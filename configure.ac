@@ -1,9 +1,13 @@
 dnl Process this file with autoconf to produce a configure script.
-AC_INIT([mediastreamer],[2.10.0])
+AC_INIT([mediastreamer],[2.11.2])
 
 AC_MSG_NOTICE([$PACKAGE_NAME-$PACKAGE_VERSION		A mediastreaming library for telephony application.])
 AC_MSG_NOTICE([licensed under the terms of the General Public License (GPL)])
 
+dnl do not put anything else before AC_PROG_CC unless checking if macro still work for clang
+AC_PROG_CXX(["xcrun clang++" g++])
+AC_PROG_CC(["xcrun clang" gcc])
+AC_PROG_OBJC(["xcrun clang" gcc])
 AC_CANONICAL_SYSTEM
 
 dnl Source packaging numbers
@@ -12,7 +16,7 @@ MEDIASTREAMER_MINOR_VERSION=$(echo $PACKAGE_VERSION | cut -d. -f2)
 MEDIASTREAMER_MICRO_VERSION=$(echo $PACKAGE_VERSION | cut -d. -f3)
 MEDIASTREAMER_EXTRA_VERSION=$(echo $PACKAGE_VERSION | cut -d. -f4)
 
-LIBMEDIASTREAMER_SO_CURRENT=3 dnl increment this number when you add/change/remove an interface
+LIBMEDIASTREAMER_SO_CURRENT=5 dnl increment this number when you add/change/remove an interface
 LIBMEDIASTREAMER_SO_REVISION=0 dnl increment this number when you change source code, without changing interfaces; set to 0 when incrementing CURRENT
 LIBMEDIASTREAMER_SO_AGE=0 dnl increment this number when you add an interface, set to 0 if you remove an interface
 
@@ -45,27 +49,45 @@ MS_PUBLIC_CFLAGS=
 gl_LD_OUTPUT_DEF
 
 AC_MSG_CHECKING([warning make an error on compilation])
+
 AC_ARG_ENABLE(strict,
-	[AS_HELP_STRING([--enable-strict], [Enable error on compilation warning (default=no)])],
-	[wall_werror=$enableval],
-	[wall_werror=yes]
+	AC_HELP_STRING([--enable-strict], [Build with stricter options @<:@yes@:>@]),
+	[strictness="${enableval}"],
+	[strictness=yes]
 )
 
-CFLAGS="-DORTP_INET6 $CFLAGS "
+STRICT_OPTIONS="-Wall -Wuninitialized"
+STRICT_OPTIONS_CC="-Wdeclaration-after-statement "
+STRICT_OPTIONS_CXX=""
 
-dnl enable ipv6 support
-AC_ARG_ENABLE(ipv6,
-	[AS_HELP_STRING([--enable-ipv6], [Turn on IPv6 support (default=yes)])],
-	[case "${enableval}" in
-		yes)	ipv6=true;;
-		no)	ipv6=false;;
-		*)	AC_MSG_ERROR(bad value ${enableval} for --enable-ipv6) ;;
-	esac],
-	[ipv6=true]
-)
-if test x$ipv6 = xtrue ; then
-	CFLAGS="$CFLAGS -DINET6"
+#for clang
+
+case $CC in
+	*clang*)
+		STRICT_OPTIONS="$STRICT_OPTIONS -Qunused-arguments -Wno-unused-function "
+		#disabled due to wrong optimization false positive with small string
+		#(cf. https://gcc.gnu.org/bugzilla/show_bug.cgi?id=35903)
+		STRICT_OPTIONS="$STRICT_OPTIONS -Wno-array-bounds "
+	;;
+esac
+
+# because Darwin's gcc is actually clang, we need to check it...
+case "$target_os" in
+	*darwin*)
+	STRICT_OPTIONS="$STRICT_OPTIONS -Wno-error=unknown-warning-option -Qunused-arguments -Wno-tautological-compare -Wno-unused-function "
+	#disabled due to wrong optimization false positive with small string
+	#(cf. https://gcc.gnu.org/bugzilla/show_bug.cgi?id=35903)
+	STRICT_OPTIONS="$STRICT_OPTIONS -Wno-array-bounds "
+	;;
+esac
+
+if test "$strictness" = "yes" ; then
+	STRICT_OPTIONS="$STRICT_OPTIONS -Werror"
+	CFLAGS="$CFLAGS -fno-strict-aliasing"
 fi
+AC_SUBST(STRICT_OPTIONS)
+AC_SUBST(STRICT_OPTIONS_CC)
+AC_SUBST(STRICT_OPTIONS_CXX)
 
 dnl enable timestamp support
 AC_ARG_ENABLE(ntp-timestamp,
@@ -78,10 +100,6 @@ AC_ARG_ENABLE(ntp-timestamp,
 	[ntptimestamp=false]
 )
 
-dnl Checks for programs.
-AC_PROG_CXX
-AC_PROG_CC
-AC_PROG_OBJC
 
 AC_CONFIG_MACRO_DIR([m4])
 LT_INIT([win32-dll shared disable-static])
@@ -111,9 +129,9 @@ AC_ARG_ENABLE([debug],
 
 AS_CASE([$enable_debug],
 		[yes],[
-			CFLAGS="$CFLAGS -g -DDEBUG"
-			CXXFLAGS="$CXXFLAGS -g -DDEBUG"
-			OBJCFLAGS="$OBJCFLAGS -g -DDEBUG"
+			CFLAGS="$CFLAGS -g -O0 -DDEBUG"
+			CXXFLAGS="$CXXFLAGS -g -O0 -DDEBUG"
+			OBJCFLAGS="$OBJCFLAGS -g -O0 -DDEBUG"
 		],
 		[no],
 		[
@@ -129,6 +147,18 @@ AS_CASE([$enable_debug],
 		],
 		[AC_MSG_ERROR([Bad value ($enable_debug) for --enable-debug. Valid values are yes or no.])])
 
+AC_ARG_ENABLE(non-free-codecs,
+	AC_HELP_STRING([--enable-non-free-codecs], [Include non-free codecs in build @<:@yes@:>@]),
+	[non_free_codecs="${enableval}"],
+	[non_free_codecs=yes]
+)
+
+if test "$non_free_codecs" = "yes" ; then
+	AC_DEFINE(HAVE_NON_FREE_CODECS, 1, [whether non free codecs are allowed in the build])
+else
+	AC_DEFINE(HAVE_NON_FREE_CODECS, 0, [whether non free codecs are allowed in the build])
+fi
+
 dnl Checks for header files.
 AC_HEADER_STDC
 
@@ -141,40 +171,33 @@ if test x$ac_cv_c_bigendian = xyes ; then
 	CFLAGS="$CFLAGS -D_BIGENDIAN "
 fi
 
-if test $GCC = yes && test $wall_werror = yes;  then
-	CFLAGS="$CFLAGS -Werror -Wno-error=deprecated-declarations"
-	OBJCFLAGS="$OBJCFLAGS -Werror"
-fi
-
 macosx_found=no
-ios_found=false
 mingw32ce_found=no
 ios_found=no
 
 dnl add thread flags
 case $host in
-	i386-apple*|armv6-apple*|armv7-apple*|armv7s-apple*)
+	i386-apple*|armv6-apple*|armv7-apple*|armv7s-apple*|aarch64-apple*|arm64-apple*|*-darwin.ios)
 		ios_found=yes
 	;;
 	x86_64-apple*|i686-apple*)
 		macosx_found=yes
-                LIBS="$LIBS -mmacosx-version-min=10.6"
-                CXXFLAGS="$CXXFLAGS -mmacosx-version-min=10.6"
-                CFLAGS="$CFLAGS -mmacosx-version-min=10.6"
-		OBJCFLAGS="$OBJCFLAGS -mmacosx-version-min=10.6"
-		
+		OBJCFLAGS="$OBJCFLAGS -Wno-error=deprecated-declarations"
 	;;
   	*mingw32ce)
-		CFLAGS="$CFLAGS -DINET6 -DORTP_INET6 -D_WIN32_WINNT=0x0501  -D_WIN32_WCE  -DORTP_STATIC"
-		CXXFLAGS="$CXXFLAGS -DINET6 -DORTP_INET6 -D_WIN32_WINNT=0x0501 -DORTP_STATIC  -D_WIN32_WCE"
+		CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0501  -D_WIN32_WCE  -DORTP_STATIC"
+		CXXFLAGS="$CXXFLAGS -D_WIN32_WINNT=0x0501 -DORTP_STATIC  -D_WIN32_WCE"
 dnl ORTP_STATIC to tell ortp not to export its variable with dllexport, as if we were building statically, or dynamically on linux
 	  	LIBS="$LIBS -lws2"
 		mingw_found=yes
 		mingw32ce_found=yes
 	;;
 	*mingw*)
-		CFLAGS="$CFLAGS -DINET6 -DORTP_INET6 -D_WIN32_WINNT=0x0501 -DORTP_STATIC"
-		CXXFLAGS="$CXXFLAGS -DINET6 -DORTP_INET6 -D_WIN32_WINNT=0x0501 -DORTP_STATIC"
+		dnl Workaround for mingw, whose compiler does not check in /usr/include ...
+		CPPFLAGS="$CPPFLAGS -I/usr/include"
+		LDFLAGS="$LDFLAGS -L/usr/lib"
+		CFLAGS="$CFLAGS -D_WIN32_WINNT=0x0501 -DORTP_STATIC"
+		CXXFLAGS="$CXXFLAGS -D_WIN32_WINNT=0x0501 -DORTP_STATIC"
 dnl ORTP_STATIC to tell ortp not to export its variable with dllexport, as if we were building statically, or dynamically on linux
 		LIBS="$LIBS -lws2_32 -lwinmm "
 		mingw_found=yes
@@ -214,7 +237,7 @@ else
 	if test "$USE_NLS" = "yes" ; then
 		AC_DEFINE(ENABLE_NLS,1,[Tells whether localisation is possible])
 		AC_DEFINE(HAVE_GETTEXT,1,[Tells wheter localisation is possible])
-		LIBS="$LIBS -lintl"
+		LIBS="$LIBS -L/usr/lib -lintl"
 	fi
 fi
 
@@ -233,6 +256,21 @@ AC_CONFIG_COMMANDS([libtool-hacking],
 	[mingw_found=$mingw_found]
 )
 
+dnl conditionnal build of tools.
+AC_ARG_ENABLE(tools,
+	[AS_HELP_STRING([--enable-tools=[yes/no]], [Turn on or off compilation of console interface (default=yes)])],
+	[case "${enableval}" in
+		yes)	build_tools=true ;;
+		no)	build_tools=false ;;
+		*)	AC_MSG_ERROR(bad value ${enableval} for --enable-tools) ;;
+	esac],
+	[build_tools=check]
+)
+AM_CONDITIONAL(BUILD_TOOLS, test x$build_tools != xfalse)
+if test "$build_tools" != "false" ; then
+	build_tools=true
+	AC_DEFINE(BUILD_TOOLS, 1, [Define if tools enabled] )
+fi
 
 dnl prefer fixed point computations
 AC_ARG_ENABLE(fixed_point,
@@ -574,6 +612,63 @@ fi
 
 fi
 
+
+
+
+dnl check for matroska file support
+AC_ARG_ENABLE(matroska,
+	[AS_HELP_STRING([--enable-matroska], [Enable mkv file support])],
+	[case "${enableval}" in
+		yes)	matroska=true ;;
+		no)	matroska=false ;;
+		*)	AC_MSG_ERROR(bad value ${enableval} for --enable-matroska) ;;
+	esac],
+	[matroska=guess]
+)
+AC_ARG_WITH(ebml,
+	[AS_HELP_STRING([--with-ebml],[Sets the installation prefix of ebml library (v2) [default=/usr]])],
+	[ ebmldir=${withval} ],
+	[ ebmldir=/usr ]
+)
+AC_ARG_WITH(matroska,
+	[AS_HELP_STRING([--with-matroska],[Sets the installation prefix of matroska library (v2) [default=/usr]])],
+	[ matroskadir=${withval} ],
+	[ matroskadir=/usr ]
+)
+
+if test x$matroska != xfalse ; then
+
+build_matroska=yes
+if test x"$ebmldir" != xno ; then
+	MS_CHECK_DEP([ebml library],[EBML],[${ebmldir}/include],
+		[${ebmldir}/lib],[ebml/ebml.h],[ebml2],[EBML_ElementRender])
+	if test "$EBML_found" = "no" ; then
+		build_matroska=no
+		if test "$matroska" = "true" ; then
+			AC_MSG_ERROR([Could not locate ebml headers or library.])
+		fi
+	fi
+else
+	build_matroska=no
+fi
+
+if test x"$matroskadir" != xno ; then
+	MS_CHECK_DEP([matroska library],[MATROSKA],[${matroskadir}/include],
+		[${matroskadir}/lib],[matroska/matroska.h],[matroska2],[MATROSKA_BlockReleaseData],[-lebml2])
+	if test "$MATROSKA_found" = "trueno" ; then
+		build_matroska=no
+		if test "$matroska" = "true" ; then
+			AC_MSG_ERROR([Could not locate matroska headers or library.])
+		fi
+	fi
+else
+	build_matroska=no
+fi
+
+fi
+
+
+
 dnl check for spandsp support to bring up g726 codec
 AC_ARG_ENABLE(spandsp,
 	[AS_HELP_STRING([--disable-spandsp], [Disable spandsp support])],
@@ -608,15 +703,15 @@ AC_ARG_ENABLE(upnp,
 )
 
 if test "$build_upnp" != "false" ; then
-	PKG_CHECK_MODULES([LIBUPNP], [libupnp], 
+	PKG_CHECK_MODULES([LIBUPNP], [libupnp],
 		[if  pkg-config --atleast-version=1.6 "libupnp < 1.7"; then
 			build_upnp=true
 			old_CFLAGS="$CFLAGS"
-			CFLAGS="$CFLAGS $LIBUPNP_CFLAGS -Wno-error=unused-variable"
+			CFLAGS="$CFLAGS $LIBUPNP_CFLAGS -Werror -Wno-error=unused-variable"
 			AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 				#include <upnp.h>
 			]], [[
-				struct Upnp_Action_Complete aa;
+				struct Upnp_Action_Complete aa={0};
 				char *url = aa.CtrlUrl;
 			]])],,
 			AC_DEFINE(USE_PATCHED_UPNP, 1, [Define if upnp is patched]))
@@ -653,6 +748,7 @@ fi
 
 AM_CONDITIONAL(BUILD_OPUS, test x$have_opus = xtrue)
 AM_CONDITIONAL(BUILD_GSM, test x$build_gsm = xyes )
+AM_CONDITIONAL(BUILD_MATROSKA, test x$build_matroska = xyes )
 AM_CONDITIONAL(BUILD_G726, test "$have_spandsp" = "true" )
 
 MS_CHECK_VIDEO
@@ -698,9 +794,11 @@ AC_ARG_ENABLE(external-ortp,
 
 if test "$ortp_enabled" = 'true'; then
 	if test "$external_ortp" = 'false'; then
-		if test -e $srcdir/../oRTP/include/ortp/ortp.h ; then
+		if test -e ../oRTP/ortp.defs ; then
 			echo "building from linphone source tree, using ../oRTP/include/ortp/ortp.h"
 			ORTP_CFLAGS="-I\$(top_srcdir)/../oRTP/include"
+			ORTP_DEFS=`cat ../oRTP/ortp.defs`
+			ORTP_CFLAGS="$ORTP_CFLAGS $ORTP_DEFS"
 			ORTP_LIBS="\$(top_builddir)/../oRTP/src/libortp.la"
 			if test x$ac_cv_c_bigendian = xyes ; then
 				ORTP_CFLAGS="$ORTP_CFLAGS -DORTP_BIGENDIAN"
@@ -713,7 +811,7 @@ if test "$ortp_enabled" = 'true'; then
 		fi
 	fi
 	if test "$external_ortp" = 'true'; then
-		PKG_CHECK_MODULES(ORTP, ortp >= 0.21.0, ,
+		PKG_CHECK_MODULES(ORTP, ortp >= 0.24.0, ,
 			[ AC_MSG_ERROR([Couldn't find ortp library]) ] )
 	fi
 else
@@ -831,6 +929,11 @@ PKG_CHECK_MODULES(LIBV4L1, libv4l1,
 	have_libv4l1=yes],
 	[echo "No libv4l1 found."]
 )
+PKG_CHECK_MODULES(LIBV4LCONVERT, libv4lconvert,
+	[AC_DEFINE(HAVE_LIBV4LCONVERT,1,[Defined if we have libv4lconvert])
+	have_libv4lconvert=yes],
+	[echo "No libv4lconvert found."]
+)
 
 if test "$found_v4l2" = "yes" && test "$have_libv4l2" != "yes" ; then
 	if test "$video" = "true" && test "$libv4l2" = "yes" ; then
@@ -865,7 +968,7 @@ if test x$enable_pcap == xyes ; then
 		AC_SUBST(PCAP_CFLAGS)
 		AC_DEFINE(HAVE_PCAP,1,[whether we compile with libpcap support])
 	fi
-	
+
 fi
 
 
@@ -928,12 +1031,238 @@ case "$target_os" in
 	;;
 esac
 
+dnl check for libsrtp support (secure rtp)
+AC_ARG_WITH(srtp,
+	AC_HELP_STRING([--with-srtp], [Set prefix where libsrtp can be found or "none" to disable (ex:/usr or /usr/local) [[default=/usr]]]),
+	[srtp_prefix=$withval],
+	[if test "$prefix" != "NONE"; then
+		srtp_prefix=$prefix
+	 else
+		srtp_prefix="/usr"
+	 fi])
+
+if test "${srtp_prefix}" != "none" ; then
+	if test "${srtp_prefix}" != "/usr" ; then
+		SRTP_CFLAGS="-I${srtp_prefix}/include -I${srtp_prefix}/include/srtp"
+		SRTP_LIBS="-L${srtp_prefix}/lib"
+	fi
+	SRTP_LIBS="$SRTP_LIBS -lsrtp"
+
+	dnl check srtp headers
+	CPPFLAGS_save=$CPPFLAGS
+	CPPFLAGS="$CPPFLAGS $SRTP_CFLAGS"
+	AC_CHECK_HEADER([srtp/srtp.h],have_srtp_headers=yes)
+	CPPFLAGS=$CPPFLAGS_save
+
+	dnl check for srtp lib
+	LDFLAGS_save=$LDFLAGS
+	LDFLAGS="$LDFLAGS $SRTP_LIBS"
+	LIBS_save=$LIBS
+	AC_CHECK_LIB(srtp,[srtp_init, crypto_policy_set_aes_cm_256_hmac_sha1_80, crypto_policy_set_aes_cm_256_hmac_sha1_32], have_srtp_lib=yes)
+	LDFLAGS=$LDFLAGS_save
+	LIBS=$LIBS_save
+
+	if test "$have_srtp_headers$have_srtp_lib" = "yesyes" ; then
+		LDFLAGS_save=$LDFLAGS
+		LIBS_save=$LIBS
+		LDFLAGS="$LDFLAGS $SRTP_LIBS"
+		AC_CHECK_LIB(
+			srtp,
+			sha1_update,[
+				AC_MSG_WARN([This libsrtp version exports symbols conflicting with polarssl, resulting in a bad execution path. libsrtp will be statically linked])
+				srtp_polarssl_conflict=yes
+			],
+			srtp_polarssl_conflict=no
+		)
+		LDFLAGS=$LDFLAGS_save
+		LIBS=$LIBS_save
+
+		if test "$srtp_polarssl_conflict" = "yes"; then
+			srtp_static_lib="${srtp_prefix}/lib/libsrtp.a"
+			if test -f $srtp_static_lib -a -r $srtp_static_lib; then
+				SRTP_LIBS="${srtp_prefix}/lib/libsrtp.a -Bsymbolic -Wl,--version-script=\$(top_srcdir)/src/libsrtp.map"
+				AC_DEFINE(HAVE_SRTP, 1, [Defined when srtp support is compiled])
+				have_srtp=true
+			else
+				AC_MSG_WARN([Could not access to $srtp_static_lib. Please use --with-srtp=PREFIX to specify the prefix where libsrtp.a has been installed])
+				SRTP_CFLAGS=
+				SRTP_LIBS=
+				have_srtp=true
+			fi
+		else
+			AC_DEFINE(HAVE_SRTP, 1, [Defined when srtp support is compiled])
+			have_srtp=true
+		fi
+
+	else
+		AC_MSG_NOTICE([Could not find libsrtp headers or lib, cryto transport disabled.])
+		have_srtp=false
+		SRTP_CFLAGS=
+		SRTP_LIBS=
+	fi
+
+	AC_SUBST(SRTP_CFLAGS)
+	AC_SUBST(SRTP_LIBS)
+else
+	have_srtp=false
+	SRTP_CFLAGS=
+	SRTP_LIBS=
+fi
+
+
+dnl check for libzrtp support (RFC 6189: Media Path Key Agreement for Unicast Secure RTP)
+AC_ARG_ENABLE(zrtp,
+	[AS_HELP_STRING([--enable-zrtp], [Turn on or off compilation of zrtp (default=detect)])],
+	[case "${enableval}" in
+		yes)	zrtp=true ;;
+		no)	zrtp=false ;;
+		*)	AC_MSG_ERROR(bad value ${enableval} for --enable-zrtp) ;;
+	esac],
+	[zrtp=detect]
+)
+
+if test "$zrtp" != "false" ; then
+	PKG_CHECK_MODULES(LIBBZRTP, libbzrtp >= 1.0.0, found_zrtp=true, found_zrtp=false)
+	if test "$zrtp$found_zrtp" = "truefalse" ; then
+		AC_MSG_ERROR("Cound not find bZRTP library.")
+	fi
+	if test "$found_zrtp" = "true" ; then
+		if test "$have_srtp" = "false" ; then
+			if test "$zrtp" = "true" ; then
+				AC_MSG_ERROR("ZRTP requires SRTP")
+			else
+				AC_MSG_WARN("ZRTP requires SRTP")
+				zrtp=false
+			fi
+		else
+			AC_DEFINE(HAVE_ZRTP, 1, [Defined when zrtp support is compiled])
+			LIBS="$LIBS $LIBBZRTP_LIBS"
+			CFLAGS="$CFLAGS $LIBBZRTP_CFLAGS"
+			zrtp=true
+		fi
+	else
+		zrtp=false
+	fi
+fi
+
+AM_CONDITIONAL(LIBBZRTP,test x$zrtp != xfalse)
+
+dnl Polarssl lib is requested for DTLS
+AC_ARG_WITH( polarssl,
+      [  --with-polarssl      Set prefix where polarssl can be found (ex:/usr, /usr/local)[[default=PREFIX or /usr if NONE]] ],
+      [ polarssl_prefix=${withval}],[ if test "$prefix" != "NONE"; then
+					polarssl_prefix=${prefix}
+				      else
+					polarssl_prefix="/usr"
+				      fi ])
+
+found_polarssl=no
+
+if test "$polarssl_prefix" != "none" ; then
+	if test "$polarssl_prefix" != "/usr" ; then
+		POLARSSL_CFLAGS="-I${polarssl_prefix}/include"
+		POLARSSL_LIBS="-L${polarssl_prefix}/lib"
+	fi
+
+	CPPFLAGS_save=$CPPFLAGS
+	LIBS_save=$LIBS
+
+	CPPFLAGS="$CPPFLAGS $POLARSSL_CFLAGS"
+	LIBS="$LIBS $POLARSSL_LIBS"
+	AC_CHECK_LIB(mbedtls, sha1_update , [found_polarssl=yes POLARSSL_LIBS="$POLARSSL_LIBS -lmbedtls"],
+					 [AC_CHECK_LIB(polarssl, sha1_update, [found_polarssl=yes POLARSSL_LIBS="$POLARSSL_LIBS -lpolarssl"],[AC_MSG_NOTICE([polarssl library not found !])])])
+ 
+	if test "x$found_polarssl" == "xyes" ; then
+		AC_CHECK_HEADERS(polarssl/ssl.h, [found_polarssl=yes],[found_polarssl=no POLARSSL_CFLAGS="" POLARSSL_LIBS=""])
+	fi
+	CPPFLAGS=$CPPFLAGS_save
+	LIBS=$LIBS_save
+fi
+
+dnl check for DTLS-SRTP support, need polarssl version >= 1.4
+AC_ARG_ENABLE(dtls,
+	[AS_HELP_STRING([--enable-dtls], [Turn on or off compilation of dtls (default=no)])],
+	[case "${enableval}" in
+		yes)	dtls=true ;;
+		no)	dtls=false ;;
+		*)	AC_MSG_ERROR(bad value ${enableval} for --enable-dtls) ;;
+	esac],
+	[dtls=false]
+)
+
+if test "$dtls" = "true" ; then
+	if test "$have_srtp" = "false" ; then
+		AC_MSG_ERROR("DTLS-SRTP requires SRTP")
+	fi
+
+	if test "x$found_polarssl" != "xyes" ; then
+		AC_MSG_ERROR("DTLS-SRTP requires POLARSSL")
+	fi
+	dnl check for polarssl presence and support for DTLS
+	CPPFLAGS_save=$CPPFLAGS
+	LIBS_save=$LIBS
+
+	CPPFLAGS="$CPPFLAGS $POLARSSL_CFLAGS"
+	LIBS="$LIBS $POLARSSL_LIBS"
+	AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+		#include <polarssl/ssl.h>
+		]],
+		[[ssl_set_dtls_srtp_protection_profiles(0,0,0)]])],
+		[AC_DEFINE(HAVE_DTLS, 1, [Defined when dtls support is compiled])
+		AC_MSG_NOTICE([polarssl usable for DTLS-SRTP])],[AC_MSG_ERROR([polarssl not usable for DTLS-SRTP])])
+
+	CPPFLAGS=$CPPFLAGS_save
+	LIBS=$LIBS_save
+else
+	echo "DTLS-SRTP compilation is disabled."
+fi
+
+AC_SUBST(POLARSSL_CFLAGS)
+AC_SUBST(POLARSSL_LIBS)
+
+dnl check for bcg729 annexB presence to use for VAD/DTX (RFC3389 : Real-time Transport Protocol (RTP) Payload for Comfort Noise (CN))
+AC_ARG_ENABLE(g729bCN,
+	[AS_HELP_STRING([--enable-g729bCN], [Turn on or off usage of G729AnnexB in RFC3389 implementation of Comfort Noise Payload (default=no)])],
+	[case "${enableval}" in
+		yes)	g729bCN=true ;;
+		no)	g729bCN=false ;;
+		*)	AC_MSG_ERROR(bad value ${enableval} for --enable-g729bCN) ;;
+	esac],
+	[g729bCN=false]
+)
+
+if test "$g729bCN" = "true" ; then
+	PKG_CHECK_MODULES(LIBBCG729, libbcg729 >= 1.0)
+
+	AC_DEFINE(HAVE_G729B, 1, [Defined when use of g729AnnexB Comfort Noise and RFC3389 support is compiled])
+
+	LIBS="$LIBS $LIBBCG729_LIBS"
+	CFLAGS="$CFLAGS $LIBBCG729_CFLAGS"
+else
+	echo "G729 AnnexB in RFC3389 is disabled."
+fi
+AM_CONDITIONAL(LIBBCG729,test x$g729bCN != xfalse)
+
 dnl ##################################################
 dnl # Check for doxygen
 dnl ##################################################
 
-AC_PATH_PROG(DOXYGEN,doxygen,false)
-AM_CONDITIONAL(HAVE_DOXYGEN, test $DOXYGEN != false)
+AC_ARG_ENABLE(documentation,
+	[AS_HELP_STRING([--enable-documentation], [Documentation generation using doxygen (default=yes)])],
+	[case "${enableval}" in
+		yes)	documentation_enabled=yes;;
+		no)		documentation_enabled=no;;
+		*)		AC_MSG_ERROR("Bad value for --enable-documentation");;
+	esac],
+	[documentation_enabled=yes]
+)
+if test "$documentation_enabled" = "yes" ; then
+	AC_CHECK_PROG(DOXYGEN,doxygen,doxygen,false)
+else
+	DOXYGEN=false
+fi
+AC_CHECK_PROG(DOXYGEN,doxygen,doxygen,false)
+AM_CONDITIONAL(HAVE_DOXYGEN, test "$DOXYGEN" != "false")
 
 
 dnl ##################################################
@@ -949,7 +1278,7 @@ AM_CONDITIONAL(WITH_EPM,test $EPM != false && test $MKEPMLIST != false && test $
 dnl Check for xxd
 AC_CHECK_PROG(xxd_found, xxd, yes)
 if test "$xxd_found" != yes ;then
- 	AC_MSG_ERROR("xxd is required")
+ 	AC_MSG_ERROR("xxd is required (provided by vim package)")
 fi
 
 # Preferred packaging system, as per EPM terminology
@@ -1035,3 +1364,12 @@ AC_CONFIG_FILES(
 )
 
 AC_OUTPUT
+
+echo "Mediastreamer2 build configuration ended."
+echo "Summary of build options:"
+printf "* %-30s %s\n" "Video support"		$video
+printf "* %-30s %s\n" "sRTP encryption"		$have_srtp
+printf "* %-30s %s\n" "zRTP encryption"		$zrtp
+printf "* %-30s %s\n" "SRTP-DTLS encryption"	$dtls
+printf "* %-30s %s\n" "Non-free codecs" 	$non_free_codecs
+

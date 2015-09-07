@@ -77,6 +77,7 @@ static void android_display_preprocess(MSFilter *f){
 #define LANDSCAPE 0
 #define PORTRAIT 1
 
+#if 0
 static int vsize_get_orientation(MSVideoSize vs){
 	return vs.width>=vs.height ? LANDSCAPE : PORTRAIT;
 }
@@ -92,6 +93,7 @@ static void select_orientation(AndroidDisplay *ad, MSVideoSize wsize, MSVideoSiz
 		ad->orientation_change_pending=TRUE;
 	}
 }
+#endif
 
 
 static void android_display_process(MSFilter *f){
@@ -207,7 +209,7 @@ MSFilterDesc ms_android_display_desc={
 };
 
 
-bool_t libmsandroiddisplay_init(void){
+bool_t libmsandroiddisplay_init(MSFactory *factory){
 	/*See if we can use AndroidBitmap_* symbols (only since android 2.2 normally)*/
 	void *handle=NULL;
 	handle=dlopen("libjnigraphics.so",RTLD_LAZY);
@@ -220,7 +222,7 @@ bool_t libmsandroiddisplay_init(void){
 			|| sym_AndroidBitmap_unlockPixels==NULL){
 			ms_warning("AndroidBitmap not available.");
 		}else{
-			ms_filter_register(&ms_android_display_desc);
+			ms_factory_register_filter(factory,&ms_android_display_desc);
 			ms_message("MSAndroidDisplay registered.");
 			return TRUE;
 		}

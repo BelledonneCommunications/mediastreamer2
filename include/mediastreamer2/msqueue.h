@@ -38,24 +38,36 @@ typedef struct _MSQueue
 
 MS2_PUBLIC MSQueue * ms_queue_new(struct _MSFilter *f1, int pin1, struct _MSFilter *f2, int pin2 );
 
-static inline mblk_t *ms_queue_get(MSQueue *q){
+static MS2_INLINE mblk_t *ms_queue_get(MSQueue *q){
 	return getq(&q->q);
 }
 
-static inline void ms_queue_put(MSQueue *q, mblk_t *m){
+static MS2_INLINE void ms_queue_put(MSQueue *q, mblk_t *m){
 	putq(&q->q,m);
 	return;
 }
 
-static inline mblk_t * ms_queue_peek_last(MSQueue *q){
+static MS2_INLINE mblk_t * ms_queue_peek_last(MSQueue *q){
 	return qlast(&q->q);
 }
 
-static inline void ms_queue_remove(MSQueue *q, mblk_t *m){
+static MS2_INLINE mblk_t *ms_queue_peek_first(MSQueue *q){
+	return qbegin(&q->q);
+}
+
+static MS2_INLINE mblk_t *ms_queue_next(MSQueue *q, mblk_t *m){
+	return m->b_next;
+}
+
+static MS2_INLINE bool_t ms_queue_end(MSQueue *q, mblk_t *m){
+	return qend(&q->q,m);
+}
+
+static MS2_INLINE void ms_queue_remove(MSQueue *q, mblk_t *m){
 	remq(&q->q,m);
 }
 
-static inline bool_t ms_queue_empty(MSQueue *q){
+static MS2_INLINE bool_t ms_queue_empty(MSQueue *q){
 	return qempty(&q->q);
 }
 
@@ -80,13 +92,24 @@ MS2_PUBLIC void ms_queue_destroy(MSQueue *q);
 #define mblk_set_timestamp_info(m,ts) (m)->reserved1=(ts);
 #define mblk_get_timestamp_info(m)    ((m)->reserved1)
 #define mblk_set_marker_info(m,bit)   __mblk_set_flag(m,0,bit)
-#define mblk_get_marker_info(m)	      ((m)->reserved2&0x1) /*bit 1*/
-#define mblk_set_precious_flag(m,bit)    __mblk_set_flag(m,1,bit)  /*use to prevent mirroring*/
-#define mblk_get_precious_flag(m)    (((m)->reserved2)>>1 & 0x1) /*bit 2*/
+#define mblk_get_marker_info(m)	      ((m)->reserved2 & 0x1) /*bit 1*/
+
+#define mblk_set_precious_flag(m,bit)    __mblk_set_flag(m,1,bit)  /*use to prevent mirroring for video*/
+#define mblk_get_precious_flag(m)    (((m)->reserved2)>>1 & 0x1) /*bit 2 */
+
 #define mblk_set_plc_flag(m,bit)    __mblk_set_flag(m,2,bit)  /*use to mark a plc generated block*/
-#define mblk_get_plc_flag(m)    (((m)->reserved2)>>1 & 0x2) /*bit 2*/
+#define mblk_get_plc_flag(m)    (((m)->reserved2)>>2 & 0x1) /*bit 3*/
+
+#define mblk_set_cng_flag(m,bit)    __mblk_set_flag(m,3,bit)  /*use to mark a cng generated block*/
+#define mblk_get_cng_flag(m)    (((m)->reserved2)>>3 & 0x1) /*bit 4*/
+
+#define mblk_set_user_flag(m,bit)    __mblk_set_flag(m,7,bit)  /* to be used by extensions to mediastreamer2*/
+#define mblk_get_user_flag(m)    (((m)->reserved2)>>7 & 0x1) /*bit 8*/
+
 #define mblk_set_cseq(m,value) (m)->reserved2=(m)->reserved2| ((value&0xFFFF)<<16);	
 #define mblk_get_cseq(m) ((m)->reserved2>>16)
+
+#define HAVE_ms_bufferizer_fill_current_metas
 	
 struct _MSBufferizer{
 	queue_t q;
@@ -106,10 +129,14 @@ MS2_PUBLIC void ms_bufferizer_put(MSBufferizer *obj, mblk_t *m);
 /* put every mblk_t from q, into the bufferizer */
 MS2_PUBLIC void ms_bufferizer_put_from_queue(MSBufferizer *obj, MSQueue *q);
 
+/*read bytes from bufferizer object*/
 MS2_PUBLIC int ms_bufferizer_read(MSBufferizer *obj, uint8_t *data, int datalen);
 
+/*obtain current meta-information of the last read bytes (if any) and copy them into 'm'*/
+MS2_PUBLIC void ms_bufferizer_fill_current_metas(MSBufferizer *obj, mblk_t *m);
+
 /* returns the number of bytes available in the bufferizer*/
-static inline int ms_bufferizer_get_avail(MSBufferizer *obj){
+static MS2_INLINE int ms_bufferizer_get_avail(MSBufferizer *obj){
 	return obj->size;
 }
 

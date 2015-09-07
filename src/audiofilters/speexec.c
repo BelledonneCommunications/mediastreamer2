@@ -32,11 +32,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "mediastreamer-config.h"
 #endif
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <malloc.h> /* for alloca */
 #endif
 
-#include "flowcontrol.h"
+#include "mediastreamer2/flowcontrol.h"
 
 
 //#define EC_DUMP 1
@@ -46,7 +46,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define EC_DUMP_PREFIX "/dynamic/tests"
 #endif
 
-static const float smooth_factor=0.05;
 static const int framesize=64;
 static const int flow_control_interval_ms=5000;
 
@@ -65,7 +64,7 @@ typedef struct SpeexECState{
 	int tail_length_ms;
 	int nominal_ref_samples;
 	int min_ref_samples;
-	AudioFlowController afc;
+	MSAudioFlowController afc;
 	uint64_t flow_control_time;
 	char *state_str;
 #ifdef EC_DUMP
@@ -79,7 +78,7 @@ typedef struct SpeexECState{
 }SpeexECState;
 
 static void speex_ec_init(MSFilter *f){
-	SpeexECState *s=(SpeexECState *)ms_new(SpeexECState,1);
+	SpeexECState *s=ms_new0(SpeexECState,1);
 
 	s->samplerate=8000;
 	ms_bufferizer_init(&s->delayed_ref);
@@ -208,7 +207,7 @@ static void speex_ec_preprocess(MSFilter *f){
 	ms_bufferizer_put (&s->delayed_ref,m);
 	s->min_ref_samples=-1;
 	s->nominal_ref_samples=delay_samples;
-	audio_flow_controller_init(&s->afc);
+	ms_audio_flow_controller_init(&s->afc);
 	s->flow_control_time = f->ticker->time;
 #ifdef SPEEX_ECHO_GET_BLOB
 	apply_config(s);
@@ -241,7 +240,7 @@ static void speex_ec_process(MSFilter *f){
 	if (f->inputs[0]!=NULL){
 		if (s->echostarted){
 			while((refm=ms_queue_get(f->inputs[0]))!=NULL){
-				refm=audio_flow_controller_process(&s->afc,refm);
+				refm=ms_audio_flow_controller_process(&s->afc,refm);
 				if (refm){
 					mblk_t *cp=dupmsg(refm);
 					ms_bufferizer_put(&s->delayed_ref,cp);
@@ -323,7 +322,7 @@ static void speex_ec_process(MSFilter *f){
 		if (diff>(nbytes/2)){
 			int purge=diff-(nbytes/2);
 			ms_warning("echo canceller: we are accumulating too much reference signal, need to throw out %i samples",purge);
-			audio_flow_controller_set_target(&s->afc,purge,(flow_control_interval_ms*s->samplerate)/1000);
+			ms_audio_flow_controller_set_target(&s->afc,purge,(flow_control_interval_ms*s->samplerate)/1000);
 		}
 		s->min_ref_samples=-1;
 		s->flow_control_time = f->ticker->time;
@@ -404,7 +403,8 @@ static MSFilterMethod speex_ec_methods[]={
 	{	MS_ECHO_CANCELLER_SET_BYPASS_MODE	,	speex_ec_set_bypass_mode	},
 	{	MS_ECHO_CANCELLER_GET_BYPASS_MODE	,	speex_ec_get_bypass_mode	},
 	{	MS_ECHO_CANCELLER_GET_STATE_STRING	,	speex_ec_get_state		},
-	{	MS_ECHO_CANCELLER_SET_STATE_STRING	,	speex_ec_set_state		}
+	{	MS_ECHO_CANCELLER_SET_STATE_STRING	,	speex_ec_set_state		},
+	{	0, 0 }
 };
 
 #ifdef _MSC_VER

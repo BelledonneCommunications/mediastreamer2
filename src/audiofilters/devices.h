@@ -28,6 +28,16 @@
 #define DEVICE_HAS_BUILTIN_AEC_CRAPPY	(1<<1) /*set when the device is claiming to have AEC but we should not trust it */
 #define DEVICE_USE_ANDROID_MIC			(1<<2) /*set when the device needs to capture using MIC instead of Voice communication (I.E kindle fire) */
 #define DEVICE_HAS_BUILTIN_OPENSLES_AEC		(1<<3) /*set when the device automatically enables it's AEC when using OpenSLES */
+#define DEVICE_HAS_CRAPPY_ANDROID_FASTTRACK		(1<<4) /*set when the AUDIO_OUTPUT_FLAG_FAST flag of android AudioTrack doesn't work*/
+#define DEVICE_HAS_CRAPPY_ANDROID_FASTRECORD	(1<<5) /*set when the AUDIO_INPUT_FLAG_FAST flag of android AudioRecord doesn't work*/
+#define DEVICE_HAS_UNSTANDARD_LIBMEDIA			(1<<6) /*set when the libmedia backend shall not be used because of proprietary modifications made into it by the manufacturer*/
+
+struct SoundDeviceAudioHacks {
+	const char *equalizer;
+	float mic_gain;
+};
+
+typedef struct SoundDeviceAudioHacks SoundDeviceAudioHacks;
 
 struct SoundDeviceDescription{
 	const char *manufacturer;
@@ -36,9 +46,11 @@ struct SoundDeviceDescription{
 	unsigned int flags;
 	int delay;
 	int recommended_rate;
+	SoundDeviceAudioHacks *hacks;
 };
 
 typedef struct SoundDeviceDescription SoundDeviceDescription;
+
 
 #ifdef __cplusplus
 extern "C"{
@@ -46,6 +58,8 @@ extern "C"{
 
 /*obtain information regarding sound system of current device*/
 SoundDeviceDescription * sound_device_description_get(void);
+
+extern SoundDeviceDescription genericSoundDeviceDescriptor;
 
 #ifdef __cplusplus
 }

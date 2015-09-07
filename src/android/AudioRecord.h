@@ -29,8 +29,9 @@ namespace fake_android {
 class AudioRecordImpl;
 // ----------------------------------------------------------------------------
 
-class AudioRecord
+class AudioRecord : public RefBase
 {
+	friend class AudioRecordImpl;
 public:
 
     static const int DEFAULT_SAMPLE_RATE = 8000;
@@ -351,10 +352,15 @@ public:
      * Unit: the number of input audio frames
      */
             unsigned int  getInputFramesLost() const;
-
+protected:
+	/* ms2 addition:*/
+	virtual void *getRealThis()const;
+	virtual bool isRefCounted()const;
+	virtual void destroy()const;
 private:
 	uint8_t *mThis;
 	AudioRecordImpl *mImpl;
+	int mSessionId;
 };
 
 class AudioRecordImpl{
@@ -389,12 +395,17 @@ public:
 		int,
 		int> mCtor;
 	Function1<void,void*> mDtor;
+	Function1<void,void*> mDefaultCtor;
 	Function1<status_t,const void *> mInitCheck;
 	Function1<status_t,void *> mStop;
 	Function3<status_t, void *, AudioSystem::sync_event_t , int> mStart;
 	Function4<status_t, int*, uint32_t, int, int> mGetMinFrameCount;
 	Function1<int,const void *> mGetSessionId;
 	//Function1<audio_io_handle_t,void*> mGetInput;
+	ptrdiff_t mRefBaseOffset;
+	int mApiVersion;
+	bool mUseRefcount;
+	static const size_t sObjSize=1024;
 private:
 	AudioRecordImpl(Library *lib);
 	static AudioRecordImpl *sImpl;

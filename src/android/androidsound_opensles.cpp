@@ -88,10 +88,6 @@ namespace fake_opensles {
 	}
 }
 
-#define NATIVE_USE_HARDWARE_RATE 1
-
-static int sdk_version = 0;
-
 static const int flowControlIntervalMs = 1000;
 static const int flowControlThresholdMs = 40;
 
@@ -185,6 +181,7 @@ struct OpenSLESInputContext {
 		ms_mutex_init(&mutex,NULL);
 		mTickerSynchronizer = NULL;
 		aec = NULL;
+		mAvSkew = 0;
 		
 		currentBuffer = 0;
 		recBuffer[0] = (uint8_t *) calloc(inBufSize, sizeof(uint8_t));
@@ -220,6 +217,7 @@ struct OpenSLESInputContext {
 	uint8_t *recBuffer[2];
 	int inBufSize;
 	int currentBuffer;
+	double mAvSkew;
 };
 
 static SLuint32 convertSamplerate(int samplerate)
@@ -249,24 +247,13 @@ static SLuint32 convertSamplerate(int samplerate)
 }
 
 static void android_snd_card_detect(MSSndCardManager *m) {
-	/* Get Android SDK version. */
-	JNIEnv *jni_env = ms_get_jni_env();
-	jclass version_class = jni_env->FindClass("android/os/Build$VERSION");
-	jfieldID fid = jni_env->GetStaticFieldID(version_class, "SDK_INT", "I");
-	sdk_version = jni_env->GetStaticIntField(version_class, fid);
-	ms_message("SDK version [%i] detected", sdk_version);
-	jni_env->DeleteLocalRef(version_class);
 	
-	if (sdk_version >= 19) { // Use only if Android OS >= KIT_KAT (4.4)
-		if (initOpenSLES() == 0) { // Try to dlopen libOpenSLES
-			ms_message("Android version is %i, libOpenSLES correctly loaded, creating OpenSLES MS soundcard", sdk_version);
-			MSSndCard *card = android_snd_card_new();
-			ms_snd_card_manager_add_card(m, card);
-		} else {
-			ms_warning("Android version is %i, failed to dlopen libOpenSLES, OpenSLES MS soundcard unavailable", sdk_version);
-		}
+	if (initOpenSLES() == 0) { // Try to dlopen libOpenSLES
+		ms_message("libOpenSLES correctly loaded, creating OpenSLES MS soundcard");
+		MSSndCard *card = android_snd_card_new();
+		ms_snd_card_manager_add_card(m, card);
 	} else {
-		ms_warning("Android version is %i, OpenSLES MS soundcard unavailable on Android < 4.4", sdk_version);
+		ms_warning("Failed to dlopen libOpenSLES, OpenSLES MS soundcard unavailable");
 	}
 }
 
@@ -407,19 +394,34 @@ static void compute_timespec(OpenSLESInputContext *ictx) {
 	MSTimeSpec ts;
 	ts.tv_nsec = ns % 1000000000;
 	ts.tv_sec = ns / 1000000000;
-	double av_skew = ms_ticker_synchronizer_set_external_time(ictx->mTickerSynchronizer, &ts);
-	if ((++count) % 100 == 0)
-		ms_message("sound/wall clock skew is average=%f ms", av_skew);
+	ictx->mAvSkew = ms_ticker_synchronizer_set_external_time(ictx->mTickerSynchronizer, &ts);
 }
 
+
+/*
+ * This is a callback function called by AudioRecord's thread. This thread is not created by ortp/ms2 and is not able to attach to a JVM without crashing
+ * at the end, despite it is detached (since android 4.4).
+ * We must not output a single log within this callback in the event that the application is using LinphoneCoreFactory.setLogHandler(), in which case
+ * the log would be upcalled to java, which will attach the thread to the jvm.
+**/
 static void opensles_recorder_callback(SLAndroidSimpleBufferQueueItf bq, void *context) {
 	SLresult result;
 	OpenSLESInputContext *ictx = (OpenSLESInputContext *)context;
 
 	if (ictx->mTickerSynchronizer == NULL) {
 		MSFilter *obj = ictx->mFilter;
+		/*
+		 * ABSOLUTE HORRIBLE HACK. We temporarily disable logs to prevent ms_ticker_set_time_func() to output a debug log.
+		 * This is horrible because this also suspends logs for all concurrent threads during these two lines of code.
+		 * Possible way to do better:
+		 *  1) understand why AudioRecord thread doesn't detach.
+		 *  2) disable logs just for this thread (using a TLS)
+		 */
+		int loglevel=ortp_get_log_level_mask();
+		ortp_set_log_level_mask(ORTP_ERROR|ORTP_FATAL);
 		ictx->mTickerSynchronizer = ms_ticker_synchronizer_new();
-		ms_ticker_set_time_func(obj->ticker, (uint64_t (*)(void*))ms_ticker_synchronizer_get_corrected_time, ictx->mTickerSynchronizer);
+		ms_ticker_set_time_func(obj->ticker,(uint64_t (*)(void*))ms_ticker_synchronizer_get_corrected_time, ictx->mTickerSynchronizer);
+		ortp_set_log_level_mask(loglevel);
 	}
 	ictx->read_samples += ictx->inBufSize / sizeof(int16_t);
 
@@ -434,7 +436,7 @@ static void opensles_recorder_callback(SLAndroidSimpleBufferQueueItf bq, void *c
 
  	result = (*ictx->recorderBufferQueue)->Enqueue(ictx->recorderBufferQueue, ictx->recBuffer[ictx->currentBuffer], ictx->inBufSize);
 	if (result != SL_RESULT_SUCCESS) {
-		ms_error("OpenSLES Error %u while enqueueing record buffer", result);
+		/*ms_error("OpenSLES Error %u while enqueueing record buffer", result);*/
 	}
 	ictx->currentBuffer = ictx->currentBuffer == 1 ? 0 : 1;
 }
@@ -510,6 +512,9 @@ static void android_snd_read_process(MSFilter *obj) {
 		ms_queue_put(obj->outputs[0], m);
 	}
 	ms_mutex_unlock(&ictx->mutex);
+	if (obj->ticker->time % 5000 == 0)
+			ms_message("sound/wall clock skew is average=%g ms", ictx->mAvSkew);
+	
 }
 
 static void android_snd_read_postprocess(MSFilter *obj) {
@@ -553,14 +558,17 @@ static void android_snd_read_uninit(MSFilter *obj) {
 }
 
 static int android_snd_read_set_sample_rate(MSFilter *obj, void *data) {
-#ifndef NATIVE_USE_HARDWARE_RATE
+#if 0
 	int *n = (int*)data;
 	OpenSLESInputContext *ictx = (OpenSLESInputContext*)obj->data;
+	if (ictx->opensles_context->forced_sample_rate > 0) {
+		ms_warning("Sample rate is forced by mediastreamer2 device table, skipping...");
+		return -1;
+	}
 	ictx->opensles_context->samplerate = *n;
 	return 0;
-#else
-	return -1;
 #endif
+	return -1; /*don't accept custom sample rates, use recommended rate always*/
 }
 
 static int android_snd_read_get_sample_rate(MSFilter *obj, void *data) {
@@ -653,61 +661,61 @@ static SLresult opensles_mixer_init(OpenSLESOutputContext *octx) {
 
 static SLresult opensles_sink_init(OpenSLESOutputContext *octx) {
 	SLresult result;
-        SLuint32 sample_rate = convertSamplerate(octx->opensles_context->samplerate);
+	SLuint32 sample_rate = convertSamplerate(octx->opensles_context->samplerate);
 	SLuint32 channels = (SLuint32) octx->opensles_context->nchannels;
 
-        SLDataFormat_PCM format_pcm;
-	
+	SLDataFormat_PCM format_pcm;
+
 	format_pcm.formatType = SL_DATAFORMAT_PCM;
-        format_pcm.numChannels = channels;
-        format_pcm.samplesPerSec = sample_rate;
-        format_pcm.bitsPerSample = SL_PCMSAMPLEFORMAT_FIXED_16;
-        format_pcm.containerSize = SL_PCMSAMPLEFORMAT_FIXED_16;
-        format_pcm.endianness = SL_BYTEORDER_LITTLEENDIAN;
+	format_pcm.numChannels = channels;
+	format_pcm.samplesPerSec = sample_rate;
+	format_pcm.bitsPerSample = SL_PCMSAMPLEFORMAT_FIXED_16;
+	format_pcm.containerSize = SL_PCMSAMPLEFORMAT_FIXED_16;
+	format_pcm.endianness = SL_BYTEORDER_LITTLEENDIAN;
 	if (channels == 1) {
-	        format_pcm.channelMask = SL_SPEAKER_FRONT_CENTER;
+		format_pcm.channelMask = SL_SPEAKER_FRONT_CENTER;
 	} else if (channels == 2) {
-	        format_pcm.channelMask = SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT;
+		format_pcm.channelMask = SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT;
 	} else {
 		ms_error("OpenSLES Error trying to use %i channels", channels);
 	}
 
-        SLDataLocator_AndroidSimpleBufferQueue loc_bufq = {
-                SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, 
-                2
-        };
+	SLDataLocator_AndroidSimpleBufferQueue loc_bufq = {
+		SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, 
+		2
+	};
 
-        SLDataSource audio_src = {
-                &loc_bufq,
-                &format_pcm
-        };
+	SLDataSource audio_src = {
+		&loc_bufq,
+		&format_pcm
+	};
 
-        SLDataLocator_OutputMix loc_outmix = {
-                SL_DATALOCATOR_OUTPUTMIX,
-                octx->outputMixObject
-        };
+	SLDataLocator_OutputMix loc_outmix = {
+		SL_DATALOCATOR_OUTPUTMIX,
+		octx->outputMixObject
+	};
 
-        SLDataSink audio_sink = {
-                &loc_outmix,
-                NULL
-        };
+	SLDataSink audio_sink = {
+		&loc_outmix,
+		NULL
+	};
 
-        const SLuint32 nbInterface = 3;
-        const SLInterfaceID ids[] = { SLW_IID_VOLUME, SLW_IID_ANDROIDSIMPLEBUFFERQUEUE, SLW_IID_ANDROIDCONFIGURATION };
-        const SLboolean req[] = { SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE };
-        result = (*octx->opensles_context->engineEngine)->CreateAudioPlayer(
-                octx->opensles_context->engineEngine,
-                &(octx->playerObject),
-                &audio_src,
-                &audio_sink,
-                nbInterface,
-                ids,
-                req
-                );
-        if (result != SL_RESULT_SUCCESS) {
+	const SLuint32 nbInterface = 3;
+	const SLInterfaceID ids[] = { SLW_IID_VOLUME, SLW_IID_ANDROIDSIMPLEBUFFERQUEUE, SLW_IID_ANDROIDCONFIGURATION };
+	const SLboolean req[] = { SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE };
+	result = (*octx->opensles_context->engineEngine)->CreateAudioPlayer(
+	octx->opensles_context->engineEngine,
+		&(octx->playerObject),
+		&audio_src,
+		&audio_sink,
+		nbInterface,
+		ids,
+		req
+	);
+	if (result != SL_RESULT_SUCCESS) {
 		ms_error("OpenSLES Error %u while creating ouput audio player", result);
 		return result;
-        }
+	}
 
 	result = (*octx->playerObject)->GetInterface(octx->playerObject, SLW_IID_ANDROIDCONFIGURATION, &octx->playerConfig);
 	if (result != SL_RESULT_SUCCESS) {
@@ -742,6 +750,13 @@ static SLresult opensles_sink_init(OpenSLESOutputContext *octx) {
 	return result;
 }
 
+/*
+ * This is a callback function called by AudioTrack's thread. This thread is not created by ortp/ms2 and is not able to attach to a JVM without crashing
+ * at the end, despite it is detached (since android 4.4).
+ * We must not output a single log within this callback in the event that the application is using LinphoneCoreFactory.setLogHandler(), in which case
+ * the log would be upcalled to java, which will attach the thread to the jvm.
+**/
+
 static void opensles_player_callback(SLAndroidSimpleBufferQueueItf bq, void* context) {
 	SLresult result;
 	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)context;
@@ -752,7 +767,7 @@ static void opensles_player_callback(SLAndroidSimpleBufferQueueItf bq, void* con
 	int bytes = MIN(ask, avail);
 
 	if ((octx->nbufs == 0) && (avail > (ask * 2))) {
-		ms_warning("OpenSLES skipping %i bytes", avail - (ask * 2) );
+		/*ms_warning("OpenSLES skipping %i bytes", avail - (ask * 2) );*/
 		ms_bufferizer_skip_bytes(&octx->buffer, avail - (ask * 2));
 	}
 
@@ -776,7 +791,7 @@ static void opensles_player_callback(SLAndroidSimpleBufferQueueItf bq, void* con
 	if (bytes == 0) bytes = ask;
  	result = (*octx->playerBufferQueue)->Enqueue(octx->playerBufferQueue, octx->playBuffer[octx->currentBuffer], bytes);
 	if (result != SL_RESULT_SUCCESS) {
-		ms_error("OpenSLES Error %u while adding buffer to output queue", result);
+		/*ms_error("OpenSLES Error %u while adding buffer to output queue", result);*/
 	}
 	octx->currentBuffer = octx->currentBuffer == 1 ? 0 : 1;
 }
@@ -796,8 +811,8 @@ static SLresult opensles_player_callback_init(OpenSLESOutputContext *octx) {
 		return result;
 	}
 
-        result = (*octx->playerBufferQueue)->RegisterCallback(octx->playerBufferQueue, opensles_player_callback, octx);
-        if (result != SL_RESULT_SUCCESS) {
+	result = (*octx->playerBufferQueue)->RegisterCallback(octx->playerBufferQueue, opensles_player_callback, octx);
+	if (result != SL_RESULT_SUCCESS) {
 		ms_error("OpenSLES Error %u while registering player callback", result);
 		return result;
 	}
@@ -844,14 +859,17 @@ static void android_snd_write_uninit(MSFilter *obj){
 }
 
 static int android_snd_write_set_sample_rate(MSFilter *obj, void *data) {
-#ifndef NATIVE_USE_HARDWARE_RATE
+#if 0
 	int *n = (int*)data;
 	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
+	if (octx->opensles_context->forced_sample_rate > 0) {
+		ms_warning("Sample rate is forced by mediastreamer2 device table, skipping...");
+		return -1;
+	}
 	octx->opensles_context->samplerate = *n;
 	return 0;
-#else
-	return -1;
 #endif
+	return -1; /*don't accept custom sample rates, use recommended rate always*/
 }
 
 static int android_snd_write_get_sample_rate(MSFilter *obj, void *data) {
@@ -899,7 +917,7 @@ static void android_snd_write_process(MSFilter *obj) {
 
 	if (((uint32_t)(obj->ticker->time - octx->flowControlStart)) >= flowControlIntervalMs) {
 		int threshold = (flowControlThresholdMs * octx->opensles_context->nchannels * 2 * octx->opensles_context->samplerate) / 1000;
-		ms_message("OpenSLES Time to flow control: minBufferFilling=%i, threshold=%i", octx->minBufferFilling, threshold);
+		//ms_message("OpenSLES Time to flow control: minBufferFilling=%i, threshold=%i", octx->minBufferFilling, threshold);
 		if (octx->minBufferFilling > threshold) {
 			int drop = octx->minBufferFilling - (threshold/4); //keep a bit in order not to risk an underrun in the next period.
 			ms_warning("OpenSLES Too many samples waiting in sound writer (minBufferFilling=%i ms, threshold=%i ms), dropping %i ms", 
@@ -927,18 +945,18 @@ static void android_snd_write_postprocess(MSFilter *obj) {
 	}
 
 	if (octx->playerObject != NULL)
-        {
-                (*octx->playerObject)->Destroy(octx->playerObject);
-                octx->playerObject = NULL;
-                octx->playerPlay = NULL;
-                octx->playerBufferQueue = NULL;
-        }
+	{
+		(*octx->playerObject)->Destroy(octx->playerObject);
+		octx->playerObject = NULL;
+		octx->playerPlay = NULL;
+		octx->playerBufferQueue = NULL;
+	}
 
 	if (octx->outputMixObject != NULL)
-        {
-                (*octx->outputMixObject)->Destroy(octx->outputMixObject);
-                octx->outputMixObject = NULL;
-        }
+	{
+			(*octx->outputMixObject)->Destroy(octx->outputMixObject);
+			octx->outputMixObject = NULL;
+	}
 }
 
 static MSFilterMethod android_snd_write_methods[] = {
@@ -971,7 +989,7 @@ static MSFilter* ms_android_snd_write_new(void) {
 }
 
 MSSndCardDesc android_native_snd_opensles_card_desc = {
-	"libmedia",
+	"openSLES",
 	android_snd_card_detect,
 	android_native_snd_card_init,
 	NULL,
@@ -989,16 +1007,22 @@ static MSSndCard* android_snd_card_new(void) {
 	SoundDeviceDescription *d;
 	
 	obj = ms_snd_card_new(&android_native_snd_opensles_card_desc);
-	obj->name = ms_strdup("android opensles sound card");
+	obj->name = ms_strdup("android sound card");
 	d = sound_device_description_get();
 	OpenSLESContext *context = opensles_context_init();
 	if (d->flags & DEVICE_HAS_BUILTIN_OPENSLES_AEC) {
 		obj->capabilities |= MS_SND_CARD_CAP_BUILTIN_ECHO_CANCELLER;
 		context->builtin_aec = true;
+	} else if (d->flags & DEVICE_HAS_BUILTIN_AEC) {
+		ms_warning("Removing MS_SND_CARD_CAP_CAPTURE flag from soundcard to use HAEC Java capture soundcard");
+		obj->capabilities = MS_SND_CARD_CAP_PLAYBACK;
 	}
-	obj->latency = 0; // Force software echo canceller if no builtin echo canceller
+	obj->latency = d->delay;
 	obj->data = context;
-
+	if (d->recommended_rate){
+		context->samplerate = d->recommended_rate;
+	}
 	return obj;
 }
+
 

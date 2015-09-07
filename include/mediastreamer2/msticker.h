@@ -33,8 +33,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
 
 /**
- * @defgroup mediastreamer2_ticker Ticker API - manage mediastreamer2 graphs.
- * @ingroup mediastreamer2_api
+ * @addtogroup mediastreamer2_ticker
  * @{
  */
 
@@ -63,6 +62,14 @@ enum _MSTickerPrio{
 
 typedef enum _MSTickerPrio MSTickerPrio;
 
+struct _MSTickerLateEvent{
+	int lateMs; /**< late at the time of the last event, in milliseconds */
+	uint64_t time; /**< time of late event, in milliseconds */
+	int current_late_ms; /**< late at the time of the last tick, in milliseconds */
+};
+
+typedef struct _MSTickerLateEvent MSTickerLateEvent;
+
 struct _MSTicker
 {
 	ms_mutex_t lock;
@@ -82,6 +89,8 @@ struct _MSTicker
 	MSTickerPrio prio;
 	MSTickerTickFunc wait_next_tick;
 	void *wait_next_tick_data;
+	MSTickerLateEvent late_event;
+	unsigned long thread_id;
 	bool_t run;       /* flag to indicate whether the ticker must be run or not */
 };
 
@@ -227,6 +236,13 @@ MS2_PUBLIC void ms_ticker_print_graphs(MSTicker *ticker);
 **/
 MS2_PUBLIC float ms_ticker_get_average_load(MSTicker *ticker);
 
+
+/**
+ * Get last late tick event description.
+ * @param ticker the MSTicker
+ * @param ev a MSTickerLaterEvent structure that will be filled in return by the ticker.
+**/
+MS2_PUBLIC void ms_ticker_get_last_late_tick(MSTicker *ticker, MSTickerLateEvent *ev);
 /**
  * Create a ticker synchronizer.
  *

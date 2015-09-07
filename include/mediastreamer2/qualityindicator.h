@@ -37,6 +37,11 @@ extern "C"{
 MS2_PUBLIC MSQualityIndicator *ms_quality_indicator_new(RtpSession *session);
 
 /**
+ * Set a label, just used for logging.
+**/
+MS2_PUBLIC void ms_quality_indicator_set_label(MSQualityIndicator *obj, const char *label);
+
+/**
  * Updates quality indicator based on a received RTCP packet.
 **/
 MS2_PUBLIC void ms_quality_indicator_update_from_feedback(MSQualityIndicator *qi, mblk_t *rtcp);
@@ -50,12 +55,22 @@ MS2_PUBLIC void ms_quality_indicator_update_local(MSQualityIndicator *qi);
 /**
  * Return the real time rating of the session. Its value is between 0 (worse) and 5.0 (best).
 **/
-MS2_PUBLIC float ms_quality_indicator_get_rating(MSQualityIndicator *qi);
+MS2_PUBLIC float ms_quality_indicator_get_rating(const MSQualityIndicator *qi);
 
 /**
  * Returns the average rating of the session, that is the rating for all the duration of the session.
 **/
-MS2_PUBLIC float ms_quality_indicator_get_average_rating(MSQualityIndicator *qi);
+MS2_PUBLIC float ms_quality_indicator_get_average_rating(const MSQualityIndicator *qi);
+
+/**
+ * Return the real time rating of the listening quality of the session. Its value is between 0.0 (worse) and 5.0 (best).
+**/
+MS2_PUBLIC float ms_quality_indicator_get_lq_rating(const MSQualityIndicator *qi);
+
+/**
+ * Returns the average rating of the listening quality of the session, that is the rating of the listening quality for all the duration of the session.
+**/
+MS2_PUBLIC float ms_quality_indicator_get_average_lq_rating(const MSQualityIndicator *qi);
 
 /**
  * Returns the local loss rate, as computed internally by ms_quality_indicator_update_local().

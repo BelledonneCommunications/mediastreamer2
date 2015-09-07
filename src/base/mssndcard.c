@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 static MSSndCardManager *scm=NULL;
 
 static MSSndCardManager * create_manager(){
-	MSSndCardManager *obj=(MSSndCardManager *)ms_new(MSSndCardManager,1);
+	MSSndCardManager *obj=(MSSndCardManager *)ms_new0(MSSndCardManager,1);
 	obj->cards=NULL;
 	obj->descs=NULL;
 	return obj;
@@ -103,6 +103,17 @@ const MSList * ms_snd_card_manager_get_list(MSSndCardManager *m){
 void ms_snd_card_manager_add_card(MSSndCardManager *m, MSSndCard *c){
 	ms_message("Card '%s' added",ms_snd_card_get_string_id(c));
 	m->cards=ms_list_append(m->cards,c);
+}
+
+void ms_snd_card_manager_prepend_cards(MSSndCardManager *m, MSList *l) {
+	MSList *elem;
+	MSList *lcopy = ms_list_copy(l);
+	if (m->cards != NULL) m->cards = ms_list_concat(lcopy, m->cards);
+	else m->cards = lcopy;
+	for (elem = l; elem != NULL; elem = elem->next) {
+		MSSndCard *card = (MSSndCard *)elem->data;
+		ms_message("Card '%s' added", ms_snd_card_get_string_id(card));
+	}
 }
 
 static void card_detect(MSSndCardManager *m, MSSndCardDesc *desc){
@@ -221,6 +232,11 @@ struct _MSFilter * ms_snd_card_create_writer(MSSndCard *obj){
 		return obj->desc->create_writer(obj);
 	else ms_warning("ms_snd_card_create_writer: unimplemented by %s wrapper",obj->desc->driver_type);
 	return NULL;
+}
+
+void ms_snd_card_set_usage_hint(MSSndCard *obj, bool_t is_going_to_be_used){
+	if (obj->desc->usage_hint!=NULL)
+		obj->desc->usage_hint(obj, is_going_to_be_used);
 }
 
 void ms_snd_card_destroy(MSSndCard *obj){

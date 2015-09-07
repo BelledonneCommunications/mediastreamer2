@@ -22,17 +22,18 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "mediastreamer-config.h"
 #endif
 
+#include "ortp/port.h"
 #include "mediastreamer2/mediastream.h"
 #include "private.h"
-
 #include <ctype.h>
+
+
 
 #ifndef MS_MINIMAL_MTU
 /*this is used for determining the minimum size of recv buffers for RTP packets
  Keep 1500 for maximum interoparibility*/
-#define MS_MINIMAL_MTU 1500 
+#define MS_MINIMAL_MTU 1500
 #endif
-
 
 
 #if defined(_WIN32_WCE)
@@ -56,82 +57,56 @@ static void disable_checksums(ortp_socket_t sock) {
 #endif
 }
 
-/**
- * This function must be called from the MSTicker thread:
- * it replaces one filter by another one.
- * This is a dirty hack that works anyway.
- * It would be interesting to have something that does the job
- * more easily within the MSTicker API.
- */
-static void media_stream_change_decoder(MediaStream *stream, int payload) {
-	RtpSession *session = stream->session;
-	RtpProfile *prof = rtp_session_get_profile(session);
-	PayloadType *pt = rtp_profile_get_payload(prof, payload);
-	
-	if (stream->decoder == NULL){
-		ms_message("media_stream_change_decoder(): ignored, no decoder.");
-		return;
+static int _ms_ticker_prio_from_env(const char *penv, MSTickerPrio *prio) {
+	if (strcasecmp(penv, "NORMAL") == 0) {
+		*prio = MS_TICKER_PRIO_NORMAL;
+		return 0;
 	}
-	
-	if (pt != NULL){
-		MSFilter *dec;
-
-		if (stream->type == VideoStreamType){
-			/* Q: why only video ? this optimization seems relevant for audio too.*/
-			if ((stream->decoder != NULL) && (stream->decoder->desc->enc_fmt != NULL)
-			&& (strcasecmp(pt->mime_type, stream->decoder->desc->enc_fmt) == 0)) {
-				/* Same formats behind different numbers, nothing to do. */
-				return;
-			}
-		}
-
-		dec = ms_filter_create_decoder(pt->mime_type);
-		if (dec != NULL) {
-			MSFilter *nextFilter = stream->decoder->outputs[0]->next.filter;
-			ms_filter_unlink(stream->rtprecv, 0, stream->decoder, 0);
-			ms_filter_unlink(stream->decoder, 0, nextFilter, 0);
-			ms_filter_postprocess(stream->decoder);
-			ms_filter_destroy(stream->decoder);
-			stream->decoder = dec;
-			if (pt->recv_fmtp != NULL)
-				ms_filter_call_method(stream->decoder, MS_FILTER_ADD_FMTP, (void *)pt->recv_fmtp);
-			ms_filter_link(stream->rtprecv, 0, stream->decoder, 0);
-			ms_filter_link(stream->decoder, 0, nextFilter, 0);
-			ms_filter_preprocess(stream->decoder,stream->ticker);
-		} else {
-			ms_warning("No decoder found for %s", pt->mime_type);
-		}
-	} else {
-		ms_warning("No payload defined with number %i", payload);
+	if (strcasecmp(penv, "HIGH") == 0) {
+		*prio = MS_TICKER_PRIO_HIGH;
+		return 0;
 	}
+	if (strcasecmp(penv, "REALTIME") == 0) {
+		*prio = MS_TICKER_PRIO_REALTIME;
+		return 0;
+	}
+	ms_error("Undefined priority %s", penv);
+	return -1;
 }
 
 MSTickerPrio __ms_get_default_prio(bool_t is_video) {
-	const char *penv;
+	const char *penv = NULL;
+	MSTickerPrio prio;
 
 	if (is_video) {
+#ifndef MS2_WINDOWS_UNIVERSAL
+		penv = getenv("MS_VIDEO_PRIO");
+#endif
+		if(penv && _ms_ticker_prio_from_env(penv, &prio) == 0) return prio;
+
 #ifdef __ios
 		return MS_TICKER_PRIO_HIGH;
 #else
 		return MS_TICKER_PRIO_NORMAL;
 #endif
-	}
-
-	penv = getenv("MS_AUDIO_PRIO");
-	if (penv) {
-		if (strcasecmp(penv, "NORMAL") == 0) return MS_TICKER_PRIO_NORMAL;
-		if (strcasecmp(penv, "HIGH") == 0) return MS_TICKER_PRIO_HIGH;
-		if (strcasecmp(penv, "REALTIME") == 0) return MS_TICKER_PRIO_REALTIME;
-		ms_error("Undefined priority %s", penv);
-	}
-#ifdef __linux
-	return MS_TICKER_PRIO_REALTIME;
-#else
-	return MS_TICKER_PRIO_HIGH;
+	} else {
+#ifndef MS2_WINDOWS_UNIVERSAL
+		penv = getenv("MS_AUDIO_PRIO");
 #endif
+		if (penv && _ms_ticker_prio_from_env(penv, &prio) == 0) return prio;
+
+		return MS_TICKER_PRIO_HIGH;
+
+	}
 }
 
-RtpSession * create_duplex_rtpsession(int loc_rtp_port, int loc_rtcp_port, bool_t ipv6) {
+void media_stream_init(MediaStream *stream) {
+	stream->evd = ortp_ev_dispatcher_new(stream->sessions.rtp_session);
+	stream->evq = ortp_ev_queue_new();
+	rtp_session_register_event_queue(stream->sessions.rtp_session, stream->evq);
+}
+
+RtpSession * ms_create_duplex_rtp_session(const char* local_ip, int loc_rtp_port, int loc_rtcp_port) {
 	RtpSession *rtpr;
 
 	rtpr = rtp_session_new(RTP_SESSION_SENDRECV);
@@ -140,101 +115,121 @@ RtpSession * create_duplex_rtpsession(int loc_rtp_port, int loc_rtcp_port, bool_
 	rtp_session_set_blocking_mode(rtpr, 0);
 	rtp_session_enable_adaptive_jitter_compensation(rtpr, TRUE);
 	rtp_session_set_symmetric_rtp(rtpr, TRUE);
-	rtp_session_set_local_addr(rtpr, ipv6 ? "::" : "0.0.0.0", loc_rtp_port, loc_rtcp_port);
-	rtp_session_signal_connect(rtpr, "timestamp_jump", (RtpCallback)rtp_session_resync, (long)NULL);
-	rtp_session_signal_connect(rtpr, "ssrc_changed", (RtpCallback)rtp_session_resync, (long)NULL);
+	rtp_session_set_local_addr(rtpr, local_ip, loc_rtp_port, loc_rtcp_port);
+	rtp_session_signal_connect(rtpr, "timestamp_jump", (RtpCallback)rtp_session_resync, NULL);
+	rtp_session_signal_connect(rtpr, "ssrc_changed", (RtpCallback)rtp_session_resync, NULL);
 	rtp_session_set_ssrc_changed_threshold(rtpr, 0);
 	rtp_session_set_rtcp_report_interval(rtpr, 2500);	/* At the beginning of the session send more reports. */
+	rtp_session_set_multicast_loopback(rtpr,TRUE); /*very useful, specially for testing purposes*/
 	disable_checksums(rtp_session_get_rtp_socket(rtpr));
-
 	return rtpr;
 }
 
-void start_ticker(MediaStream *stream) {
-	MSTickerParams params = {0};
-	char name[16];
+int media_stream_join_multicast_group(MediaStream *stream, const char *ip){
+	return rtp_session_join_multicast_group(stream->sessions.rtp_session,ip);
+}
 
+void media_stream_start_ticker(MediaStream *stream) {
+	MSTickerParams params = {0};
+	char name[32] = {0};
+
+	if (stream->sessions.ticker) return;
 	snprintf(name, sizeof(name) - 1, "%s MSTicker", media_stream_type_str(stream));
 	name[0] = toupper(name[0]);
 	params.name = name;
-	params.prio = __ms_get_default_prio((stream->type == VideoStreamType) ? TRUE : FALSE);
-	stream->ticker = ms_ticker_new_with_params(&params);
+	params.prio = __ms_get_default_prio((stream->type == MSVideo) ? TRUE : FALSE);
+	stream->sessions.ticker = ms_ticker_new_with_params(&params);
 }
 
 const char * media_stream_type_str(MediaStream *stream) {
-	switch (stream->type) {
-		default:
-		case AudioStreamType:
-			return "audio";
-		case VideoStreamType:
-			return "video";
+	return ms_format_type_to_string(stream->type);
+}
+
+void ms_media_stream_sessions_uninit(MSMediaStreamSessions *sessions){
+	if (sessions->srtp_context) {
+		ms_srtp_context_delete(sessions->srtp_context);
+		sessions->srtp_context=NULL;
+	}
+	if (sessions->rtp_session) {
+		rtp_session_destroy(sessions->rtp_session);
+		sessions->rtp_session=NULL;
+	}
+	if (sessions->zrtp_context != NULL) {
+		ms_zrtp_context_destroy(sessions->zrtp_context);
+		sessions->zrtp_context = NULL;
+	}
+	if (sessions->dtls_context != NULL) {
+		ms_dtls_srtp_context_destroy(sessions->dtls_context);
+		sessions->dtls_context = NULL;
+	}
+	if (sessions->ticker){
+		ms_ticker_destroy(sessions->ticker);
+		sessions->ticker=NULL;
 	}
 }
 
 void media_stream_free(MediaStream *stream) {
-	if (stream->zrtp_context != NULL) {
-		ortp_zrtp_context_destroy(stream->zrtp_context);
-		stream->zrtp_context = NULL;
-	}
-	if (stream->session != NULL) {
-		rtp_session_unregister_event_queue(stream->session, stream->evq);
-		rtp_session_destroy(stream->session);
-	}
-	if (stream->evq) ortp_ev_queue_destroy(stream->evq);
+	if (stream->sessions.rtp_session != NULL) rtp_session_unregister_event_queue(stream->sessions.rtp_session, stream->evq);
+	if (stream->evq != NULL) ortp_ev_queue_destroy(stream->evq);
+	if (stream->evd != NULL) ortp_ev_dispatcher_destroy(stream->evd);
+	if (stream->owns_sessions) ms_media_stream_sessions_uninit(&stream->sessions);
 	if (stream->rc != NULL) ms_bitrate_controller_destroy(stream->rc);
 	if (stream->rtpsend != NULL) ms_filter_destroy(stream->rtpsend);
 	if (stream->rtprecv != NULL) ms_filter_destroy(stream->rtprecv);
 	if (stream->encoder != NULL) ms_filter_destroy(stream->encoder);
 	if (stream->decoder != NULL) ms_filter_destroy(stream->decoder);
 	if (stream->voidsink != NULL) ms_filter_destroy(stream->voidsink);
-	if (stream->ticker != NULL) ms_ticker_destroy(stream->ticker);
 	if (stream->qi) ms_quality_indicator_destroy(stream->qi);
-    if (stream->srtp_session) ortp_srtp_dealloc(stream->srtp_session);
+}
+
+bool_t media_stream_started(MediaStream *stream) {
+	return stream->start_time != 0;
 }
 
 void media_stream_set_rtcp_information(MediaStream *stream, const char *cname, const char *tool) {
-	if (stream->session != NULL) {
-		rtp_session_set_source_description(stream->session, cname, NULL, NULL, NULL, NULL, tool, NULL);
+	if (stream->sessions.rtp_session != NULL) {
+		rtp_session_set_source_description(stream->sessions.rtp_session, cname, NULL, NULL, NULL, NULL, tool, NULL);
 	}
 }
 
 void media_stream_get_local_rtp_stats(MediaStream *stream, rtp_stats_t *lstats) {
-	if (stream->session) {
-		const rtp_stats_t *stats = rtp_session_get_stats(stream->session);
+	if (stream->sessions.rtp_session) {
+		const rtp_stats_t *stats = rtp_session_get_stats(stream->sessions.rtp_session);
 		memcpy(lstats, stats, sizeof(*stats));
 	} else memset(lstats, 0, sizeof(rtp_stats_t));
 }
 
 int media_stream_set_dscp(MediaStream *stream, int dscp) {
 	ms_message("Setting DSCP to %i for %s stream.", dscp, media_stream_type_str(stream));
-	return rtp_session_set_dscp(stream->session, dscp);
+	return rtp_session_set_dscp(stream->sessions.rtp_session, dscp);
 }
 
 void media_stream_enable_adaptive_bitrate_control(MediaStream *stream, bool_t enabled) {
-	stream->use_rc = enabled;
+	stream->rc_enable = enabled;
+}
+
+void media_stream_set_adaptive_bitrate_algorithm(MediaStream *stream, MSQosAnalyzerAlgorithm algorithm) {
+	stream->rc_algorithm = algorithm;
 }
 
 void media_stream_enable_adaptive_jittcomp(MediaStream *stream, bool_t enabled) {
-	rtp_session_enable_adaptive_jitter_compensation(stream->session, enabled);
+	rtp_session_enable_adaptive_jitter_compensation(stream->sessions.rtp_session, enabled);
 }
 
-bool_t media_stream_enable_srtp(MediaStream *stream, enum ortp_srtp_crypto_suite_t suite, const char *snd_key, const char *rcv_key) {
-	/* Assign new srtp transport to stream->session with 2 Master Keys. */
-	RtpTransport *rtp_tpt, *rtcp_tpt;
-
-	if (!ortp_srtp_supported()) {
-		ms_error("ortp srtp support not enabled");
-		return FALSE;
+void media_stream_enable_dtls(MediaStream *stream, MSDtlsSrtpParams *params){
+	if (stream->sessions.dtls_context==NULL) {
+		ms_message("Start DTLS media stream context in stream session [%p]", &(stream->sessions));
+		stream->sessions.dtls_context=ms_dtls_srtp_context_new(&(stream->sessions), params);
 	}
+}
 
-	ms_message("%s: %s stream snd_key='%s' rcv_key='%s'", __FUNCTION__, media_stream_type_str(stream), snd_key, rcv_key);
-	stream->srtp_session = ortp_srtp_create_configure_session(suite, rtp_session_get_send_ssrc(stream->session), snd_key, rcv_key);
-	if (!stream->srtp_session) return FALSE;
+bool_t media_stream_dtls_supported(void){
+	return ms_dtls_srtp_available();
+}
 
-	// TODO: check who will free rtp_tpt ?
-	srtp_transport_new(stream->srtp_session, &rtp_tpt, &rtcp_tpt);
-	rtp_session_set_transports(stream->session, rtp_tpt, rtcp_tpt);
-	return TRUE;
+/*deprecated*/
+bool_t media_stream_enable_srtp(MediaStream *stream, MSCryptoSuite suite, const char *snd_key, const char *rcv_key) {
+	return ms_media_stream_sessions_set_srtp_recv_key_b64(&stream->sessions,suite,rcv_key)==0 && ms_media_stream_sessions_set_srtp_send_key_b64(&stream->sessions,suite,snd_key)==0;
 }
 
 const MSQualityIndicator *media_stream_get_quality_indicator(MediaStream *stream){
@@ -243,65 +238,136 @@ const MSQualityIndicator *media_stream_get_quality_indicator(MediaStream *stream
 
 bool_t ms_is_ipv6(const char *remote) {
 	bool_t ret = FALSE;
-#ifdef INET6
 	struct addrinfo hints, *res0;
 	int err;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
 	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_NUMERICHOST;
 	err = getaddrinfo(remote,"8000", &hints, &res0);
 	if (err != 0) {
-		ms_warning("get_local_addr_for: %s", gai_strerror(err));
+		ms_warning("ms_is_ipv6(%s): %s", remote, gai_strerror(err));
 		return FALSE;
 	}
 	ret = (res0->ai_addr->sa_family == AF_INET6);
 	freeaddrinfo(res0);
-#endif
 	return ret;
 }
 
-void mediastream_payload_type_changed(RtpSession *session, unsigned long data) {
-	MediaStream *stream = (MediaStream *)data;
-	int pt = rtp_session_get_recv_payload_type(stream->session);
-	media_stream_change_decoder(stream, pt);
+bool_t ms_is_multicast_addr(const struct sockaddr *addr) {
+
+	switch (addr->sa_family) {
+		case AF_INET:
+			return IN_MULTICAST(ntohl(((struct sockaddr_in *) addr)->sin_addr.s_addr));
+		case AF_INET6:
+			return IN6_IS_ADDR_MULTICAST(&(((struct sockaddr_in6 *) addr)->sin6_addr));
+		default:
+			return FALSE;
+	}
+
+}
+
+bool_t ms_is_multicast(const char *address) {
+	bool_t ret = FALSE;
+	struct addrinfo hints, *res0;
+	int err;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_NUMERICHOST;
+	err = getaddrinfo(address,"8000", &hints, &res0);
+	if (err != 0) {
+		ms_warning("ms_is_multicast(%s): %s", address, gai_strerror(err));
+		return FALSE;
+	}
+	ret = ms_is_multicast_addr(res0->ai_addr);
+
+	freeaddrinfo(res0);
+	return ret;
+}
+
+static void media_stream_process_rtcp(MediaStream *stream, mblk_t *m, time_t curtime){
+	stream->last_packet_time=curtime;
+	ms_message("%s stream [%p]: receiving RTCP %s%s",media_stream_type_str(stream),stream,(rtcp_is_SR(m)?"SR":""),(rtcp_is_RR(m)?"RR":""));
+	do{
+		if (stream->rc_enable && stream->rc) ms_bitrate_controller_process_rtcp(stream->rc,m);
+		if (stream->qi) ms_quality_indicator_update_from_feedback(stream->qi,m);
+		stream->process_rtcp(stream,m);
+	}while(rtcp_next_packet(m));
 }
 
 void media_stream_iterate(MediaStream *stream){
 	time_t curtime=ms_time(NULL);
-	
-	if (stream->is_beginning && (curtime-stream->start_time>15)){
-		rtp_session_set_rtcp_report_interval(stream->session,5000);
-		stream->is_beginning=FALSE;
-	}
-	if ((curtime-stream->last_bw_sampling_time)>=1) {
-		/*update bandwidth stat every second more or less*/
-		stream->up_bw=rtp_session_compute_send_bandwidth(stream->session);
-		stream->down_bw=rtp_session_compute_recv_bandwidth(stream->session);
-		stream->last_bw_sampling_time=curtime;
-	}
-	if (stream->ice_check_list) ice_check_list_process(stream->ice_check_list,stream->session);
+
+	if (stream->ice_check_list) ice_check_list_process(stream->ice_check_list,stream->sessions.rtp_session);
 	/*we choose to update the quality indicator as much as possible, since local statistics can be computed realtime. */
-	if (stream->qi && curtime>stream->last_iterate_time) ms_quality_indicator_update_local(stream->qi);
+	if (stream->state==MSStreamStarted){
+		if (stream->is_beginning && (curtime-stream->start_time>15)){
+			rtp_session_set_rtcp_report_interval(stream->sessions.rtp_session,5000);
+			stream->is_beginning=FALSE;
+		}
+		if (stream->qi && curtime>stream->last_iterate_time) ms_quality_indicator_update_local(stream->qi);
+	}
 	stream->last_iterate_time=curtime;
+
+	if (stream->rc) ms_bitrate_controller_update(stream->rc);
+
+	if (stream->evd) {
+		ortp_ev_dispatcher_iterate(stream->evd);
+	}
+
 	if (stream->evq){
-		OrtpEvent *ev=ortp_ev_queue_get(stream->evq);
-		if (ev!=NULL){
+		OrtpEvent *ev=NULL;
+
+		while ((ev=ortp_ev_queue_get(stream->evq))!=NULL){
 			OrtpEventType evt=ortp_event_get_type(ev);
 			if (evt==ORTP_EVENT_RTCP_PACKET_RECEIVED){
 				mblk_t *m=ortp_event_get_data(ev)->packet;
-				ms_message("stream [%p]: receiving RTCP %s%s",stream,(rtcp_is_SR(m)?"SR":""),(rtcp_is_RR(m)?"RR":""));
-				stream->process_rtcp(stream,m);
+				media_stream_process_rtcp(stream,m,curtime);
 			}else if (evt==ORTP_EVENT_RTCP_PACKET_EMITTED){
-				ms_message("%s_stream_iterate[%p]: local statistics available\n\tLocal's current jitter buffer size:%f ms",
-					media_stream_type_str(stream), stream, rtp_session_get_jitter_stats(stream->session)->jitter_buffer_size_ms);
-			}else if ((evt==ORTP_EVENT_STUN_PACKET_RECEIVED)&&(stream->ice_check_list)){
-				ice_handle_stun_packet(stream->ice_check_list,stream->session,ortp_event_get_data(ev));
+				ms_message("%s_stream_iterate[%p], local statistics available:"
+							"\n\tLocal current jitter buffer size: %5.1fms",
+					media_stream_type_str(stream), stream, rtp_session_get_jitter_stats(stream->sessions.rtp_session)->jitter_buffer_size_ms);
+			} else if (evt==ORTP_EVENT_STUN_PACKET_RECEIVED){
+				if (stream->ice_check_list) {
+						ice_handle_stun_packet(stream->ice_check_list,stream->sessions.rtp_session,ortp_event_get_data(ev));
+				} else if (rtp_session_get_symmetric_rtp(stream->sessions.rtp_session)){
+					/*try to know if we can trust stun packets for symetric rtp*/
+					rtp_stats_t stats;
+					media_stream_get_local_rtp_stats(stream, &stats);
+					if (stats.packet_recv == 0 && !ms_is_multicast_addr((const struct sockaddr *)&stream->sessions.rtp_session->rtp.gs.rem_addr)) {
+						memcpy(&stream->sessions.rtp_session->rtp.gs.rem_addr,&ortp_event_get_data(ev)->source_addr,ortp_event_get_data(ev)->source_addrlen);
+						ms_message("stun packet received but no rtp yet for stream [%p], switching rtp destination address",stream);
+					}
+				}
+			} else if ((evt == ORTP_EVENT_ZRTP_ENCRYPTION_CHANGED) || (evt == ORTP_EVENT_DTLS_ENCRYPTION_CHANGED)) {
+				ms_message("%s_stream_iterate[%p]: is %s ",media_stream_type_str(stream) , stream, media_stream_secured(stream) ? "encrypted" : "not encrypted");
 			}
 			ortp_event_destroy(ev);
 		}
 	}
+}
 
+bool_t media_stream_alive(MediaStream *ms, int timeout){
+	const rtp_stats_t *stats;
+
+	if (ms->state!=MSStreamStarted){
+		return TRUE;
+	}
+	stats=rtp_session_get_stats(ms->sessions.rtp_session);
+	if (stats->recv!=0){
+		if (stats->recv!=ms->last_packet_count){
+			ms->last_packet_count=stats->recv;
+			ms->last_packet_time=ms_time(NULL);
+		}
+	}
+	if (ms_time(NULL)-ms->last_packet_time>timeout){
+		/* more than timeout seconds of inactivity*/
+		return FALSE;
+	}
+	return TRUE;
 }
 
 float media_stream_get_quality_rating(MediaStream *stream){
@@ -318,6 +384,20 @@ float media_stream_get_average_quality_rating(MediaStream *stream){
 	return -1;
 }
 
+float media_stream_get_lq_quality_rating(MediaStream *stream) {
+	if (stream->qi) {
+		return ms_quality_indicator_get_lq_rating(stream->qi);
+	}
+	return -1;
+}
+
+float media_stream_get_average_lq_quality_rating(MediaStream *stream) {
+	if (stream->qi) {
+		return ms_quality_indicator_get_average_lq_rating(stream->qi);
+	}
+	return -1;
+}
+
 int media_stream_set_target_network_bitrate(MediaStream *stream,int target_bitrate) {
 	stream->target_bitrate=target_bitrate;
 	return 0;
@@ -327,10 +407,184 @@ int media_stream_get_target_network_bitrate(const MediaStream *stream) {
 	return stream->target_bitrate;
 }
 
-MS2_PUBLIC float media_stream_get_up_bw(const MediaStream *stream) {
-	return stream->up_bw;
+float media_stream_get_up_bw(const MediaStream *stream) {
+	return rtp_session_get_rtp_send_bandwidth(stream->sessions.rtp_session);
 }
 
-MS2_PUBLIC float media_stream_get_down_bw(const MediaStream *stream) {
-	return stream->down_bw;
+float media_stream_get_down_bw(const MediaStream *stream) {
+	return rtp_session_get_rtp_recv_bandwidth(stream->sessions.rtp_session);
 }
+
+float media_stream_get_rtcp_up_bw(const MediaStream *stream) {
+	return rtp_session_get_rtcp_send_bandwidth(stream->sessions.rtp_session);
+}
+
+float media_stream_get_rtcp_down_bw(const MediaStream *stream) {
+	return rtp_session_get_rtcp_recv_bandwidth(stream->sessions.rtp_session);
+}
+
+void media_stream_reclaim_sessions(MediaStream *stream, MSMediaStreamSessions *sessions){
+	memcpy(sessions,&stream->sessions, sizeof(MSMediaStreamSessions));
+	stream->owns_sessions=FALSE;
+}
+
+bool_t media_stream_secured (const MediaStream *stream) {
+	if (stream->state != MSStreamStarted)
+		return FALSE;
+
+	switch (stream->type) {
+	case MSAudio:
+		/*fixme need also audio stream direction to be more precise*/
+		return ms_media_stream_sessions_secured(&stream->sessions, MediaStreamSendRecv);
+	case MSVideo:{
+		VideoStream *vs = (VideoStream*)stream;
+		return ms_media_stream_sessions_secured(&stream->sessions, vs->dir);
+	}
+	}
+	return FALSE;
+}
+
+bool_t media_stream_avpf_enabled(const MediaStream *stream) {
+	return rtp_session_avpf_enabled(stream->sessions.rtp_session);
+}
+
+uint16_t media_stream_get_avpf_rr_interval(const MediaStream *stream) {
+	return rtp_session_get_avpf_rr_interval(stream->sessions.rtp_session);
+}
+
+MSStreamState media_stream_get_state(const MediaStream *stream) {
+	return stream->state;
+}
+
+RtpSession * media_stream_get_rtp_session(const MediaStream *stream) {
+	return stream->sessions.rtp_session;
+}
+
+#define keywordcmp(key,b) strncmp(key,b,sizeof(key))
+
+/* see  http://www.iana.org/assignments/sdp-security-descriptions/sdp-security-descriptions.xhtml#sdp-security-descriptions-3 */
+
+
+
+MSCryptoSuite ms_crypto_suite_build_from_name_params(const MSCryptoSuiteNameParams *descrption){
+	const char *name=descrption->name, *parameters=descrption->params;
+	if (keywordcmp ( "AES_CM_128_HMAC_SHA1_80",name ) == 0 ){
+		if (parameters && strstr(parameters,"UNENCRYPTED_SRTP")) return MS_NO_CIPHER_SHA1_80;
+		else if (parameters && strstr(parameters,"UNAUTHENTICATED_SRTP")) return MS_AES_128_NO_AUTH;
+		else return MS_AES_128_SHA1_80;
+	}else if ( keywordcmp ( "AES_CM_128_HMAC_SHA1_32",name ) == 0 ){
+		if (parameters && strstr(parameters,"UNENCRYPTED_SRTP")) goto error;
+		if (parameters && strstr(parameters,"UNAUTHENTICATED_SRTP")) return MS_AES_128_NO_AUTH;
+		else return MS_AES_128_SHA1_32;
+	}else if ( keywordcmp ( "AES_CM_256_HMAC_SHA1_32",name ) == 0 ){
+		if (parameters && strstr(parameters,"UNENCRYPTED_SRTP")) goto error;
+		if (parameters && strstr(parameters,"UNAUTHENTICATED_SRTP")) goto error;
+		return MS_AES_256_SHA1_32;
+	}else if ( keywordcmp ( "AES_CM_256_HMAC_SHA1_80",name ) == 0 ){
+		if (parameters && strstr(parameters,"UNENCRYPTED_SRTP")) goto error;
+		if (parameters && strstr(parameters,"UNAUTHENTICATED_SRTP")) goto error;
+		return MS_AES_256_SHA1_80;
+	}
+error:
+	ms_error("Unsupported crypto suite '%s' with parameters '%s'",name, parameters ? parameters : "");
+	return MS_CRYPTO_SUITE_INVALID;
+}
+
+int ms_crypto_suite_to_name_params(MSCryptoSuite cs, MSCryptoSuiteNameParams *params ){
+	params->name=NULL;
+	params->params=NULL;
+	switch(cs){
+		case MS_CRYPTO_SUITE_INVALID:
+			break;
+		case MS_AES_128_SHA1_80:
+			params->name= "AES_CM_128_HMAC_SHA1_80";
+			break;
+		case MS_AES_128_SHA1_32:
+			params->name="AES_CM_128_HMAC_SHA1_32";
+			break;
+		case MS_AES_128_NO_AUTH:
+			params->name="AES_CM_128_HMAC_SHA1_80";
+			params->params="UNAUTHENTICATED_SRTP";
+			break;
+		case MS_NO_CIPHER_SHA1_80:
+			params->name="AES_CM_128_HMAC_SHA1_80";
+			params->params="UNENCRYPTED_SRTP UNENCRYPTED_SRTCP";
+			break;
+		case MS_AES_256_SHA1_80:
+			params->name="AES_CM_256_HMAC_SHA1_80";
+			break;
+		case MS_AES_256_SHA1_32:
+			params->name="AES_CM_256_HMAC_SHA1_32";
+			break;
+	}
+	if (params->name==NULL) return -1;
+	return 0;
+}
+
+OrtpEvDispatcher* media_stream_get_event_dispatcher(const MediaStream *stream) {
+	return stream->evd;
+}
+
+const char *ms_resource_type_to_string(MSResourceType type){
+	switch(type){
+		case MSResourceDefault:
+			return "MSResourceDefault";
+		case MSResourceInvalid:
+			return "MSResourceInvalid";
+		case MSResourceCamera:
+			return "MSResourceCamera";
+		case MSResourceFile:
+			return "MSResourceFile";
+		case MSResourceRtp:
+			return "MSResourceRtp";
+		case MSResourceSoundcard:
+			return "MSResourceSoundcard";
+	}
+	return "INVALID";
+}
+
+bool_t ms_media_resource_is_consistent(const MSMediaResource *r){
+	switch(r->type){
+		case MSResourceCamera:
+		case MSResourceRtp:
+		case MSResourceSoundcard:
+			if (r->resource_arg == NULL){
+				ms_error("No resource argument specified for resource type %s", ms_resource_type_to_string(r->type));
+				return FALSE;
+			}
+			return TRUE;
+		break;
+		case MSResourceFile:
+			/*setting up file player/recorder without specifying the file to play immediately is allowed*/
+		case MSResourceDefault:
+			return TRUE;
+		case MSResourceInvalid:
+			ms_error("Invalid resource type specified");
+			return FALSE;
+	}
+	ms_error("Unsupported media resource type [%i]", (int)r->type);  
+	return FALSE;
+}
+
+bool_t ms_media_stream_io_is_consistent(const MSMediaStreamIO *io){
+	return ms_media_resource_is_consistent(&io->input) && ms_media_resource_is_consistent(&io->output);
+}
+
+/*stubs*/
+#ifndef VIDEO_ENABLED
+void video_stream_open_player(VideoStream *stream, MSFilter *sink){
+}
+
+void video_stream_close_player(VideoStream *stream){
+}
+
+const char *video_stream_get_default_video_renderer(void){
+	return NULL;
+}
+
+MSWebCamDesc *ms_mire_webcam_desc_get(void){
+	return NULL;
+}
+
+#endif
+

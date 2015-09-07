@@ -59,12 +59,14 @@ struct AndroidReaderContext {
 		androidCamera = 0;
 		previewWindow = 0;
 		rotation = rotationSavedDuringVSize = UNDEFINED_ROTATION;
+		allocator = ms_yuv_buf_allocator_new();
 	};
 
 	~AndroidReaderContext(){
 		if (frame != 0) {
 			freeb(frame);
 		}
+		ms_yuv_buf_allocator_free(allocator);
 		ms_mutex_destroy(&mutex);
 	};
 
@@ -81,6 +83,7 @@ struct AndroidReaderContext {
 	int rotation, rotationSavedDuringVSize;
 	int useDownscaling;
 	char fps_context[64];
+	MSYuvBufAllocator *allocator;
 
 	jobject androidCamera;
 	jobject previewWindow;
@@ -90,7 +93,7 @@ struct AndroidReaderContext {
 /************************ Private helper methods       ************************/
 static jclass getHelperClassGlobalRef(JNIEnv *env);
 static int compute_image_rotation_correction(AndroidReaderContext* d, int rotation);
-//static void compute_cropping_offsets(MSVideoSize hwSize, MSVideoSize outputSize, int* yoff, int* cbcroff);
+static void compute_cropping_offsets(MSVideoSize hwSize, MSVideoSize outputSize, int* yoff, int* cbcroff);
 static AndroidReaderContext *getContext(MSFilter *f);
 
 
@@ -112,7 +115,7 @@ static int video_capture_set_autofocus(MSFilter *f, void* data){
 
 static int video_capture_get_fps(MSFilter *f, void *arg){
 	AndroidReaderContext* d = (AndroidReaderContext*) f->data;
-	*((float*)arg) = d->fps;
+	*((float*)arg) = ms_average_fps_get(&d->averageFps);
 	return 0;
 }
 
@@ -137,6 +140,7 @@ static int video_capture_set_vsize(MSFilter *f, void* data){
 	jobject resArray = env->CallStaticObjectMethod(d->helperClass, method, ((AndroidWebcamConfig*)d->webcam->data)->id, d->requestedSize.width, d->requestedSize.height);
 
 	if (!resArray) {
+		ms_mutex_unlock(&d->mutex);
 		ms_error("Failed to retrieve camera '%d' supported resolutions\n", ((AndroidWebcamConfig*)d->webcam->data)->id);
 		return -1;
 	}
@@ -146,7 +150,7 @@ static int video_capture_set_vsize(MSFilter *f, void* data){
     //   - 1 : height
     //   - 2 : useDownscaling
 	jint res[3];
-   env->GetIntArrayRegion((jintArray)resArray, 0, 3, res);
+	env->GetIntArrayRegion((jintArray)resArray, 0, 3, res);
 	ms_message("Camera selected resolution is: %dx%d (requested: %dx%d) with downscaling?%d\n", res[0], res[1], d->requestedSize.width, d->requestedSize.height, res[2]);
 	d->hwCapableSize.width =  res[0];
 	d->hwCapableSize.height = res[1];
@@ -165,8 +169,8 @@ static int video_capture_set_vsize(MSFilter *f, void* data){
 	} else if ((hwSize * downscale * downscale) > rqSize) {
 		ms_message("Camera cannot produce requested resolution %dx%d, will capture a bigger one (%dx%d) and crop it to match encoder requested resolution\n",
 			d->requestedSize.width, d->requestedSize.height, (int)(res[0] * downscale), (int)(res[1] * downscale));
-		d->usedSize.width = d->hwCapableSize.width;
-		d->usedSize.height = d->hwCapableSize.height;
+		d->usedSize.width = d->requestedSize.width;
+		d->usedSize.height = d->requestedSize.height;
 	} else {
 		d->usedSize.width = d->requestedSize.width;
 		d->usedSize.height = d->requestedSize.height;
@@ -247,7 +251,6 @@ static int video_set_native_preview_window(MSFilter *f, void *arg) {
 						(jint)d->fps,
 						(d->rotation != UNDEFINED_ROTATION) ? d->rotation:0,
 						(jlong)d));
-
 		}
 		// if previewWindow AND camera are valid => set preview window
 		if (w && d->androidCamera)
@@ -262,9 +265,9 @@ static int video_set_native_preview_window(MSFilter *f, void *arg) {
 }
 
 static int video_get_native_preview_window(MSFilter *f, void *arg) {
-    AndroidReaderContext* d = (AndroidReaderContext*) f->data;
-    arg = &d->previewWindow;
-    return 0;
+	AndroidReaderContext* d = (AndroidReaderContext*) f->data;
+	arg = &d->previewWindow;
+	return 0;
 }
 
 static int video_set_device_rotation(MSFilter* f, void* arg) {
@@ -327,9 +330,10 @@ static void video_capture_process(MSFilter *f){
 static void video_capture_postprocess(MSFilter *f){
 	ms_message("Postprocessing of Android VIDEO capture filter");
 	AndroidReaderContext* d = getContext(f);
-	ms_mutex_lock(&d->mutex);
 	JNIEnv *env = ms_get_jni_env();
-
+	
+	ms_mutex_lock(&d->mutex);
+	
 	if (d->androidCamera) {
 		jmethodID method = env->GetStaticMethodID(d->helperClass,"stopRecording", "(Ljava/lang/Object;)V");
 
@@ -338,6 +342,10 @@ static void video_capture_postprocess(MSFilter *f){
 	}
 	d->androidCamera = 0;
 	d->previewWindow = 0;
+	if (d->frame){
+		freemsg(d->frame);
+		d->frame=NULL;
+	}
 	ms_mutex_unlock(&d->mutex);
 }
 
@@ -460,9 +468,13 @@ extern "C" {
 JNIEXPORT void JNICALL Java_org_linphone_mediastream_video_capture_AndroidVideoApi5JniWrapper_putImage(JNIEnv*  env,
 		jclass  thiz,jlong nativePtr,jbyteArray frame) {
 	AndroidReaderContext* d = (AndroidReaderContext*) nativePtr;
-	if (!d->androidCamera)
-		return;
+	
 	ms_mutex_lock(&d->mutex);
+	
+	if (!d->androidCamera){
+		ms_mutex_unlock(&d->mutex);
+		return;
+	}
 
 	if (!ms_video_capture_new_frame(&d->fpsControl,d->filter->ticker->time)) {
 		ms_mutex_unlock(&d->mutex);
@@ -484,7 +496,11 @@ JNIEXPORT void JNICALL Java_org_linphone_mediastream_video_capture_AndroidVideoA
 	}
 
 	int y_cropping_offset=0, cbcr_cropping_offset=0;
-	//compute_cropping_offsets(d->hwCapableSize, d->requestedSize, &y_cropping_offset, &cbcr_cropping_offset);
+	MSVideoSize targetSize;
+	d->useDownscaling?targetSize.width=d->requestedSize.width*2:targetSize.width=d->requestedSize.width;
+	d->useDownscaling?targetSize.height=d->requestedSize.height*2:targetSize.height=d->requestedSize.height;
+
+	compute_cropping_offsets(d->hwCapableSize, targetSize, &y_cropping_offset, &cbcr_cropping_offset);
 
 	int width = d->hwCapableSize.width;
 	int height = d->hwCapableSize.height;
@@ -492,20 +508,21 @@ JNIEXPORT void JNICALL Java_org_linphone_mediastream_video_capture_AndroidVideoA
 	uint8_t* y_src = (uint8_t*)(jinternal_buff + y_cropping_offset);
 	uint8_t* cbcr_src = (uint8_t*) (jinternal_buff + width * height + cbcr_cropping_offset);
 
+
 	/* Warning note: image_rotation_correction == 90 does not imply portrait mode !
 	   (incorrect function naming).
 	   It only implies one thing: image needs to rotated by that amount to be correctly
 	   displayed.
 	*/
- 	mblk_t* yuv_block = copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(y_src
+ 	mblk_t* yuv_block = copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(d->allocator, y_src
 														, cbcr_src
 														, image_rotation_correction
 														, d->usedSize.width
 														, d->usedSize.height
 														, d->hwCapableSize.width
-														, d->hwCapableSize.width,
-														false,
-														d->useDownscaling);
+														, d->hwCapableSize.width
+														, false
+														, d->useDownscaling);
 	if (yuv_block) {
 		if (d->frame)
 			freemsg(d->frame);
@@ -537,7 +554,7 @@ static int compute_image_rotation_correction(AndroidReaderContext* d, int rotati
 	return result % 360;
 }
 
-#if 0
+
 static void compute_cropping_offsets(MSVideoSize hwSize, MSVideoSize outputSize, int* yoff, int* cbcroff) {
 	// if hw <= out -> return
 	if (hwSize.width * hwSize.height <= outputSize.width * outputSize.height) {
@@ -552,7 +569,7 @@ static void compute_cropping_offsets(MSVideoSize hwSize, MSVideoSize outputSize,
 	*yoff = hwSize.width * halfDiffH + halfDiffW;
 	*cbcroff = hwSize.width * halfDiffH * 0.5 + halfDiffW;
 }
-#endif
+
 
 static jclass getHelperClassGlobalRef(JNIEnv *env) {
 	ms_message("getHelperClassGlobalRef (env: %p)", env);

@@ -25,12 +25,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "mediastreamer2/msvideo.h"
 #include <string.h>
 
-#ifdef WIN32
-#include <malloc.h> /* for alloca */
-#endif
 
 MSQueue * ms_queue_new(struct _MSFilter *f1, int pin1, struct _MSFilter *f2, int pin2 ){
-	MSQueue *q=(MSQueue*)ms_new(MSQueue,1);
+	MSQueue *q=(MSQueue*)ms_new0(MSQueue,1);
 	qinit(&q->q);
 	q->prev.filter=f1;
 	q->prev.pin=pin1;
@@ -63,7 +60,7 @@ void ms_bufferizer_init(MSBufferizer *obj){
 }
 
 MSBufferizer * ms_bufferizer_new(){
-	MSBufferizer *obj=(MSBufferizer *)ms_new(MSBufferizer,1);
+	MSBufferizer *obj=(MSBufferizer *)ms_new0(MSBufferizer,1);
 	ms_bufferizer_init(obj);
 	return obj;
 }
@@ -82,13 +79,16 @@ void ms_bufferizer_put_from_queue(MSBufferizer *obj, MSQueue *q){
 
 int ms_bufferizer_read(MSBufferizer *obj, uint8_t *data, int datalen){
 	if (obj->size>=datalen){
+		/*we can return something */
 		int sz=0;
 		int cplen;
 		mblk_t *m=peekq(&obj->q);
-		/*we can return something */
+		
+		/* first store current meta information in the _q_stopper field the queue, just to reuse space*/
+		mblk_meta_copy(m, &obj->q._q_stopper);
 		while(sz<datalen){
 			cplen=MIN(m->b_wptr-m->b_rptr,datalen-sz);
-			memcpy(data+sz,m->b_rptr,cplen);
+			if (data) memcpy(data+sz,m->b_rptr,cplen);
 			sz+=cplen;
 			m->b_rptr+=cplen;
 			if (m->b_rptr==m->b_wptr){
@@ -109,9 +109,16 @@ int ms_bufferizer_read(MSBufferizer *obj, uint8_t *data, int datalen){
 	return 0;
 }
 
+void ms_bufferizer_fill_current_metas(MSBufferizer *obj, mblk_t *dest){
+	mblk_t *source=&obj->q._q_stopper;
+#if defined(ORTP_TIMESTAMP)
+	dest->timestamp = source->timestamp;
+#endif
+	dest->ttl_or_hl = source->ttl_or_hl;
+}
+
 void ms_bufferizer_skip_bytes(MSBufferizer *obj, int bytes){
-	uint8_t *tmp=(uint8_t*)alloca(bytes);
-	ms_bufferizer_read(obj,tmp,bytes);
+	ms_bufferizer_read(obj, NULL, bytes);
 }
 
 void ms_bufferizer_flush(MSBufferizer *obj){

@@ -50,7 +50,7 @@ then try incrementing the number of periods*/
 having sound quality trouble:*/
 /*#define EPIPE_BUGFIX 1*/
 
-static MSSndCard * alsa_card_new(int id);
+static MSSndCard * alsa_card_new(int id, const char *pcmbasename);
 static MSSndCard *alsa_card_duplicate(MSSndCard *obj);
 static MSFilter * ms_alsa_read_new(const char *dev);
 static MSFilter * ms_alsa_write_new(const char *dev);
@@ -69,7 +69,7 @@ static void alsa_resume(snd_pcm_t *handle){
 	snd_pcm_status_t *status=NULL;
 
 	snd_pcm_status_alloca(&status);
-	
+
 	if ((err=snd_pcm_status(handle,status))!=0){
 		ms_warning("snd_pcm_status() failed: %s",snd_strerror(err));
 		return;
@@ -96,16 +96,16 @@ static int alsa_set_params(snd_pcm_t *pcm_handle, int rw, int bits, int stereo, 
 	snd_pcm_uframes_t buffersize;
 	int err;
 	int format;
-	
+
 	/* Allocate the snd_pcm_hw_params_t structure on the stack. */
 	snd_pcm_hw_params_alloca(&hwparams);
-	
+
 	/* Init hwparams with full configuration space */
 	if (snd_pcm_hw_params_any(pcm_handle, hwparams) < 0) {
 		ms_warning("alsa_set_params: Cannot configure this PCM device.");
 		return -1;
 	}
-	
+
 	if (snd_pcm_hw_params_set_access(pcm_handle, hwparams, SND_PCM_ACCESS_RW_INTERLEAVED) < 0) {
 		ms_warning("alsa_set_params: Error setting access.");
 		return -1;
@@ -124,7 +124,7 @@ static int alsa_set_params(snd_pcm_t *pcm_handle, int rw, int bits, int stereo, 
 		return -1;
 	}
 	/* Set sample rate. If the exact rate is not supported */
-	/* by the hardware, use nearest possible rate.         */ 
+	/* by the hardware, use nearest possible rate.         */
 	exact_uvalue=rate;
 	dir=0;
 	if ((err=snd_pcm_hw_params_set_rate_near(pcm_handle, hwparams, &exact_uvalue, &dir))<0){
@@ -136,8 +136,8 @@ static int alsa_set_params(snd_pcm_t *pcm_handle, int rw, int bits, int stereo, 
 		"==> Using %d Hz instead.", rate, exact_uvalue);
 	}
 	/* choose greater period size when rate is high */
-	periodsize=periodsize*(rate/8000);	
-	
+	periodsize=periodsize*(rate/8000);
+
 	/* Set buffer size (in frames). The resulting latency is given by */
 	/* latency = periodsize * periods / (rate * bytes_per_frame)     */
 	/* set period size */
@@ -153,7 +153,7 @@ static int alsa_set_params(snd_pcm_t *pcm_handle, int rw, int bits, int stereo, 
 	}
 	ms_warning("alsa_set_params: periodsize:%d Using %d", periodsize, (int)exact_ulvalue);
 	periodsize=exact_ulvalue;
-	/* Set number of periods. Periods used to be called fragments. */ 
+	/* Set number of periods. Periods used to be called fragments. */
 	exact_uvalue=periods;
 	dir=0;
 	if (snd_pcm_hw_params_set_periods_near(pcm_handle, hwparams, &exact_uvalue, &dir) < 0) {
@@ -171,7 +171,7 @@ static int alsa_set_params(snd_pcm_t *pcm_handle, int rw, int bits, int stereo, 
 		buffersize=0;
 		ms_warning("alsa_set_params: could not obtain hw buffer size.");
 	}
-	
+
 	/* Apply HW parameter settings to */
 	/* PCM device and prepare device  */
 	if ((err=snd_pcm_hw_params(pcm_handle, hwparams)) < 0) {
@@ -194,7 +194,7 @@ static int alsa_set_params(snd_pcm_t *pcm_handle, int rw, int bits, int stereo, 
 			return -1;
 		}
 	}
-	return 0;	
+	return 0;
 }
 
 #ifdef EPIPE_BUGFIX
@@ -202,7 +202,7 @@ static void alsa_fill_w (snd_pcm_t *pcm_handle)
 {
 	snd_pcm_hw_params_t *hwparams=NULL;
 	int channels;
-        snd_pcm_uframes_t buffer_size;
+		snd_pcm_uframes_t buffer_size;
 	int buffer_size_bytes;
 	void *buffer;
 
@@ -255,7 +255,7 @@ static snd_pcm_t * alsa_open_r(const char *pcmdev,int bits,int stereo,int rate)
 	struct timezone tz;
 	int diff = 0;
 	err = gettimeofday(&tv1, &tz);
-	while (1) { 
+	while (1) {
 		if (!(alsa_set_params(pcm_handle,0,bits,stereo,rate)<0)){
 			ms_message("alsa_open_r: Audio params set");
 			break;
@@ -287,7 +287,7 @@ static snd_pcm_t * alsa_open_w(const char *pcmdev,int bits,int stereo,int rate)
 	snd_pcm_t *pcm_handle;
 
 	ms_message("alsa_open_w: opening %s at %iHz, bits=%i, stereo=%i",pcmdev,rate,bits,stereo);
-	
+
 	if (snd_pcm_open(&pcm_handle, pcmdev,SND_PCM_STREAM_PLAYBACK,SND_PCM_NONBLOCK) < 0) {
 		ms_warning("alsa_open_w: Error opening PCM device %s",pcmdev );
 		return NULL;
@@ -300,7 +300,7 @@ static snd_pcm_t * alsa_open_w(const char *pcmdev,int bits,int stereo,int rate)
 	int diff = 0;
 	int err;
 	err = gettimeofday(&tv1, &tz);
-	while (1) { 
+	while (1) {
 		if (!(alsa_set_params(pcm_handle,1,bits,stereo,rate)<0)){
 			ms_message("alsa_open_w: Audio params set");
 			break;
@@ -339,14 +339,14 @@ static int alsa_can_read(snd_pcm_t *dev)
 		ms_error("*** alsa_can_read fixup, trying to recover");
 		snd_pcm_drain(dev); /* Ignore possible error, at least -EAGAIN.*/
 		err = snd_pcm_recover(dev, avail, 0);
-		if (err){ 
+		if (err){
 			ms_error("snd_pcm_recover() failed with err %d: %s", err, snd_strerror(err));
 			return -1;
 		}
 		err = snd_pcm_start(dev);
-		if (err){ 
-			ms_error("snd_pcm_start() failed with err %d: %s", err, snd_strerror(err)); 
-			return -1; 
+		if (err){
+			ms_error("snd_pcm_start() failed with err %d: %s", err, snd_strerror(err));
+			return -1;
 		}
 		ms_message("Recovery done");
 	}
@@ -468,7 +468,7 @@ static int get_mixer_element(snd_mixer_t *mixer,const char *name, MixerAction ac
 				}
 				break;
 				case CAPTURE_SWITCH:
-				
+
 				break;
 				case PLAYBACK_SWITCH:
 
@@ -477,7 +477,7 @@ static int get_mixer_element(snd_mixer_t *mixer,const char *name, MixerAction ac
 		}
 		elem=snd_mixer_elem_next(elem);
 	}
-	
+
 	return value;
 }
 
@@ -488,9 +488,9 @@ static void set_mixer_element(snd_mixer_t *mixer,const char *name, int level,Mix
 	long sndMixerPMin=0;
 	long sndMixerPMax=0;
 	long newvol=0;
-	
+
 	elem=snd_mixer_first_elem(mixer);
-	
+
 	while (elem!=NULL){
 		elemname=snd_mixer_selem_get_name(elem);
 		//ms_message("Found alsa mixer element %s.",elemname);
@@ -537,7 +537,7 @@ static void set_mixer_element(snd_mixer_t *mixer,const char *name, int level,Mix
 
 
 static void alsa_card_set_level(MSSndCard *obj,MSSndCardMixerElem e,int a)
-{	
+{
 	snd_mixer_t *mixer;
 	AlsaData *ad=(AlsaData*)obj->data;
 	mixer=alsa_mixer_open(ad->mixdev);
@@ -616,9 +616,20 @@ static MSFilter *alsa_card_create_writer(MSSndCard *card)
 }
 
 
+void alsa_error_log_handler(const char *file, int line, const char *function, int err, const char *fmt, ...) {
+	char * format = ms_strdup_printf("also error in %s:%d - %s", file, line, fmt);
+	va_list args;
+	va_start (args, fmt);
+	ortp_logv(ORTP_MESSAGE, format, args);
+	va_end (args);
+	ms_free(format);
+}
+
 static void alsa_card_init(MSSndCard *obj){
 	AlsaData *ad=ms_new0(AlsaData,1);
 	obj->data=ad;
+	snd_lib_error_set_handler(alsa_error_log_handler);
+
 }
 
 static void alsa_card_uninit(MSSndCard *obj){
@@ -630,10 +641,31 @@ static void alsa_card_uninit(MSSndCard *obj){
 
 static void alsa_card_detect(MSSndCardManager *m){
 	int i;
-	for (i=-1;i<10;i++){
-		MSSndCard *card=alsa_card_new(i);
+	void **hints=NULL;
+	int device_count=0;
+	int old_device_count=0; /*previous alsa pcm naming convention*/
+	const char *pcmname = "sysdefault";
+
+	/*get the number of PCM device availables*/
+	if (snd_device_name_hint(-1, "pcm", &hints)==0){
+		int i;
+		for(i=0; hints[i]!=NULL; ++i){
+			char *name = snd_device_name_get_hint(hints[i],"NAME");
+			if (name && strstr(name,"sysdefault") == name) device_count++;
+			if (name && strstr(name,"default") == name) old_device_count++;
+			if (name) free(name);
+		}
+		snd_device_name_free_hint(hints);
+	}
+	if (device_count == 0) {
+		device_count = old_device_count;
+		pcmname = "default";
+	}
+	for (i=-1;i<device_count;i++){
+		MSSndCard *card=alsa_card_new(i, pcmname);
 		if (card!=NULL)
 			ms_snd_card_manager_add_card(m,card);
+		else break;
 	}
 	atexit((void(*)(void))snd_config_update_free_global);
 }
@@ -675,33 +707,56 @@ MSSndCard * ms_alsa_card_new_custom(const char *pcmdev, const char *mixdev){
 	return obj;
 }
 
-static unsigned int get_card_capabilities(const char *devname){
+static char *get_card_name(snd_pcm_t *handle, unsigned int *card_index_ret){
+	snd_pcm_info_t *info=NULL;
+	unsigned int card_index=-1;
+	char *ret = NULL;
+
+	snd_pcm_info_malloc(&info);
+	if (snd_pcm_info(handle, info)==0){
+		card_index = snd_pcm_info_get_card(info);
+	}
+	snd_pcm_info_free(info);
+	if (card_index != (unsigned int) -1){
+		char *name=NULL;
+		*card_index_ret = card_index;
+		snd_card_get_name(card_index, &name);
+		if (name){
+			/* remove trailing spaces from card name */
+			char *pos2;
+			ret =ms_strdup(name);
+			pos2 = ret + strlen(ret) - 1;
+			for (; pos2>name && *pos2==' '; pos2--) *pos2='\0';
+			free(name);
+		}
+	}
+	if (!ret) ret = ms_strdup("default");
+	return ret;
+}
+
+static unsigned int get_card_capabilities(const char *devname, char **card_name, unsigned int *card_index){
 	snd_pcm_t *pcm_handle;
-	unsigned int ret=0;
+	unsigned int ret = 0;
+
+	*card_name = NULL;
 	if (snd_pcm_open(&pcm_handle,devname,SND_PCM_STREAM_CAPTURE,SND_PCM_NONBLOCK)==0) {
+		*card_name = get_card_name(pcm_handle, card_index);
 		ret|=MS_SND_CARD_CAP_CAPTURE;
 		snd_pcm_close(pcm_handle);
 	}
 	if (snd_pcm_open(&pcm_handle,devname,SND_PCM_STREAM_PLAYBACK,SND_PCM_NONBLOCK)==0) {
+		if (*card_name == NULL) *card_name = get_card_name(pcm_handle, card_index);
 		ret|=MS_SND_CARD_CAP_PLAYBACK;
 		snd_pcm_close(pcm_handle);
 	}
 	return ret;
 }
 
-static MSSndCard * alsa_card_new(int id)
-{
+static MSSndCard * alsa_card_new(int id, const char *pcmbasename){
 	MSSndCard * obj;
-	char *name=NULL;
 	AlsaData *ad;
-	int err;
-	
-	if (id!=-1){
-		err=snd_card_get_name(id,&name);
-		if (err<0) {
-			return NULL;
-		}
-	}
+	unsigned int hw_index=0;
+
 	obj=ms_snd_card_new(&alsa_card_desc);
 	ad=(AlsaData*)obj->data;
 	if (id==-1) {
@@ -710,39 +765,19 @@ static MSSndCard * alsa_card_new(int id)
 		ad->pcmdev=ms_strdup("default");
 		ad->mixdev=ms_strdup("default");
 	}else{
-		/* remove trailing spaces from card name */
-		char *pos1, *pos2;
-		pos1=ms_strdup(name);
-		pos2=pos1+strlen(pos1)-1;
-		for (; pos2>pos1 && *pos2==' '; pos2--) *pos2='\0';
-		obj->name=pos1;
-		ad->pcmdev=ms_strdup_printf("default:%i",id);
-		ad->mixdev=ms_strdup_printf("default:%i",id);
-		{
-			snd_mixer_t *mixer;
-			mixer = alsa_mixer_open(ad->mixdev);
-			if (mixer==NULL) {
-				ms_free(ad->mixdev);
-				ad->mixdev=ms_strdup_printf("hw:%i",id);
-			} else {
-				alsa_mixer_close(mixer);
-			}
+		snd_mixer_t *mixer;
+		if (id == 0) ad->pcmdev = ms_strdup(pcmbasename);
+		else ad->pcmdev=ms_strdup_printf("%s:%i",pcmbasename, id);
+		obj->capabilities = get_card_capabilities(ad->pcmdev, &obj->name, &hw_index);
+		if (obj->capabilities == 0){
+			ms_snd_card_destroy(obj);
+			return NULL;
 		}
+		ad->mixdev=ms_strdup_printf("hw:%i",hw_index);
+		mixer = alsa_mixer_open(ad->mixdev);
+		if (!mixer) ms_warning("Fail to get a mixer for device %s", ad->mixdev);
+		else alsa_mixer_close(mixer);
 	}
-	/*check card capabilities: */
-	obj->capabilities=get_card_capabilities(ad->pcmdev);
-	if (obj->capabilities==0){
-		ms_warning("Strange, sound card %s does not seems to be capable of anything, retrying with plughw...",obj->name);
-		/*retry with plughw: this workarounds an alsa bug*/
-		ms_free(ad->pcmdev);
-		ad->pcmdev=ms_strdup_printf("plughw:%i",id);
-		obj->capabilities=get_card_capabilities(ad->pcmdev);
-		if (obj->capabilities==0){
-			ms_warning("Strange, sound card %s seems totally unusable.",obj->name);
-		}
-	}
-	free(name);
-	/*ms_message("alsa device %s found",obj->name);*/
 	return obj;
 }
 
@@ -753,20 +788,20 @@ struct _AlsaReadData{
 	int nchannels;
 	uint64_t read_samples;
 	MSTickerSynchronizer *ticker_synchronizer;
+	bool_t read_started;
+	bool_t write_started;
 
 #ifdef THREADED_VERSION
 	ms_thread_t thread;
 	ms_mutex_t mutex;
 	MSBufferizer * bufferizer;
-	bool_t read_started;
-	bool_t write_started;
 #endif
 };
 
 typedef struct _AlsaReadData AlsaReadData;
 
 void alsa_read_init(MSFilter *obj){
-	AlsaReadData *ad=ms_new(AlsaReadData,1);
+	AlsaReadData *ad=ms_new0(AlsaReadData,1);
 	ad->pcmdev=NULL;
 	ad->handle=NULL;
 	ad->rate=forced_rate!=-1 ? forced_rate : 8000;
@@ -799,51 +834,51 @@ static void * alsa_write_thread(void *p){
 
 	while (ad->read_started)
 	  {
-	    count = alsa_can_read(ad->handle,samples);
-	    if (count==24)
-	      { /* keep this value for this driver */ }
-	    else if (count<=0)
-	      {
+		count = alsa_can_read(ad->handle,samples);
+		if (count==24)
+		  { /* keep this value for this driver */ }
+		else if (count<=0)
+		  {
 		count = samples;
-	      }
-	    else if (count>0)
-	      {
+		  }
+		else if (count>0)
+		  {
 		//ms_warning("%i count", count);
 		//count = samples;
-	      }
+		  }
 
-	    int size=count*2;
-	    om=allocb(size,0);
+		int size=count*2;
+		om=allocb(size,0);
 
-	    if ((err=alsa_read(ad->handle,om->b_wptr,count))<=0)
-	      {
+		if ((err=alsa_read(ad->handle,om->b_wptr,count))<=0)
+		  {
 		ms_warning("nothing to read");
 		//ms_warning("Fail to read samples %i", count);
 		freemsg(om); /* leak fixed */
 		continue;
-	      }
-	    //ms_warning(" read %i", err);
-	    
-	    size=err*2;
-	    om->b_wptr+=size;
+		  }
+		//ms_warning(" read %i", err);
 
-	    ms_mutex_lock(&ad->mutex);
-	    ms_bufferizer_put(ad->bufferizer,om);
-	    ms_mutex_unlock(&ad->mutex);
+		size=err*2;
+		om->b_wptr+=size;
 
-	    if (count==24)
-	      {
+		ms_mutex_lock(&ad->mutex);
+		ms_bufferizer_put(ad->bufferizer,om);
+		ms_mutex_unlock(&ad->mutex);
+
+		if (count==24)
+		  {
 		timeout.tv_sec = 0;
 		timeout.tv_usec = 2000;
 		select(0, 0, NULL, NULL, &timeout );
-	      }
-	    else
-	      {
+		  }
+		else
+		  {
 		/* select will be less active than locking on "read" */
 		timeout.tv_sec = 0;
 		timeout.tv_usec = 5000;
 		select(0, 0, NULL, NULL, &timeout );
-	      }
+		  }
 	  }
 
 	if (ad->handle!=NULL) snd_pcm_close(ad->handle);
@@ -862,8 +897,8 @@ static void alsa_stop_r(AlsaReadData *d){
 	d->read_started=FALSE;
 	if (d->thread!=0)
 	  {
-	    ms_thread_join(d->thread,NULL);
-	    d->thread=0;
+		ms_thread_join(d->thread,NULL);
+		d->thread=0;
 	  }
 }
 #endif
@@ -871,10 +906,11 @@ static void alsa_stop_r(AlsaReadData *d){
 static void compute_timespec(AlsaReadData *d) {
 	static int count = 0;
 	uint64_t ns = ((1000 * d->read_samples) / (uint64_t) d->rate) * 1000000;
+	double av_skew;
 	MSTimeSpec ts;
 	ts.tv_nsec = ns % 1000000000;
 	ts.tv_sec = ns / 1000000000;
-	double av_skew = ms_ticker_synchronizer_set_external_time(d->ticker_synchronizer, &ts);
+	av_skew = ms_ticker_synchronizer_set_external_time(d->ticker_synchronizer, &ts);
 	if ((++count) % 100 == 0)
 		ms_message("sound/wall clock skew is average=%f ms", av_skew);
 }
@@ -894,6 +930,7 @@ void alsa_read_postprocess(MSFilter *obj){
 #endif
 	ms_ticker_set_time_func(obj->ticker,NULL,NULL);
 	if (ad->handle!=NULL) snd_pcm_close(ad->handle);
+	ad->read_started=FALSE;
 	ad->handle=NULL;
 }
 
@@ -918,7 +955,8 @@ void alsa_read_process(MSFilter *obj){
 	int samples=(128*ad->rate)/8000;
 	int err;
 	mblk_t *om=NULL;
-	if (ad->handle==NULL && ad->pcmdev!=NULL){
+	if (ad->handle==NULL && ad->pcmdev!=NULL && !ad->read_started){
+		ad->read_started=TRUE;
 		ad->handle=alsa_open_r(ad->pcmdev,16,ad->nchannels==2,ad->rate);
 		if (ad->handle){
 			ad->read_samples=0;
@@ -927,7 +965,7 @@ void alsa_read_process(MSFilter *obj){
 	}
 	if (ad->handle==NULL) return;
 	while (alsa_can_read(ad->handle)>=samples){
-	  
+
 		int size=samples*2*ad->nchannels;
 		om=allocb(size,0);
 		if ((err=alsa_read(ad->handle,om->b_wptr,samples))<=0) {
@@ -952,12 +990,12 @@ void alsa_read_process(MSFilter *obj){
 	mblk_t *om=NULL;
 	int samples=(160*ad->rate)/8000;
 	int size=samples*2*ad->nchannels;
-	
+
 	ms_mutex_lock(&ad->mutex);
 	while (ms_bufferizer_get_avail(ad->bufferizer)>=size){
-	  
+
 	  om=allocb(size,0);
-	  ms_bufferizer_read(ad->bufferizer,om->b_wptr,size);	  
+	  ms_bufferizer_read(ad->bufferizer,om->b_wptr,size);
 	  om->b_wptr+=size;
 	  /*ms_message("alsa_read_process: Outputing %i bytes",size);*/
 	  ms_queue_put(obj->outputs[0],om);
@@ -1024,7 +1062,7 @@ static MSFilter * ms_alsa_read_new(const char *dev){
 typedef struct _AlsaReadData AlsaWriteData;
 
 void alsa_write_init(MSFilter *obj){
-	AlsaWriteData *ad=ms_new(AlsaWriteData,1);
+	AlsaWriteData *ad=ms_new0(AlsaWriteData,1);
 	ad->pcmdev=NULL;
 	ad->handle=NULL;
 	ad->rate=forced_rate!=-1 ? forced_rate : 8000;
@@ -1035,6 +1073,7 @@ void alsa_write_init(MSFilter *obj){
 void alsa_write_postprocess(MSFilter *obj){
 	AlsaReadData *ad=(AlsaReadData*)obj->data;
 	if (ad->handle!=NULL) snd_pcm_close(ad->handle);
+	ad->write_started=FALSE;
 	ad->handle=NULL;
 }
 
@@ -1078,7 +1117,8 @@ void alsa_write_process(MSFilter *obj){
 	int size;
 	int samples;
 	int err;
-	if (ad->handle==NULL && ad->pcmdev!=NULL){
+	if (ad->handle==NULL && ad->pcmdev!=NULL && !ad->write_started){
+		ad->write_started=TRUE;
 		ad->handle=alsa_open_w(ad->pcmdev,16,ad->nchannels==2,ad->rate);
 #ifdef EPIPE_BUGFIX
 		alsa_fill_w (ad->pcmdev);

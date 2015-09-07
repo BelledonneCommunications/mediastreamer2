@@ -38,16 +38,18 @@ typedef struct _ResampleData{
 	int in_nchannels;
 	int out_nchannels;
 	SpeexResamplerState *handle;
+	int cpuFeatures; /*store because there is no SPEEX_LIB_GET_CPU_FEATURES*/
 } ResampleData;
 
 static ResampleData * resample_data_new(){
-	ResampleData *obj=(ResampleData *)ms_new(ResampleData,1);
+	ResampleData *obj=ms_new0(ResampleData,1);
 	obj->bz=ms_bufferizer_new();
 	obj->ts=0;
 	obj->input_rate=8000;
 	obj->output_rate=16000;
 	obj->handle=NULL;
 	obj->in_nchannels=obj->out_nchannels=1;
+	obj->cpuFeatures=0;
 	return obj;
 }
 
@@ -59,24 +61,24 @@ static void resample_data_destroy(ResampleData *obj){
 }
 
 static void resample_init(MSFilter *obj){
+	ResampleData* data=resample_data_new();
 #ifdef SPEEX_LIB_SET_CPU_FEATURES
-	int cpuFeatures = 0;
-#ifdef __arm__
+#if defined(__arm__) || defined(_M_ARM)
 	#ifdef ANDROID
 	if (android_getCpuFamily() == ANDROID_CPU_FAMILY_ARM 
 		&& (android_getCpuFeatures() & ANDROID_CPU_ARM_FEATURE_NEON) != 0) {
-		cpuFeatures = SPEEX_LIB_CPU_FEATURE_NEON;
+		data->cpuFeatures = SPEEX_LIB_CPU_FEATURE_NEON;
 	}
 	#elif defined(__ARM_NEON__)
-	cpuFeatures = SPEEX_LIB_CPU_FEATURE_NEON;
+	data->cpuFeatures = SPEEX_LIB_CPU_FEATURE_NEON;
 	#endif
-	ms_message("speex_lib_ctl init with neon ? %d", (cpuFeatures == SPEEX_LIB_CPU_FEATURE_NEON));
+	ms_message("speex_lib_ctl init with neon ? %d", (data->cpuFeatures == SPEEX_LIB_CPU_FEATURE_NEON));
 #endif
-	speex_lib_ctl(SPEEX_LIB_SET_CPU_FEATURES, &cpuFeatures);
+	speex_lib_ctl(SPEEX_LIB_SET_CPU_FEATURES, &data->cpuFeatures);
 #else
 	ms_message("speex_lib_ctl does not support SPEEX_LIB_CPU_FEATURE_NEON");
 #endif
-	obj->data=resample_data_new();
+	obj->data=data;
 }
 
 static void resample_uninit(MSFilter *obj){
@@ -98,9 +100,30 @@ static int resample_channel_adapt(int in_nchannels, int out_nchannels, mblk_t *i
 			((int16_t *)(*om)->b_wptr)[0] = *(int16_t *)im->b_rptr;
 			((int16_t *)(*om)->b_wptr)[1] = *(int16_t *)im->b_rptr;
 		}
+		mblk_meta_copy(im, *om);
 		return 1;
 	}
 	return 0;
+}
+
+static void resample_init_speex(ResampleData *dt){
+	int err=0;
+	int quality=SPEEX_RESAMPLER_QUALITY_VOIP; /*default value is voip*/
+#if defined(__arm__) || defined(_M_ARM) /*on ARM, NEON optimization are mandatory to support this quality, else using basic mode*/
+#if SPEEX_LIB_SET_CPU_FEATURES
+	if (dt->cpuFeatures != SPEEX_LIB_CPU_FEATURE_NEON)
+		quality=SPEEX_RESAMPLER_QUALITY_MIN;
+#elif !defined(__ARM_NEON__)
+	quality=SPEEX_RESAMPLER_QUALITY_MIN;
+#endif /*SPEEX_LIB_SET_CPU_FEATURES*/
+#endif /*defined(__arm__) || defined(_M_ARM)*/
+	ms_message("Initializing speex resampler in mode [%s] ",(quality==SPEEX_RESAMPLER_QUALITY_VOIP?"voip":"min"));
+	dt->handle=speex_resampler_init(dt->in_nchannels, dt->input_rate, dt->output_rate, quality, &err);
+}
+
+static void resample_preprocess(MSFilter *obj){
+	ResampleData *dt=(ResampleData*)obj->data;
+	resample_init_speex(dt);
 }
 
 static void resample_process_ms2(MSFilter *obj){
@@ -128,8 +151,7 @@ static void resample_process_ms2(MSFilter *obj){
 		}
 	}
 	if (dt->handle==NULL){
-		int err=0;
-		dt->handle=speex_resampler_init(dt->in_nchannels, dt->input_rate, dt->output_rate, SPEEX_RESAMPLER_QUALITY_VOIP, &err);
+		resample_init_speex(dt);
 	}
 
 	
@@ -229,7 +251,7 @@ MSFilterDesc ms_resample_desc={
 	1,
 	1,
 	resample_init,
-	NULL,
+	resample_preprocess,
 	resample_process_ms2,
 	NULL,
 	resample_uninit,
@@ -246,6 +268,7 @@ MSFilterDesc ms_resample_desc={
 	.ninputs=1,
 	.noutputs=1,
 	.init=resample_init,
+	.preprocess=resample_preprocess,
 	.process=resample_process_ms2,
 	.uninit=resample_uninit,
 	.methods=methods

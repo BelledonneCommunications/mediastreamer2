@@ -9,15 +9,20 @@ if BUILD_TESTS
 noinst_PROGRAMS=mediastreamer2_tester
 
 mediastreamer2_tester_SOURCES=	\
-								mediastreamer2_tester.c mediastreamer2_tester.h \
-								mediastreamer2_tester_private.c mediastreamer2_tester_private.h \
-								mediastreamer2_basic_audio_tester.c \
-								mediastreamer2_sound_card_tester.c \
-								mediastreamer2_audio_stream_tester.c \
-								mediastreamer2_framework_tester.c
-
+	mediastreamer2_tester.c mediastreamer2_tester.h \
+	mediastreamer2_tester_private.c mediastreamer2_tester_private.h \
+	mediastreamer2_basic_audio_tester.c \
+	mediastreamer2_sound_card_tester.c \
+	mediastreamer2_adaptive_tester.c \
+	mediastreamer2_audio_stream_tester.c \
+	mediastreamer2_framework_tester.c \
+	mediastreamer2_player_tester.c \
+	mediastreamer2_neon_tester.c \
+	common/bc_tester_utils.c common/bc_tester_utils.h
 
 AM_CPPFLAGS=\
+	-DBC_CONFIG_FILE=\"mediastreamer-config.h\" \
+	-I$(top_srcdir)/ \
 	-I$(top_srcdir)/include/ \
 	-I$(top_srcdir)/src/base \
 	-I$(top_srcdir)/src/utils \
@@ -27,17 +32,52 @@ AM_CPPFLAGS=\
 	-I$(top_srcdir)/src/videofilters \
 	-I$(top_srcdir)/src \
 	-I$(top_builddir)/src \
-	-I$(top_srcdir)/tester
+	-I$(top_srcdir)/tester \
+	-I$(top_srcdir)/tester/common \
+	$(ORTP_CFLAGS) \
+	$(SPEEX_CFLAGS)
 
 LDADD=$(top_builddir)/src/libmediastreamer_base.la \
 	$(top_builddir)/src/libmediastreamer_voip.la \
 	$(ORTP_LIBS) \
-	$(CUNIT_LIBS)
+	$(CUNIT_LIBS) \
+	$(SPEEX_LIBS)
+
+if BUILD_MACOSX
+noinst_LTLIBRARIES=libmediastreamer2_tester_cocoa.la
+libmediastreamer2_tester_cocoa_la_LIBTOOLFLAGS = --tag=CC
+libmediastreamer2_tester_cocoa_la_SOURCES = mediastreamer2_tester_cocoa.m
+LDADD+=libmediastreamer2_tester_cocoa.la
+endif BUILD_MACOSX
+
+if BUILD_VIDEO
+mediastreamer2_tester_SOURCES+=	mediastreamer2_video_stream_tester.c
+endif
+
 
 AM_LDFLAGS=-no-undefined -export-dynamic
 
-AM_CFLAGS=$(STRICT_OPTIONS) $(ORTP_CFLAGS) $(CUNIT_CFLAGS)
+AM_CFLAGS=$(STRICT_OPTIONS) $(STRICT_OPTIONS_CC) $(ORTP_CFLAGS) $(CUNIT_CFLAGS)
 
+if BUILD_VIDEO
+AM_CFLAGS+=$(VIDEO_CFLAGS) $(GLEW_CFLAGS)
+endif
+
+if BUILD_MATROSKA
+AM_CFLAGS+=-DHAVE_MATROSKA
+endif
+
+
+if BUILD_IOS
+
+noinst_LTLIBRARIES=libmediastreamer2_tester_ios.la
+libmediastreamer2_tester_ios_la_SOURCES      = mediastreamer2_tester_ios.m
+libmediastreamer2_tester_ios_la_LIBTOOLFLAGS = --tag=CC
+LDADD+=libmediastreamer2_tester_ios.la
+
+AM_CFLAGS    += $(SPEEX_CFLAGS)
+AM_OBJCFLAGS  = $(AM_CFLAGS)
+endif
 
 test: mediastreamer2_tester
 	./mediastreamer2_tester $(TEST_OPTIONS)

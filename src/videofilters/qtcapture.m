@@ -31,15 +31,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 struct v4mState;
 
 // Define != NULL to have QT Framework convert hardware device pixel format to another one.
-#if TARGET_CPU_X86 /*for an unknown reason kCVPixelFormatType_420YpCbCr8Planar does not work for 32bits compilation*/
-static OSType forcedPixelFormat=kCVPixelFormatType_24RGB;
-#else
-static OSType forcedPixelFormat=kCVPixelFormatType_420YpCbCr8Planar;
-#endif
+static OSType forcedPixelFormat=kCVPixelFormatType_422YpCbCr8_yuvs;
 //static OSType forcedPixelFormat=0;
 
 static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
-	// ms_message("OSType= %i", pixelFormat);
+        ms_message("OSType= %i", (int)pixelFormat);
         switch(pixelFormat){
                 case kCVPixelFormatType_420YpCbCr8Planar:
                 	if (printFmtName) ms_message("FORMAT = MS_YUV420P");
@@ -62,14 +58,15 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
         }
 }
 
-@interface NsMsWebCam :NSObject
+@interface NsMsWebCam : NSObject
 {
 	QTCaptureDeviceInput *input;
 	QTCaptureDecompressedVideoOutput * output;
 	QTCaptureSession *session;
-	
+	MSYuvBufAllocator *allocator;
 	ms_mutex_t mutex;
 	queue_t rq;
+	BOOL isStretchingCamera;
 };
 
 - (id)init;
@@ -78,6 +75,7 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 - (int)stop;
 - (void)setSize:(MSVideoSize) size;
 - (MSVideoSize)getSize;
+- (QTCaptureDevice*)initDevice:(NSString*)deviceId;
 - (void)openDevice:(NSString*) deviceId;
 - (int)getPixFmt;
 
@@ -104,7 +102,7 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 		MSPicture pict;
 	    	size_t w = CVPixelBufferGetWidth(frame);
 		size_t h = CVPixelBufferGetHeight(frame);
-		mblk_t *yuv_block = ms_yuv_buf_alloc(&pict, w, h);
+		mblk_t *yuv_block = ms_yuv_buf_allocator_get(allocator, &pict, w, h);
 
 		CVReturn status = CVPixelBufferLockBaseAddress(frame, 0);
 		if (kCVReturnSuccess != status) {
@@ -149,7 +147,8 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 	output = [[QTCaptureDecompressedVideoOutput alloc] init];
 	[output automaticallyDropsLateVideoFrames];
 	[output setDelegate: self];
-	
+	allocator = ms_yuv_buf_allocator_new();
+	isStretchingCamera = FALSE;
 	return self;
 }
 
@@ -172,7 +171,7 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 	}
 	
 	flushq(&rq,0);
-
+	ms_yuv_buf_allocator_free(allocator);
 	ms_mutex_destroy(&mutex);
 
 	[super dealloc];
@@ -210,11 +209,11 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 				if (msfmt != MS_PIX_FMT_UNKNOWN) {
 					return msfmt;
 				}
-            		}
-        	}
-    	} else {
-    		ms_error("The camera wasn't opened when asking for pixel format");
-    	}
+            }
+        }
+    } else {
+        ms_error("The camera wasn't opened when asking for pixel format");
+    }
 
 	ms_warning("No compatible format found, using MS_YUV420P pixel format");
 	// Configure the output to convert the uncompatible hardware pixel format to MS_YUV420P
@@ -231,10 +230,20 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 	return MS_YUV420P;
 }
 
+static const char *stretchingCameras[]={
+	"UVC Camera VendorID_1452 ProductID_34057",
+	NULL
+};
 
+static bool is_stretching_camera(const char *modelID){
+	const char **it;
+	for (it = stretchingCameras; *it != NULL; ++it){
+		if (strcasecmp(*it, modelID) == 0) return true;
+	}
+	return false;
+}
 
-- (void)openDevice:(NSString*)deviceId {
-	NSError *error = nil;
+- (QTCaptureDevice*)initDevice:(NSString*)deviceId {
 	unsigned int i = 0;
 	QTCaptureDevice * device = NULL;
 
@@ -250,9 +259,16 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 		ms_error("Error: camera %s not found, using default one", [deviceId UTF8String]);
 		device = [QTCaptureDevice defaultInputDeviceWithMediaType:QTMediaTypeVideo];
 	}
+	isStretchingCamera = is_stretching_camera([[device modelUniqueID] UTF8String]);
+	return device;
+}
+
+- (void)openDevice:(NSString*)deviceId {
+	NSError *error = nil;
+	QTCaptureDevice * device = [self initDevice:deviceId];
 	
 	bool success = [device open:&error];
-	if (success) ms_message("Device opened");
+	if (success) ms_message("Device opened, model is %s", [[device modelUniqueID] UTF8String]);
 	else {
 		ms_error("Error while opening camera: %s", [[error localizedDescription] UTF8String]);
 		return;
@@ -266,10 +282,32 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 
 	success = [session addOutput:output error:&error];
 	if (!success) ms_error("%s", [[error localizedDescription] UTF8String]);
+	
 }
+
+
 
 - (void)setSize:(MSVideoSize)size {	
 	NSDictionary *dic;
+	MSVideoSize new_size = size;
+	
+	/*mac cameras are not able to capture between VGA and 720P without doing an ugly stretching.  Workaround this problem here for SVGA, which a common format
+	used by mediastreamer2 encoders.
+	*/
+	const MSVideoSize svga = MS_VIDEO_SIZE_SVGA;
+
+	if (isStretchingCamera){
+		if (ms_video_size_equal(size, svga)){
+			new_size.width = 960;
+			new_size.height = 540;
+		}
+	}
+	if (!ms_video_size_equal(new_size, size)){
+		ms_message("QTCatpure video size requested is %ix%i, but adapted to %ix%i in order to avoid stretching", size.width, size.height,
+					new_size.width, new_size.height);
+		size = new_size;
+	}
+	
 	if (forcedPixelFormat != 0) {
 		ms_message("QTCapture set size w=%i, h=%i fmt=%i", size.width, size.height, (unsigned int)forcedPixelFormat);
 		dic = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -321,6 +359,7 @@ typedef struct v4mState {
 	float fps;
 	float start_time;
 	int frame_count;
+	MSAverageFPS afps;
 } v4mState;
 
 
@@ -340,7 +379,7 @@ static int v4m_start(MSFilter *f, void *arg) {
 	NSAutoreleasePool* myPool = [[NSAutoreleasePool alloc] init];
 	v4mState *s = (v4mState*)f->data;
 	[s->webcam performSelectorOnMainThread:@selector(start) withObject:nil waitUntilDone:NO];
-	ms_message("v4m video device opened.");
+	ms_message("qtcapture video device opened.");
 	[myPool drain];
 	return 0;
 }
@@ -349,7 +388,7 @@ static int v4m_stop(MSFilter *f, void *arg) {
 	NSAutoreleasePool* myPool = [[NSAutoreleasePool alloc] init];
 	v4mState *s = (v4mState*)f->data;
 	[s->webcam performSelectorOnMainThread:@selector(stop) withObject:nil waitUntilDone:NO];
-	ms_message("v4m video device closed.");
+	ms_message("qtcapture video device closed.");
 	[myPool drain];
 	return 0;
 }
@@ -391,6 +430,7 @@ static void v4m_process(MSFilter * obj){
 			mblk_set_marker_info(om,TRUE);	
 			ms_queue_put(obj->outputs[0],om);
 			s->frame_count++;
+			ms_average_fps_update(&s->afps, obj->ticker->time);
 		}
 	} else {
 		flushq([s->webcam rq],0);
@@ -402,18 +442,27 @@ static void v4m_process(MSFilter * obj){
 }
 
 static void v4m_preprocess(MSFilter *f) {
-	v4m_start(f,NULL);
-        
+	v4mState *s = (v4mState *)f->data;
+	ms_average_fps_init(&s->afps, "QuickTime capture average fps = %f");
+	v4m_start(f,NULL);    
 }
 
 static void v4m_postprocess(MSFilter *f) {
+	v4mState *s = (v4mState *)f->data;
 	v4m_stop(f,NULL);
+	ms_average_fps_init(&s->afps, "QuickTime capture average fps = %f");
 }
 
 static int v4m_set_fps(MSFilter *f, void *arg) {
 	v4mState *s = (v4mState*)f->data;
 	s->fps = *((float*)arg);
 	s->frame_count = -1;
+	return 0;
+}
+
+static int v4m_get_fps(MSFilter *f, void *arg) {
+	v4mState *s = (v4mState *)f->data;
+	*((float *)arg) = ms_average_fps_get(&s->afps);
 	return 0;
 }
 
@@ -443,6 +492,7 @@ static int v4m_get_vsize(MSFilter *f, void *arg) {
 
 static MSFilterMethod methods[] = {
 	{	MS_FILTER_SET_FPS		,	v4m_set_fps		},
+	{	MS_FILTER_GET_FPS		,	v4m_get_fps		},
 	{	MS_FILTER_GET_PIX_FMT	,	v4m_get_pix_fmt	},
 	{	MS_FILTER_SET_VIDEO_SIZE, 	v4m_set_vsize	},
 	{	MS_V4L_START			,	v4m_start		},
@@ -453,7 +503,7 @@ static MSFilterMethod methods[] = {
 
 MSFilterDesc ms_v4m_desc={
 	.id=MS_V4L_ID,
-	.name="MSV4m",
+	.name="MSQtCapture",
 	.text="A video for macosx compatible source filter to stream pictures.",
 	.ninputs=0,
 	.noutputs=1,
@@ -476,6 +526,7 @@ static void ms_v4m_cam_init(MSWebCam *cam) {
 static int v4m_open_device(MSFilter *f, void *arg) {
 	NSAutoreleasePool* myPool = [[NSAutoreleasePool alloc] init];
 	v4mState *s = (v4mState*)f->data;
+	[s->webcam initDevice: [NSString stringWithUTF8String:(char*)arg]];
 	[s->webcam performSelectorOnMainThread:@selector(openDevice:) withObject:[NSString stringWithUTF8String:(char*)arg] waitUntilDone:NO];
 	[myPool drain];
 	return 0;

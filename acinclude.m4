@@ -121,8 +121,26 @@ AC_DEFUN([MS_CHECK_VIDEO],[
 
 			dnl check for new/old ffmpeg header file layout
 			CPPFLAGS_save=$CPPFLAGS
-			CPPFLAGS="$FFMPEG_CFLAGS $CPPFLAGS"
+			CPPFLAGS="$FFMPEG_CFLAGS $CPPFLAGS -Wno-error"
 			AC_CHECK_HEADERS(libavcodec/avcodec.h)
+			AC_CHECK_HEADER(libavcodec/old_codec_ids.h,[ old_codec_ids_found=yes
+                                                                     AC_DEFINE(HAVE_AVCODEC_OLD_CODEC_IDS,1,[for compatibility purpose with old ffmpeg])]
+                                                                     ,[old_codec_ids_found=no],[#include "libavcodec/avcodec.h"])
+			AC_MSG_CHECKING([AV_CODEC_ID_SNOW])
+			AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <libavcodec/avcodec.h>]],
+                                        		[[enum AVCodecID toto=AV_CODEC_ID_SNOW;if(toto){}]])]
+                                           ,[if test x$old_codec_ids_found = xno ; then
+						AC_DEFINE(CODEC_ID_SNOW,AV_CODEC_ID_SNOW,[for compatibility purpose with old ffmpeg])
+					     fi
+                                            AC_DEFINE(HAVE_AVCODEC_SNOW,1,[for compatibility purpose with old ffmpeg])
+                                            AC_MSG_RESULT([found])]
+                                           ,[AC_MSG_RESULT([not found])])
+			AC_MSG_CHECKING([CODEC_ID_SNOW])
+			AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <libavcodec/avcodec.h>]],
+                                        		[[enum CodecID toto=CODEC_ID_SNOW;if (toto){}]])]
+                                           ,[AC_DEFINE(HAVE_AVCODEC_SNOW,1,[for compatibility purpose with old ffmpeg])
+                                           AC_MSG_RESULT([found])]
+                                           ,[AC_MSG_RESULT([not found])])
 			CPPFLAGS=$CPPFLAGS_save
 
 			LIBS_save=$LIBS
@@ -142,7 +160,7 @@ AC_DEFUN([MS_CHECK_VIDEO],[
 			dnl # include "swscale.h" // private linhone swscale.h
 			dnl #endif
 			CPPFLAGS_save=$CPPFLAGS
-			CPPFLAGS="$SWSCALE_CFLAGS $CPPFLAGS"
+			CPPFLAGS="$SWSCALE_CFLAGS $CPPFLAGS -Wno-error"
 			AC_CHECK_HEADERS(libswscale/swscale.h)
 			CPPFLAGS=$CPPFLAGS_save
 
@@ -151,6 +169,9 @@ AC_DEFUN([MS_CHECK_VIDEO],[
 			AC_CHECK_LIB(avcodec,avcodec_get_context_defaults3,  [AC_DEFINE([HAVE_FUN_avcodec_get_context_defaults3], [], [Have ffmpeg function])] ,	 , $FFMPEG_LIBS )
 			AC_CHECK_LIB(avcodec,avcodec_open2, [AC_DEFINE([HAVE_FUN_avcodec_open2], [], [Have ffmpeg function])] , , $FFMPEG_LIBS )
 			AC_CHECK_LIB(avcodec,avcodec_encode_video2, [AC_DEFINE([HAVE_FUN_avcodec_encode_video2], [], [Have ffmpeg function])] , , $FFMPEG_LIBS )
+			AC_CHECK_LIB(avutil,av_frame_alloc, [AC_DEFINE([HAVE_FUN_av_frame_alloc], [], [Have ffmpeg function])] , , $FFMPEG_LIBS )
+			AC_CHECK_LIB(avutil,av_frame_free, [AC_DEFINE([HAVE_FUN_av_frame_free], [], [Have ffmpeg function])] , , $FFMPEG_LIBS )
+			AC_CHECK_LIB(avutil,av_frame_unref, [AC_DEFINE([HAVE_FUN_av_frame_unref], [], [Have ffmpeg function])] , , $FFMPEG_LIBS )
 			LIBS=$LIBS_save
 
 
@@ -174,10 +195,13 @@ AC_DEFUN([MS_CHECK_VIDEO],[
 			  yes) enable_x11=true ;;
 			  no)  enable_x11=false ;;
 			  *) AC_MSG_ERROR(bad value ${enableval} for --disable-x11) ;;
-		  	  esac],[enable_x11=$enable_x11_default])
+			  esac],[enable_x11=$enable_x11_default])
 
 			if test "$enable_x11" = "true"; then
-			   AC_CHECK_HEADERS(X11/Xlib.h)
+				AC_CHECK_HEADERS(X11/Xlib.h)
+			else
+				enable_xv=no
+				enable_glx=no
 			fi
 
 			AC_ARG_ENABLE(xv,
@@ -186,7 +210,7 @@ AC_DEFUN([MS_CHECK_VIDEO],[
 			  yes) enable_xv=true ;;
 			  no)  enable_xv=false ;;
 			  *) AC_MSG_ERROR(bad value ${enableval} for --enable-xv) ;;
-		  	  esac],[enable_xv=$enable_x11_default])
+			  esac],[enable_xv=$enable_x11_default])
 
 			if test "$enable_xv" = "true"; then
 				AC_CHECK_HEADERS(X11/extensions/Xv.h,[] ,[enable_xv=false])

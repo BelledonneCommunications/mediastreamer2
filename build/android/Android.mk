@@ -47,59 +47,76 @@ MEDIASTREAMER2_INCLUDES := \
 LOCAL_MODULE := libmediastreamer2
 
 LOCAL_SRC_FILES = \
+	android/androidsound.cpp \
+	android/androidsound_depr.cpp \
+	android/androidsound_opensles.cpp \
+	android/AudioRecord.cpp \
+	android/AudioSystem.cpp \
+	android/AudioTrack.cpp \
+	android/hardware_echo_canceller.cpp \
+	android/loader.cpp \
+	android/String8.cpp \
+	audiofilters/aac-eld-android.cpp \
+	audiofilters/alaw.c \
+	audiofilters/audiomixer.c \
+	audiofilters/devices.c \
+	audiofilters/dtmfgen.c \
+	audiofilters/equalizer.c \
+	audiofilters/flowcontrol.c \
+	audiofilters/g711.c \
+	audiofilters/genericplc.c \
+	audiofilters/l16.c \
+	audiofilters/msfileplayer.c \
+	audiofilters/msfilerec.c \
+	audiofilters/msg722.c \
+	audiofilters/msresample.c \
+	audiofilters/msvaddtx.c \
+	audiofilters/msvolume.c \
+	audiofilters/tonedetector.c \
+	audiofilters/ulaw.c \
+	base/eventqueue.c \
 	base/mscommon.c \
+	base/msfactory.c \
 	base/msfilter.c \
 	base/msqueue.c \
-	base/msticker.c \
 	base/mssndcard.c \
-	base/mtu.c \
+	base/msticker.c \
+	base/msvideopresets.c \
 	base/mswebcam.c \
-	base/eventqueue.c \
-	voip/audioconference.c \
-	voip/mediastream.c \
-	voip/msvoip.c \
-	voip/ice.c \
-	voip/audiostream.c \
-	voip/ringstream.c \
-	voip/qualityindicator.c \
-	voip/bitratecontrol.c \
-	voip/bitratedriver.c \
-	voip/qosanalyzer.c \
+	base/mtu.c \
+	crypto/dtls_srtp.c \
+	crypto/ms_srtp.c \
+	crypto/zrtp.c \
+	otherfilters/itc.c \
+	otherfilters/join.c \
+	otherfilters/msrtp.c \
+	otherfilters/tee.c \
+	otherfilters/void.c \
+	utils/audiodiff.c \
 	utils/dsptools.c \
+	utils/g722_decode.c \
+	utils/g722_encode.c \
 	utils/kiss_fft.c \
 	utils/kiss_fftr.c \
 	utils/msjava.c \
-	utils/g722_decode.c \
-	utils/g722_encode.c \
-	otherfilters/msrtp.c \
-	otherfilters/tee.c \
-	otherfilters/join.c \
-	otherfilters/void.c \
-	audiofilters/audiomixer.c \
-	audiofilters/alaw.c \
-	audiofilters/ulaw.c \
-	audiofilters/msfileplayer.c \
-	audiofilters/dtmfgen.c \
-	audiofilters/msfilerec.c \
-	audiofilters/msconf.c \
-	audiofilters/msvolume.c \
-	audiofilters/equalizer.c \
-	audiofilters/tonedetector.c \
-	audiofilters/msg722.c \
-	audiofilters/l16.c \
-	audiofilters/msresample.c \
-	audiofilters/devices.c \
-	audiofilters/flowcontrol.c \
-	android/androidsound_depr.cpp \
-	android/loader.cpp \
-	android/androidsound.cpp \
-	android/AudioRecord.cpp \
-	android/AudioTrack.cpp \
-	android/AudioSystem.cpp \
-	android/String8.cpp \
-	android/androidsound_opensles.cpp
+	utils/stream_regulator.c \
+	voip/audioconference.c \
+	voip/audiostream.c \
+	voip/bitratecontrol.c \
+	voip/bitratedriver.c \
+	voip/ice.c \
+	voip/mediastream.c \
+	voip/msmediaplayer.c \
+	voip/msvoip.c \
+	voip/qosanalyzer.c \
+	voip/qualityindicator.c \
+	voip/ringstream.c \
+	voip/stun.c \
+	voip/stun_udp.c
 
-LOCAL_STATIC_LIBRARIES := 
+LOCAL_STATIC_LIBRARIES :=
+
+LOCAL_CFLAGS += -D_XOPEN_SOURCE=600
 
 ##if BUILD_ALSA
 ifeq ($(strip $(BOARD_USES_ALSA_AUDIO)),true)
@@ -109,17 +126,26 @@ endif
 
 ifeq ($(BUILD_SRTP), 1)
 	LOCAL_C_INCLUDES += $(SRTP_C_INCLUDE)
+	LOCAL_CFLAGS += -DHAVE_SRTP
 else
 
 endif
 
+LOCAL_STATIC_LIBRARIES += polarssl
+LOCAL_C_INCLUDES += $(LOCAL_PATH)/../../../externals/polarssl/include
+LOCAL_CFLAGS += -DHAVE_POLARSSL_SSL_H=1 -DHAVE_DTLS=1
+
 ifeq ($(_BUILD_VIDEO),1)
 LOCAL_SRC_FILES += \
+	voip/video_preset_high_fps.c \
+	voip/videostarter.c \
 	voip/videostream.c \
 	voip/rfc3984.c \
+	voip/vp8rtpfmt.c \
 	voip/layouts.c \
 	utils/shaders.c \
 	utils/opengles_display.c \
+	utils/ffmpeg-priv.c \
 	videofilters/videoenc.c \
 	videofilters/videodec.c \
 	videofilters/pixconv.c  \
@@ -149,15 +175,47 @@ LOCAL_SRC_FILES+= \
 	voip/scaler.c \
 	voip/msvideo.c
 endif
+
+ifeq ($(BUILD_MATROSKA), 1)
+LOCAL_CFLAGS += \
+	-DHAVE_MATROSKA \
+	-DCONFIG_EBML_WRITING \
+	-DCONFIG_EBML_UNICODE \
+	-DCONFIG_STDIO \
+	-DCONFIG_FILEPOS_64 \
+	-DNDEBUG
+
+LOCAL_C_INCLUDES += \
+	$(LOCAL_PATH)/../../../externals/libmatroska \
+	$(LOCAL_PATH)/../../../externals/libmatroska/corec \
+	$(LOCAL_PATH)/../../../externals/libmatroska/libebml2 \
+	$(LOCAL_PATH)/../../../externals/libmatroska/libmatroska2
+
+LOCAL_SRC_FILES += \
+	utils/mkv_reader.c \
+	videofilters/mkv.c
+
+
+LOCAL_STATIC_LIBRARIES += \
+	libmatroska2
+
+endif #BUILD_MATROSKA
+
+endif #_BUILD_VIDEO
+
+ifeq ($(BUILD_NON_FREE_CODECS),1)
+LOCAL_CFLAGS += -DHAVE_NON_FREE_CODECS=1
+else
+LOCAL_CFLAGS += -DHAVE_NON_FREE_CODECS=0
 endif
 
 ifeq ($(BUILD_OPUS),1)
 LOCAL_CFLAGS += -DHAVE_OPUS
 LOCAL_SRC_FILES += \
-	audiofilters/msopus.c 
+	audiofilters/msopus.c
 
 LOCAL_C_INCLUDES += \
-	$(LOCAL_PATH)/../../../externals/opus/include 
+	$(LOCAL_PATH)/../../../externals/opus/include
 endif
 
 ifeq ($(BUILD_UPNP),1)
@@ -173,7 +231,7 @@ LOCAL_C_INCLUDES += \
         $(LOCAL_PATH)/../../../externals/libupnp/threadutil/inc \
 	$(LOCAL_PATH)/../../../externals/libupnp/ixml/inc \
 
-LOCAL_STATIC_LIBRARIES += libupnp 
+LOCAL_STATIC_LIBRARIES += libupnp
 
 endif
 
@@ -195,10 +253,8 @@ LOCAL_CFLAGS += \
 	-include $(LOCAL_PATH)/../build/android/libmediastreamer2_AndroidConfig.h \
 	-DMS2_INTERNAL \
 	-DMS2_FILTERS \
-	-DINET6 \
-        -DORTP_INET6 \
-	-D_POSIX_SOURCE -Wall
-
+	-D_POSIX_SOURCE \
+	-Wall -Werror -Wno-error=strict-aliasing -Wuninitialized
 
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
 	LOCAL_CFLAGS += -DUSE_HARDWARE_RATE=1
@@ -215,15 +271,18 @@ LOCAL_STATIC_LIBRARIES += \
 	libspeex \
 	libspeexdsp
 
+ifeq ($(BUILD_ZRTP), 1)
+LOCAL_STATIC_LIBRARIES += libbzrtp
+LOCAL_CFLAGS += -DHAVE_ZRTP
+LOCAL_C_INCLUDES += $(ZRTP_C_INCLUDE)
+endif #ZRTP
+
+ifneq ($(BUILD_WEBRTC_AECM)$(BUILD_WEBRTC_ISAC), 00)
+LOCAL_CFLAGS += -DHAVE_WEBRTC
+LOCAL_STATIC_LIBRARIES += libmswebrtc
+endif
+
 ifneq ($(BUILD_WEBRTC_AECM), 0)
-LOCAL_CFLAGS += -DBUILD_WEBRTC_AECM
-
-LOCAL_C_INCLUDES += \
-	$(LOCAL_PATH)/../../../externals/webrtc/ \
-	$(LOCAL_PATH)/../../../externals/webrtc/modules/audio_processing/aecm/include
-
-LOCAL_SRC_FILES += audiofilters/webrtc_aec.c
-
 LOCAL_STATIC_LIBRARIES += \
 	libwebrtc_aecm \
 	libwebrtc_apm_utility \
@@ -237,8 +296,7 @@ endif
 endif
 
 ifneq ($(BUILD_WEBRTC_ISAC), 0)
-LOCAL_CFLAGS += -DHAVE_ISAC
-LOCAL_STATIC_LIBRARIES += libwebrtc_spl libwebrtc_isacfix libmsisac
+LOCAL_STATIC_LIBRARIES += libwebrtc_spl libwebrtc_isacfix
 endif
 
 
@@ -250,6 +308,7 @@ LOCAL_STATIC_LIBRARIES += cpufeatures
 
 ifeq ($(BUILD_MEDIASTREAMER2_SDK), 1)
 	LOCAL_SRC_FILES += \
+		../tools/common.c \
 		../tools/mediastream.c
 
 	ifneq ($(_BUILD_AMR), 0)
@@ -271,15 +330,20 @@ ifeq ($(BUILD_MEDIASTREAMER2_SDK), 1)
 		LOCAL_CFLAGS += -DHAVE_G729
 		LOCAL_STATIC_LIBRARIES += libbcg729 libmsbcg729
 	endif
+	ifeq ($(BUILD_CODEC2),1)
+		LOCAL_CFLAGS += -DHAVE_CODEC2
+		LOCAL_STATIC_LIBRARIES += libcodec2 libmscodec2
+	endif
 	ifeq ($(_BUILD_VIDEO),1)
 		LOCAL_STATIC_LIBRARIES += libvpx
 		ifeq ($(BUILD_X264),1)
 			LOCAL_STATIC_LIBRARIES += libmsx264 libx264
 		endif
+		ifeq ($(BUILD_OPENH264),1)
+			LOCAL_STATIC_LIBRARIES += libmsopenh264 libopenh264
+		endif
 		LOCAL_SHARED_LIBRARIES += \
-			libavcodec-linphone \
-			libswscale-linphone \
-			libavutil-linphone
+			libffmpeg-linphone
 		LOCAL_LDLIBS += -lGLESv2
 	endif
 	ifeq ($(BUILD_SRTP),1)
@@ -296,6 +360,8 @@ ifeq ($(BUILD_MEDIASTREAMER2_SDK), 1)
 else
 	include $(BUILD_STATIC_LIBRARY)
 endif
+LOCAL_CPPFLAGS = $(LOCAL_CLFAGS)
+LOCAL_CFLAGS += -Wdeclaration-after-statement
 
 $(call import-module,android/cpufeatures)
 

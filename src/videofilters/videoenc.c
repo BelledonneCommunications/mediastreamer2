@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "mediastreamer2/msfilter.h"
 #include "mediastreamer2/msvideo.h"
 #include "mediastreamer2/msticker.h"
+#include "mediastreamer2/videostarter.h"
 
 #ifdef _WIN32
 #include <ws2tcpip.h>
@@ -37,66 +38,69 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define RATE_CONTROL_MARGIN 15000 /*bits/second*/
 
-#define MS_VIDEOENC_CONF(required_bitrate, bitrate_limit, resolution, fps, qminvalue) \
-	{ required_bitrate, bitrate_limit, { MS_VIDEO_SIZE_ ## resolution ## _W, MS_VIDEO_SIZE_ ## resolution ## _H }, fps, (void *)&qmin ## qminvalue }
+#define MS_VIDEOENC_CONF(required_bitrate, bitrate_limit, resolution, fps, cpu, qminvalue) \
+	{ required_bitrate, bitrate_limit, { MS_VIDEO_SIZE_ ## resolution ## _W, MS_VIDEO_SIZE_ ## resolution ## _H }, fps, cpu, (void *)&qmin ## qminvalue }
 
 static bool_t avcodec_initialized=FALSE;
 
 static const int qmin2 = 2;
 static const int qmin3 = 3;
+#if HAVE_AVCODEC_SNOW
 static const int qmin4 = 4;
+#endif
 static const int qmin5 = 5;
 
 static const MSVideoConfiguration h263_conf_list[] = {
-	MS_VIDEOENC_CONF(1024000, 1536000, SVGA, 25, 2),
-	MS_VIDEOENC_CONF( 800000, 1024000,  VGA, 25, 2),
-	MS_VIDEOENC_CONF( 512000,  800000,  CIF, 25, 2),
-	MS_VIDEOENC_CONF( 256000,  512000,  CIF, 17, 3),
-	MS_VIDEOENC_CONF( 128000,  256000, QCIF, 10, 3),
-	MS_VIDEOENC_CONF(      0,  128000, QCIF,  5, 5)
+	MS_VIDEOENC_CONF( 800000, 1024000,  4CIF, 25, 2, 2),
+	MS_VIDEOENC_CONF( 512000,  800000,  CIF, 25, 1, 2),
+	MS_VIDEOENC_CONF( 256000,  512000,  CIF, 17, 1, 3),
+	MS_VIDEOENC_CONF( 128000,  256000, QCIF, 10, 1, 3),
+	MS_VIDEOENC_CONF(      0,  128000, QCIF,  5, 1, 5)
 };
 
 static const MSVideoConfiguration h263p_conf_list[] = {
-	MS_VIDEOENC_CONF(800000, 1024000, 4CIF, 25, 2),
-	MS_VIDEOENC_CONF(512000,  800000,  CIF, 25, 2),
-	MS_VIDEOENC_CONF(256000,  512000,  CIF, 17, 3),
-	MS_VIDEOENC_CONF(128000,  256000, QCIF, 10, 3),
-	MS_VIDEOENC_CONF(     0,  128000, QCIF,  5, 5)
+	MS_VIDEOENC_CONF(800000, 1024000, 4CIF, 25, 2, 2),
+	MS_VIDEOENC_CONF(512000,  800000,  CIF, 25, 1, 2),
+	MS_VIDEOENC_CONF(256000,  512000,  CIF, 17, 1, 3),
+	MS_VIDEOENC_CONF(128000,  256000, QCIF, 10, 1, 3),
+	MS_VIDEOENC_CONF(     0,  128000, QCIF,  5, 1, 5)
 };
 
 static const MSVideoConfiguration mjpeg_conf_list[] = {
-	MS_VIDEOENC_CONF(1024000, 1536000, SVGA, 25, 2),
-	MS_VIDEOENC_CONF( 800000, 1024000,  VGA, 25, 2),
-	MS_VIDEOENC_CONF( 512000,  800000,  CIF, 25, 2),
-	MS_VIDEOENC_CONF( 256000,  512000,  CIF, 17, 3),
-	MS_VIDEOENC_CONF( 170000,  256000, QVGA, 15, 3),
-	MS_VIDEOENC_CONF( 128000,  170000, QCIF, 10, 3),
-	MS_VIDEOENC_CONF(      0,  128000, QCIF,  5, 5)
+	MS_VIDEOENC_CONF(1024000, 1536000, SVGA, 25, 1, 2),
+	MS_VIDEOENC_CONF( 800000, 1024000,  VGA, 25, 1, 2),
+	MS_VIDEOENC_CONF( 512000,  800000,  CIF, 25, 1, 2),
+	MS_VIDEOENC_CONF( 256000,  512000,  CIF, 17, 1, 3),
+	MS_VIDEOENC_CONF( 170000,  256000, QVGA, 15, 1, 3),
+	MS_VIDEOENC_CONF( 128000,  170000, QCIF, 10, 1, 3),
+	MS_VIDEOENC_CONF(      0,  128000, QCIF,  5, 1, 5)
 };
 
 static const MSVideoConfiguration mpeg4_conf_list[] = {
-    	MS_VIDEOENC_CONF(2048000, 2560000, SXGA_MINUS, 25, 2),
-	MS_VIDEOENC_CONF(2048000, 2560000, 720P, 25, 2),
-    	MS_VIDEOENC_CONF(1536000, 2048000,  XGA, 25, 2),
-	MS_VIDEOENC_CONF(1024000, 1536000, SVGA, 25, 2),
-	MS_VIDEOENC_CONF( 800000, 1024000,  VGA, 25, 2),
-	MS_VIDEOENC_CONF( 512000,  800000,  CIF, 25, 2),
-	MS_VIDEOENC_CONF( 256000,  512000,  CIF, 17, 3),
-	MS_VIDEOENC_CONF( 170000,  256000, QVGA, 15, 3),
-	MS_VIDEOENC_CONF( 128000,  170000, QCIF, 10, 3),
-	MS_VIDEOENC_CONF(      0,  128000, QCIF,  5, 5)
+    	MS_VIDEOENC_CONF(2048000, 2560000, SXGA_MINUS, 25, 4, 2),
+	MS_VIDEOENC_CONF(2048000, 2560000, 720P, 25, 4, 2),
+    	MS_VIDEOENC_CONF(1536000, 2048000,  XGA, 25, 4, 2),
+	MS_VIDEOENC_CONF(1024000, 1536000, SVGA, 25, 2, 2),
+	MS_VIDEOENC_CONF( 800000, 1024000,  VGA, 25, 1, 2),
+	MS_VIDEOENC_CONF( 512000,  800000,  CIF, 25, 1, 2),
+	MS_VIDEOENC_CONF( 256000,  512000,  CIF, 17, 1, 3),
+	MS_VIDEOENC_CONF( 170000,  256000, QVGA, 15, 1, 3),
+	MS_VIDEOENC_CONF( 128000,  170000, QCIF, 10, 1, 3),
+	MS_VIDEOENC_CONF(      0,  128000, QCIF,  5, 1, 5)
 };
 
+#if HAVE_AVCODEC_SNOW
 static const MSVideoConfiguration snow_conf_list[] = {
-	MS_VIDEOENC_CONF(1024000, 1536000, SVGA, 25, 2),
-	MS_VIDEOENC_CONF( 800000, 1024000,  VGA, 25, 2),
-	MS_VIDEOENC_CONF( 512000,  800000,  CIF, 25, 2),
-	MS_VIDEOENC_CONF( 256000,  512000,  CIF, 17, 3),
-	MS_VIDEOENC_CONF( 170000,  256000, QVGA, 15, 3),
-	MS_VIDEOENC_CONF( 128000,  170000, QCIF, 10, 3),
-	MS_VIDEOENC_CONF(  64000,  128000, QCIF,  7, 4),
-	MS_VIDEOENC_CONF(      0,   64000, QCIF,  5, 5)
+	MS_VIDEOENC_CONF(1024000, 1536000, SVGA, 25, 2, 2),
+	MS_VIDEOENC_CONF( 800000, 1024000,  VGA, 25, 1, 2),
+	MS_VIDEOENC_CONF( 512000,  800000,  CIF, 25, 1, 2),
+	MS_VIDEOENC_CONF( 256000,  512000,  CIF, 17, 1, 3),
+	MS_VIDEOENC_CONF( 170000,  256000, QVGA, 15, 1, 3),
+	MS_VIDEOENC_CONF( 128000,  170000, QCIF, 10, 1, 3),
+	MS_VIDEOENC_CONF(  64000,  128000, QCIF,  7, 1, 4),
+	MS_VIDEOENC_CONF(      0,   64000, QCIF,  5, 1, 5)
 };
+#endif
 
 #ifndef FF_I_TYPE
 #define FF_I_TYPE AV_PICTURE_TYPE_I
@@ -113,9 +117,6 @@ void ms_ffmpeg_log_callback(void* ptr, int level, const char* fmt, va_list vl)
 
 void ms_ffmpeg_check_init(){
 	if(!avcodec_initialized){
-#ifdef FF_API_AVCODEC_INIT
-		avcodec_init();
-#endif
 		avcodec_register_all();
 		avcodec_initialized=TRUE;
 #ifdef ENABLE_LOG_FFMPEG
@@ -125,46 +126,17 @@ void ms_ffmpeg_check_init(){
 	}
 }
 
-/* the goal of this small object is to tell when to send I frames at startup:
-at 2 and 4 seconds*/
-typedef struct VideoStarter{
-	uint64_t next_time;
-	int i_frame_count;
-}VideoStarter;
-
-static void video_starter_init(VideoStarter *vs){
-	vs->next_time=0;
-	vs->i_frame_count=0;
-}
-
-static void video_starter_first_frame(VideoStarter *vs, uint64_t curtime){
-	vs->next_time=curtime+2000;
-}
-
-static bool_t video_starter_need_i_frame(VideoStarter *vs, uint64_t curtime){
-	if (vs->next_time==0) return FALSE;
-	if (curtime>=vs->next_time){
-		vs->i_frame_count++;
-		if (vs->i_frame_count==1){
-			vs->next_time+=2000;
-		}else{
-			vs->next_time=0;
-		}
-		return TRUE;
-	}
-	return FALSE;
-}
-
 typedef struct EncState{
 	AVCodecContext av_context;
 	AVCodec *av_codec;
+	AVFrame* pict;
 	enum CodecID codec;
 	mblk_t *comp_buf;
 	int mtu;	/* network maximum transmission unit in bytes */
 	int profile;
 	int qmin;
 	uint32_t framenum;
-	VideoStarter starter;
+	MSVideoStarter starter;
 	bool_t req_vfu;
 	const MSVideoConfiguration *vconf_list;
 	MSVideoConfiguration vconf;
@@ -239,14 +211,16 @@ static const MSVideoConfiguration * get_vconf_list(EncState *s) {
 		case CODEC_ID_MPEG4:
 		default:
 			return &mpeg4_conf_list[0];
+#if HAVE_AVCODEC_SNOW
 		case CODEC_ID_SNOW:
 			return &snow_conf_list[0];
+#endif
 	}
 }
 
 static void enc_init(MSFilter *f, enum CodecID codec)
 {
-	EncState *s=(EncState *)ms_new(EncState,1);
+	EncState *s=ms_new0(EncState,1);
 	f->data=s;
 	ms_ffmpeg_check_init();
 	s->profile=0;/*always default to profile 0*/
@@ -258,7 +232,8 @@ static void enc_init(MSFilter *f, enum CodecID codec)
 	s->framenum=0;
 	s->av_context.codec=NULL;
 	s->vconf_list = get_vconf_list(s);
-	s->vconf = ms_video_find_best_configuration_for_bitrate(s->vconf_list, 500000);
+	s->vconf = ms_video_find_best_configuration_for_bitrate(s->vconf_list, 500000, ms_get_cpu_count());
+	s->pict = av_frame_alloc();
 }
 
 static void enc_h263_init(MSFilter *f){
@@ -268,11 +243,11 @@ static void enc_h263_init(MSFilter *f){
 static void enc_mpeg4_init(MSFilter *f){
 	enc_init(f,CODEC_ID_MPEG4);
 }
-
+#if HAVE_AVCODEC_SNOW
 static void enc_snow_init(MSFilter *f){
 	enc_init(f,CODEC_ID_SNOW);
 }
-
+#endif
 static void enc_mjpeg_init(MSFilter *f){
 	enc_init(f,CODEC_ID_MJPEG);
 }
@@ -297,7 +272,7 @@ static void prepare(EncState *s){
 
 	/* put codec parameters */
 	/* in order to take in account RTP protocol overhead and avoid possible
-	 bitrate peaks especially on low bandwidth, we make a correction on the 
+	 bitrate peaks especially on low bandwidth, we make a correction on the
 	 codec's target bitrate.
 	*/
 	c->bit_rate=(float)s->vconf.required_bitrate*0.92;
@@ -308,7 +283,11 @@ static void prepare(EncState *s){
 
 	/* ffmpeg vbv rate control consumes too much cpu above a certain target bitrate.
 	We don't use it above max_br_vbv */
-	if (s->codec!=CODEC_ID_SNOW && s->vconf.required_bitrate<max_br_vbv){
+	if (
+#if HAVE_AVCODEC_SNOW
+		s->codec!=CODEC_ID_SNOW &&
+#endif
+		s->vconf.required_bitrate<max_br_vbv){
 		/*snow does not like 1st pass rate control*/
 		c->rc_max_rate=c->bit_rate;
 		c->rc_min_rate=0;
@@ -326,10 +305,11 @@ static void prepare(EncState *s){
 	c->gop_size=(int)s->vconf.fps*10; /*emit I frame every 10 seconds*/
 	c->pix_fmt=PIX_FMT_YUV420P;
 	s->comp_buf=allocb(c->bit_rate*2,0);
+#if HAVE_AVCODEC_SNOW
 	if (s->codec==CODEC_ID_SNOW){
 		c->strict_std_compliance=-2;
 	}
-	
+#endif
 	ms_message("Codec size set to w=%i/h=%i",c->width, c->height);
 
 }
@@ -363,6 +343,7 @@ static void prepare_mpeg4(EncState *s){
 
 static void enc_uninit(MSFilter  *f){
 	EncState *s=(EncState*)f->data;
+	if (s->pict) av_frame_free(&s->pict);
 	ms_free(s);
 }
 
@@ -374,9 +355,12 @@ static void enc_preprocess(MSFilter *f){
 		prepare_h263(s);
 	else if (s->codec==CODEC_ID_MPEG4)
 		prepare_mpeg4(s);
+#if HAVE_AVCODEC_SNOW
 	else if (s->codec==CODEC_ID_SNOW){
 		/**/
-	}else if (s->codec==CODEC_ID_MJPEG){
+	}
+#endif
+	else if (s->codec==CODEC_ID_MJPEG){
 		/**/
 	}else {
 		ms_error("Unsupported codec id %i",s->codec);
@@ -392,7 +376,7 @@ static void enc_preprocess(MSFilter *f){
 		ms_error("avcodec_open() failed: %i",error);
 		return;
 	}
-	video_starter_init(&s->starter);
+	ms_video_starter_init(&s->starter);
 	ms_debug("image format is %i.",s->av_context.pix_fmt);
 	ms_message("qmin=%i qmax=%i",s->av_context.qmin,s->av_context.qmax);
 	s->framenum=0;
@@ -467,7 +451,7 @@ static int get_gbsc_bytealigned(uint8_t *begin, uint8_t *end){
 
 static void rfc2190_generate_packets(MSFilter *f, EncState *s, mblk_t *frame, uint32_t timestamp){
 	mblk_t *packet=NULL;
-	
+
 	while (frame->b_rptr<frame->b_wptr){
 		packet=dupb(frame);
 		/*frame->b_rptr=packet->b_wptr=packet->b_rptr+get_gbsc(packet->b_rptr, MIN(packet->b_rptr+s->mtu,frame->b_wptr));*/
@@ -501,15 +485,15 @@ static void mpeg4_fragment_and_send(MSFilter *f,EncState *s,mblk_t *frame, uint3
 static void rfc4629_generate_follow_on_packets(MSFilter *f, EncState *s, mblk_t *frame, uint32_t timestamp, uint8_t *psc, uint8_t *end, bool_t last_packet){
 	mblk_t *packet;
 	int len=end-psc;
-	
-	packet=dupb(frame);	
+
+	packet=dupb(frame);
 	packet->b_rptr=psc;
 	packet->b_wptr=end;
 	/*ms_message("generating packet of size %i",end-psc);*/
 	rfc2429_set_P(psc,1);
 	mblk_set_timestamp_info(packet,timestamp);
 
-	
+
 	if (len>s->mtu){
 		/*need to slit the packet using "follow-on" packets */
 		/*compute the number of packets need (rounded up)*/
@@ -621,9 +605,9 @@ static void mjpeg_fragment_and_send(MSFilter *f,EncState *s,mblk_t *frame, uint3
 	struct jpeghdr_qtable qtblhdr;
 	int bytes_left = msgdsize(frame);
 	int data_len;
-	
+
 	mblk_t *packet;
-	
+
 	/* Initialize JPEG header
 	 */
 	//jpghdr.tspec = typespec;
@@ -682,9 +666,9 @@ static void mjpeg_fragment_and_send(MSFilter *f,EncState *s,mblk_t *frame, uint3
 			mblk_set_marker_info(packet,TRUE);
 		}
 
-		memcpy(packet->b_wptr, frame->b_rptr + jpghdr.off, data_len);	
+		memcpy(packet->b_wptr, frame->b_rptr + jpghdr.off, data_len);
 		packet->b_wptr=packet->b_wptr + data_len;
-				
+
 		mblk_set_timestamp_info(packet,timestamp);
 		ms_queue_put(f->outputs[0],packet);
 
@@ -716,7 +700,7 @@ static int find_marker(uint8_t **pbuf_ptr, uint8_t *buf_end){
 static mblk_t *skip_jpeg_headers(mblk_t *full_frame, mblk_t **lqt, mblk_t **cqt){
 	int err;
 	uint8_t *pbuf_ptr=full_frame->b_rptr;
-	uint8_t *buf_end=full_frame->b_wptr;	
+	uint8_t *buf_end=full_frame->b_wptr;
 
 	ms_message("image size: %li)", (long)(buf_end-pbuf_ptr));
 
@@ -762,8 +746,12 @@ static void split_and_send(MSFilter *f, EncState *s, mblk_t *frame){
 	uint8_t *lastpsc;
 	uint8_t *psc;
 	uint32_t timestamp=f->ticker->time*90LL;
-	
-	if (s->codec==CODEC_ID_MPEG4 || s->codec==CODEC_ID_SNOW)
+
+	if (s->codec==CODEC_ID_MPEG4
+#if HAVE_AVCODEC_SNOW
+	|| s->codec==CODEC_ID_SNOW
+#endif
+	)
 	{
 		mpeg4_fragment_and_send(f,s,frame,timestamp);
 		return;
@@ -804,7 +792,7 @@ static void split_and_send(MSFilter *f, EncState *s, mblk_t *frame){
 
 static void process_frame(MSFilter *f, mblk_t *inm){
 	EncState *s=(EncState*)f->data;
-	AVFrame pict;
+
 	AVCodecContext *c=&s->av_context;
 	int error,got_packet;
 	mblk_t *comp_buf=s->comp_buf;
@@ -815,21 +803,22 @@ static void process_frame(MSFilter *f, mblk_t *inm){
 
 	ms_yuv_buf_init_from_mblk(&yuv, inm);
 	/* convert image if necessary */
-	avcodec_get_frame_defaults(&pict);
-	avpicture_fill((AVPicture*)&pict,yuv.planes[0],c->pix_fmt,c->width,c->height);
-	
+	av_frame_unref(s->pict);
+	avpicture_fill((AVPicture*)s->pict,yuv.planes[0],c->pix_fmt,c->width,c->height);
+
 	/* timestamp used by ffmpeg, unset here */
-	pict.pts=AV_NOPTS_VALUE;
-		
-	if (video_starter_need_i_frame (&s->starter,f->ticker->time)){
+	s->pict->pts=AV_NOPTS_VALUE;
+
+	if (ms_video_starter_need_i_frame (&s->starter, f->ticker->time)){
 		/*sends an I frame at 2 seconds and 4 seconds after the beginning of the call*/
 		s->req_vfu=TRUE;
 	}
 	if (s->req_vfu){
-		pict.pict_type=FF_I_TYPE;
+		s->pict->pict_type=FF_I_TYPE;
 		s->req_vfu=FALSE;
 	}
 	comp_buf->b_rptr=comp_buf->b_wptr=comp_buf->b_datap->db_base;
+#if HAVE_AVCODEC_SNOW
 	if (s->codec==CODEC_ID_SNOW){
 		//prepend picture size
 		uint32_t header=((s->vconf.vsize.width&0xffff)<<16) | (s->vconf.vsize.height&0xffff);
@@ -837,16 +826,16 @@ static void process_frame(MSFilter *f, mblk_t *inm){
 		comp_buf->b_wptr+=4;
 		comp_buf_sz-=4;
 	}
-
+#endif
 	packet.data=comp_buf->b_wptr;
 	packet.size=comp_buf_sz;
-	error=avcodec_encode_video2(c, &packet, &pict, &got_packet);
+	error=avcodec_encode_video2(c, &packet, s->pict, &got_packet);
 
 	if (error<0) ms_warning("ms_AVencoder_process: error %i.",error);
 	else if (got_packet){
 		s->framenum++;
 		if (s->framenum==1){
-			video_starter_first_frame (&s->starter,f->ticker->time);
+			ms_video_starter_first_frame(&s->starter, f->ticker->time);
 		}
 		if (c->coded_frame->pict_type==FF_I_TYPE){
 			ms_message("Emitting I-frame");
@@ -891,7 +880,11 @@ static int enc_set_configuration(MSFilter *f, void *data) {
 	if (vconf->extra != NULL) {
 		s->qmin = *((int *)vconf->extra);
 	}
-	ms_message("Video configuration set: bitrate=%dbits/s, fps=%f, vsize=%dx%d", s->vconf.required_bitrate, s->vconf.fps, s->vconf.vsize.width, s->vconf.vsize.height);
+	ms_message("Video configuration set: bitrate=%dbits/s, fps=%f, vsize=%dx%d for encoder [%p]", s->vconf.required_bitrate
+																								, s->vconf.fps
+																								, s->vconf.vsize.width
+																								, s->vconf.vsize.height
+																								, f);
 	return 0;
 }
 
@@ -912,7 +905,7 @@ static int enc_set_vsize(MSFilter *f, void *arg) {
 	MSVideoConfiguration best_vconf;
 	MSVideoSize *vs = (MSVideoSize *)arg;
 	EncState *s=(EncState*)f->data;
-	best_vconf = ms_video_find_best_configuration_for_size(s->vconf_list, *vs);
+	best_vconf = ms_video_find_best_configuration_for_size(s->vconf_list, *vs, ms_get_cpu_count());
 	s->vconf.vsize = *vs;
 	s->vconf.fps = best_vconf.fps;
 	s->vconf.bitrate_limit = best_vconf.bitrate_limit;
@@ -946,7 +939,7 @@ static int enc_set_br(MSFilter *f, void *arg) {
 		s->vconf.required_bitrate = br;
 		enc_set_configuration(f, &s->vconf);
 	} else {
-		MSVideoConfiguration best_vconf = ms_video_find_best_configuration_for_bitrate(s->vconf_list, br);
+		MSVideoConfiguration best_vconf = ms_video_find_best_configuration_for_bitrate(s->vconf_list, br, ms_get_cpu_count());
 		enc_set_configuration(f, &best_vconf);
 	}
 	return 0;
@@ -1025,7 +1018,7 @@ MSFilterDesc ms_mpeg4_enc_desc={
 	enc_uninit,
 	methods
 };
-
+#if HAVE_AVCODEC_SNOW
 MSFilterDesc ms_snow_enc_desc={
 	MS_SNOW_ENC_ID,
 	"MSSnowEnc",
@@ -1041,7 +1034,7 @@ MSFilterDesc ms_snow_enc_desc={
 	enc_uninit,
 	methods
 };
-
+#endif
 MSFilterDesc ms_mjpeg_enc_desc={
 	MS_JPEG_ENC_ID,
 	"MSJpegEnc",
@@ -1107,7 +1100,7 @@ MSFilterDesc ms_mpeg4_enc_desc={
 	.uninit=enc_uninit,
 	.methods=methods
 };
-
+#if HAVE_AVCODEC_SNOW
 MSFilterDesc ms_snow_enc_desc={
 	.id=MS_SNOW_ENC_ID,
 	.name="MSSnowEnc",
@@ -1127,7 +1120,7 @@ MSFilterDesc ms_snow_enc_desc={
 	.uninit=enc_uninit,
 	.methods=methods
 };
-
+#endif
 MSFilterDesc ms_mjpeg_enc_desc={
 	.id=MS_JPEG_ENC_ID,
 	.name="MSMJpegEnc",
@@ -1146,19 +1139,21 @@ MSFilterDesc ms_mjpeg_enc_desc={
 
 #endif
 
-void __register_ffmpeg_encoders_if_possible(void){
+void __register_ffmpeg_encoders_if_possible(MSFactory *obj){
 	ms_ffmpeg_check_init();
-	if (avcodec_find_encoder(CODEC_ID_MPEG4))
-		ms_filter_register(&ms_mpeg4_enc_desc);
-	if (avcodec_find_encoder(CODEC_ID_H263)){
-		ms_filter_register(&ms_h263_enc_desc);
-		ms_filter_register(&ms_h263_old_enc_desc);
+	if (avcodec_find_encoder(CODEC_ID_MPEG4) && HAVE_NON_FREE_CODECS)
+		ms_factory_register_filter(obj,&ms_mpeg4_enc_desc);
+	if (avcodec_find_encoder(CODEC_ID_H263) && HAVE_NON_FREE_CODECS){
+		ms_factory_register_filter(obj,&ms_h263_enc_desc);
+		ms_factory_register_filter(obj,&ms_h263_old_enc_desc);
 	}
+#if HAVE_AVCODEC_SNOW
 	if (avcodec_find_encoder(CODEC_ID_SNOW))
-		ms_filter_register(&ms_snow_enc_desc);
+		ms_factory_register_filter(obj,&ms_snow_enc_desc);
+#endif
 	if (avcodec_find_encoder(CODEC_ID_MJPEG))
 	{
-		ms_filter_register(&ms_mjpeg_enc_desc);
+		ms_factory_register_filter(obj,&ms_mjpeg_enc_desc);
 	}
 }
 

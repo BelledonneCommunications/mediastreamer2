@@ -620,6 +620,7 @@ static void winsnd_write_process(MSFilter *f){
 			d->outcurbuf=0;
 			waveOutReset(d->outdev);
 			ms_queue_flush(f->inputs[0]);
+			freemsg(m);
 			break;
 		}
 		d->outcurbuf++;
@@ -644,6 +645,12 @@ static int set_nchannels(MSFilter *f, void *arg){
 	return 0;
 }
 
+static int get_nchannels(MSFilter *f, void *arg){
+	WinSnd *d=(WinSnd*)f->data;
+	*((int*)arg)=d->wfx.nChannels;
+	return 0;
+}
+
 static int winsnd_get_stat_input(MSFilter *f, void *arg){
 	WinSnd *d=(WinSnd*)f->data;
 	return d->stat_input;
@@ -665,6 +672,7 @@ static MSFilterMethod winsnd_methods[]={
 	{	MS_FILTER_SET_SAMPLE_RATE	, set_rate	},
 	{	MS_FILTER_GET_SAMPLE_RATE	, get_rate	},
 	{	MS_FILTER_SET_NCHANNELS		, set_nchannels	},
+	{	MS_FILTER_GET_NCHANNELS		, get_nchannels },
 	{	MS_FILTER_GET_STAT_INPUT, winsnd_get_stat_input },
 	{	MS_FILTER_GET_STAT_OUTPUT, winsnd_get_stat_ouptut },
 	{	MS_FILTER_GET_STAT_DISCARDED, winsnd_get_stat_discarded },

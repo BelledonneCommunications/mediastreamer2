@@ -18,6 +18,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 package org.linphone.mediastream;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.linphone.mediastream.video.capture.hwconf.Hacks;
 
 import android.content.Context;
@@ -47,6 +50,8 @@ public class Version {
 	public static final int API17_JELLY_BEAN_42 = 17;
 	public static final int API18_JELLY_BEAN_43 = 18;
 	public static final int API19_KITKAT_44 = 19;
+	public static final int API21_LOLLIPOP_50 = 21;
+	public static final int API22_LOLLIPOP_51 = 22;
 
 	private static native boolean nativeHasZrtp();
 	private static native boolean nativeHasNeon();
@@ -74,18 +79,45 @@ public class Version {
 		return buildVersion;
 	}
 
-	public static boolean isArmv7() {
+	public static List<String> getCpuAbis(){
+		List<String> cpuabis=new ArrayList<String>();
+		if (sdkAboveOrEqual(API21_LOLLIPOP_50)){
+			try {
+				String abis[]=(String[])Build.class.getField("SUPPORTED_ABIS").get(null);
+				for (String abi: abis){
+					cpuabis.add(abi);
+				}
+			} catch (Throwable e) {
+				Log.e(e);
+			}
+		}else{
+			cpuabis.add(Build.CPU_ABI);
+			cpuabis.add(Build.CPU_ABI2);
+		}
+		return cpuabis;
+	}
+	private static boolean isArmv7() {
 		try {
-			return sdkAboveOrEqual(4)
-			&& Build.class.getField("CPU_ABI").get(null).toString().startsWith("armeabi-v7");
-		} catch (Throwable e) {}
+			return getCpuAbis().get(0).startsWith("armeabi-v7");
+		} catch (Throwable e) {
+			Log.e(e);
+		}
 		return false;
 	}
-	public static boolean isX86() {
+	private static boolean isX86() {
 		try {
-			return sdkAboveOrEqual(4)
-			&& Build.class.getField("CPU_ABI").get(null).toString().startsWith("x86");
-		} catch (Throwable e) {}
+			return getCpuAbis().get(0).startsWith("x86");
+		} catch (Throwable e) {
+			Log.e(e);
+		}
+		return false;
+	}
+	private static boolean isArmv5() {
+		try {
+			return getCpuAbis().get(0).equals("armeabi");
+		} catch (Throwable e) {
+			Log.e(e);
+		}
 		return false;
 	}
 	public static boolean hasNeon(){
@@ -93,10 +125,10 @@ public class Version {
 		return hasNeon;
 	}
 	public static boolean hasFastCpu() {
-		return isArmv7() || isX86();
+		return !isArmv5();
 	}
 	public static boolean hasFastCpuWithAsmOptim() {
-		return (isArmv7() && hasNeon()) || isX86();
+		return (!isX86() && !isArmv5() && hasNeon()) || isX86();
 	}
 	public static boolean isVideoCapable() {
 		return !Version.sdkStrictlyBelow(5) && Version.hasFastCpu() && Hacks.hasCamera();
@@ -116,7 +148,7 @@ public class Version {
 
 	public static void dumpCapabilities(){
 		StringBuilder sb = new StringBuilder(" ==== Capabilities dump ====\n");
-		sb.append("Has neon: ").append(Boolean.toString(hasNeon())).append("\n");
+		if (isArmv7()) sb.append("Has neon: ").append(Boolean.toString(hasNeon())).append("\n");
 		sb.append("Has ZRTP: ").append(Boolean.toString(hasZrtp())).append("\n");
 		Log.i(sb.toString());
 	}

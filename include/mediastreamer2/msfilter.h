@@ -20,9 +20,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef msfilter_h
 #define msfilter_h
 
-#include "mscommon.h"
-#include "msqueue.h"
-#include "allfilters.h"
+#include "mediastreamer2/mscommon.h"
+#include "mediastreamer2/msqueue.h"
+#include "mediastreamer2/allfilters.h"
+#include "mediastreamer2/formats.h"
 
 /**
  * @file msfilter.h
@@ -37,8 +38,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
 
 /**
- * @defgroup mediastreamer2_filter Filter API - manage mediastreamer2 filters.
- * @ingroup mediastreamer2_api
+ * @addtogroup mediastreamer2_filter
  * @{
  */
 
@@ -85,11 +85,12 @@ enum _MSFilterInterfaceId{
 	MSFilterAudioCaptureInterface,/**<Interface for audio capture filters*/
 	MSFilterAudioPlaybackInterface,/**Interface for audio playback filters.*/
 	MSFilterAudioEncoderInterface,/**<Video encoder interface*/
+	MSFilterVoidInterface,/**<Void source/sink interface*/
 };
 
 /**
  * Interface IDs, used to generate method names (see MS_FILTER_METHOD macro).
- * 
+ *
 **/
 typedef enum _MSFilterInterfaceId MSFilterInterfaceId;
 
@@ -111,8 +112,8 @@ enum _MSFilterCategory{
 	MS_FILTER_DECODER,
 	/**used by capture filters that perform encoding*/
 	MS_FILTER_ENCODING_CAPTURER,
-	/**used by render filters that perform decoding*/
-	MS_FILTER_DECODING_RENDERER
+	/**used by filters that perform decoding and rendering */
+	MS_FILTER_DECODER_RENDERER
 };
 
 /**
@@ -132,7 +133,10 @@ typedef enum _MSFilterCategory MSFilterCategory;
  * Filter's flags controlling special behaviours.
 **/
 enum _MSFilterFlags{
-	MS_FILTER_IS_PUMP = 1 /**< The filter must be called in process function every tick.*/
+	MS_FILTER_IS_PUMP = 1, /**< The filter must be called in process function every tick.*/
+	/*...*/
+	/*private flags: don't use it in filters.*/
+	MS_FILTER_IS_ENABLED = 1<<31 /*<Flag to specify if a filter is enabled or not. Only enabled filters are returned by function ms_filter_get_encoder */
 };
 
 /**
@@ -174,15 +178,16 @@ typedef struct _MSFilterDesc MSFilterDesc;
 
 struct _MSFilter{
 	MSFilterDesc *desc; /**<Back pointer to filter's descriptor.*/
-	/*protected attributes */
+	/*protected attributes, do not move or suppress any of them otherwise plugins will be broken */
 	ms_mutex_t lock;
 	MSQueue **inputs; /**<Table of input queues.*/
 	MSQueue **outputs;/**<Table of output queues */
-	MSFilterNotifyFunc notify;
-	void *notify_ud;
-	void *data; /**<Pointer used by the filter for internal state and computations.*/
+	struct _MSFactory *factory;/**<the factory that created this filter*/
+	void *padding; /**Unused - to be reused later when new protected fields have to added*/
+	void *data; /**< Pointer used by the filter for internal state and computations.*/
 	struct _MSTicker *ticker; /**<Pointer to the ticker object. It is not NULL when being called process()*/
-	/*private attributes */
+	/*private attributes, they can be moved and changed at any time*/
+	MSList *notify_callbacks;
 	uint32_t last_tick;
 	MSFilterStats *stats;
 	int postponed_task; /*number of postponed tasks*/
@@ -292,7 +297,7 @@ MS2_PUBLIC MSFilterDesc * ms_filter_get_decoder(const char *mime);
  * This descriptor can be used to instanciate the filter using ms_filter_new_from_desc()
  * This function can be useful to query the presence of a filter loaded as a plugin, for example.
  *
- * @param name The filter name.
+ * @param filter_name The filter name.
 **/
 MS2_PUBLIC MSFilterDesc *ms_filter_lookup_by_name(const char *filter_name);
 
@@ -300,9 +305,9 @@ MS2_PUBLIC MSFilterDesc *ms_filter_lookup_by_name(const char *filter_name);
  * Returns a list of filter descriptions implementing a given interface.
  * The list itself must be freed by the caller of this function, but not the MSFilterDesc pointed by the list elements.
  * @param id a filter interface id
- * @returns a newly allocated MSList of #MSFilterDesc.
+ * @return a newly allocated MSList of #MSFilterDesc.
 **/
-MSList *ms_filter_lookup_by_interface(MSFilterInterfaceId id);
+MS2_PUBLIC MSList *ms_filter_lookup_by_interface(MSFilterInterfaceId id);
 
 /**
  * Create encoder filter according to codec name.
@@ -431,9 +436,27 @@ MS2_PUBLIC int ms_filter_call_method_noarg(MSFilter *f, unsigned int id);
  * @param f    A MSFilter object.
  * @param id   A method ID.
  *
- * Returns: 0 if successfull, -1 otherwise.
+ * Returns: TRUE if method is implemented, FALSE otherwise.
  */
 MS2_PUBLIC bool_t ms_filter_has_method(MSFilter *f, unsigned int id);
+
+/**
+ * Returns whether a filter implements a given interface.
+ * @param f a MSFilter object
+ * @param id an interface id.
+ * 
+ * Returns TRUE if interface is implemented, FALSE, otherwise.
+**/
+MS2_PUBLIC bool_t ms_filter_implements_interface(MSFilter *f, MSFilterInterfaceId id);
+
+/**
+ * Returns whether a filter implements a given interface, based on the filter's descriptor.
+ * @param f a MSFilter object
+ * @param id an interface id.
+ * 
+ * Returns TRUE if interface is implemented, FALSE, otherwise.
+**/
+MS2_PUBLIC bool_t ms_filter_desc_implements_interface(MSFilterDesc *desc, MSFilterInterfaceId id);
 
 /**
  * Set a callback on filter's to be informed of private filter's event.
@@ -444,11 +467,34 @@ MS2_PUBLIC bool_t ms_filter_has_method(MSFilter *f, unsigned int id);
  * @param f        A MSFilter object.
  * @param fn       A MSFilterNotifyFunc that will be called.
  * @param userdata A pointer to private data.
- *
+ * @deprecated use ms_filter_add_notify_callback()
  *
  */
-MS2_PUBLIC void ms_filter_set_notify_callback(MSFilter *f, MSFilterNotifyFunc fn, void *userdata);
 
+
+/**
+ * Set a callback on filter's to be informed of private filter's event.
+ * This callback is called from the filter's MSTicker, unless a global event queue
+ * is created to receive all filter's notification or synchronous flag is TRUE.
+ * See ms_event_queue_new() for details.
+ *
+ * @param f        A MSFilter object.
+ * @param fn       A MSFilterNotifyFunc that will be called.
+ * @param userdata A pointer to private data.
+ * @param synchronous boolean that indicates whether this callback must be called synchronously.
+ *
+ */
+MS2_PUBLIC void ms_filter_add_notify_callback(MSFilter *f, MSFilterNotifyFunc fn, void *userdata, bool_t synchronous);
+
+/**
+ * Remove a notify callback previously entered with ms_filter_add_notify_callback()
+ *
+ * @param f        A MSFilter object.
+ * @param fn       A MSFilterNotifyFunc that will be called.
+ * @param userdata A pointer to private data.
+ *
+ */
+MS2_PUBLIC void ms_filter_remove_notify_callback(MSFilter *f, MSFilterNotifyFunc fn, void *userdata);
 
 /**
  * Get MSFilterId's filter.
@@ -458,6 +504,13 @@ MS2_PUBLIC void ms_filter_set_notify_callback(MSFilter *f, MSFilterNotifyFunc fn
  * Returns: MSFilterId if successfull, -1 otherwise.
  */
 MS2_PUBLIC MSFilterId ms_filter_get_id(MSFilter *f);
+
+/**
+ * Get filter's name.
+ * @param[in] f #MSFilter object
+ * @return The name of the filter.
+ */
+MS2_PUBLIC const char * ms_filter_get_name(MSFilter *f);
 
 
 /**
@@ -556,6 +609,8 @@ MS2_PUBLIC const MSList * ms_filter_get_statistics(void);
 MS2_PUBLIC void ms_filter_log_statistics(void);
 
 
+
+
 /* I define the id taking the lower bits of the address of the MSFilterDesc object,
 the method index (_cnt_) and the argument size */
 /* I hope using this to avoid type mismatch (calling a method on the wrong filter)*/
@@ -563,7 +618,7 @@ the method index (_cnt_) and the argument size */
 	(  (((unsigned long)(_id_)) & 0xFFFF)<<16 | (_cnt_<<8) | (_argsize_ & 0xFF ))
 
 /**
- * Macro to create a method id, unique per filter. 
+ * Macro to create a method id, unique per filter.
  * First argument shall be the filter's ID (MSFilterId) or interface ID (MSFilterInterfaceId).
  * Second argument is the method index within the context of the filter. It should start from 0 and increment for each new method.
  * Third argument is the argument type of the method, for example "int", "float" or any structure.
@@ -590,6 +645,13 @@ the method index (_cnt_) and the argument size */
 #define MS_FILTER_EVENT_NO_ARG(_id_,_count_)\
 	MS_FILTER_METHOD_ID(_id_,_count_,0)
 
+	
+#define MS_FILTER_BASE_EVENT(_count_,_argtype_) \
+	MS_FILTER_EVENT(MS_FILTER_BASE_ID,_count_,_argtype_)
+
+#define MS_FILTER_BASE_EVENT_NO_ARG(_count_) \
+	MS_FILTER_EVENT_NO_ARG(MS_FILTER_BASE_ID,_count_)
+	
 /**
  *  some MSFilter base generic methods:
  **/
@@ -623,8 +685,36 @@ the method index (_cnt_) and the argument size */
 /**Filters can return their latency in milliseconds (if known) using this method:*/
 #define MS_FILTER_GET_LATENCY	MS_FILTER_BASE_METHOD(11,int)
 
+typedef struct _MSPinFormat{
+	int pin;
+	const MSFmtDescriptor *fmt;
+}MSPinFormat;
 
-/* more specific methods: to be moved into implementation specific header files*/
+/**
+ * Obtain the format of a filter on a given input
+ */
+#define MS_FILTER_GET_INPUT_FMT MS_FILTER_BASE_METHOD(30,MSPinFormat)
+/**
+ * Set the format of a filter on a given input
+ */
+#define MS_FILTER_SET_INPUT_FMT MS_FILTER_BASE_METHOD(31,MSPinFormat)
+/**
+ * Obtain the format of a filter on a given output
+ */
+#define MS_FILTER_GET_OUTPUT_FMT MS_FILTER_BASE_METHOD(32,MSPinFormat)
+/**
+ * Set the format of a filter on a given output
+ */
+#define MS_FILTER_SET_OUTPUT_FMT MS_FILTER_BASE_METHOD(33,MSPinFormat)
+
+
+/**
+ * MSFilter generic events
+**/
+#define MS_FILTER_OUTPUT_FMT_CHANGED MS_FILTER_BASE_EVENT_NO_ARG(0) /**<triggered whenever a filter decides to change its output format for one or more more output pins*/
+
+
+/* DEPRECATED  specific methods: to be moved into implementation specific header files - DO NOT USE IN NEW CODE*/
 #define MS_FILTER_SET_FILTERLENGTH 	MS_FILTER_BASE_METHOD(12,int)
 #define MS_FILTER_SET_OUTPUT_SAMPLE_RATE MS_FILTER_BASE_METHOD(13,int)
 #define MS_FILTER_ENABLE_DIRECTMODE	MS_FILTER_BASE_METHOD(14,int)
@@ -644,8 +734,6 @@ the method index (_cnt_) and the argument size */
 #define MS_FILTER_SET_RTP_PAYLOAD_PICKER MS_FILTER_BASE_METHOD(27,void*)
 #define MS_FILTER_SET_OUTPUT_NCHANNELS	MS_FILTER_BASE_METHOD(28,int)
 
-#define MS_CONF_SPEEX_PREPROCESS_MIC	MS_FILTER_EVENT(MS_CONF_ID, 1, void*)
-#define MS_CONF_CHANNEL_VOLUME	MS_FILTER_EVENT(MS_CONF_ID, 3, void*)
 
 /** @} */
 
@@ -655,8 +743,9 @@ MS2_PUBLIC void ms_filter_preprocess(MSFilter *f, struct _MSTicker *t);
 MS2_PUBLIC void ms_filter_postprocess(MSFilter *f);
 MS2_PUBLIC bool_t ms_filter_inputs_have_data(MSFilter *f);
 MS2_PUBLIC void ms_filter_notify(MSFilter *f, unsigned int id, void *arg);
-MS2_PUBLIC void ms_filter_notify_synchronous(MSFilter *f, unsigned int id, void *arg);
 MS2_PUBLIC void ms_filter_notify_no_arg(MSFilter *f, unsigned int id);
+void ms_filter_clear_notify_callback(MSFilter *f);
+void ms_filter_clean_pending_events(MSFilter *f);
 #define ms_filter_lock(f)	ms_mutex_lock(&(f)->lock)
 #define ms_filter_unlock(f)	ms_mutex_unlock(&(f)->lock)
 MS2_PUBLIC void ms_filter_unregister_all(void);
@@ -678,8 +767,8 @@ MS2_PUBLIC void ms_filter_postpone_task(MSFilter *f, MSFilterFunc taskfunc);
 }
 #endif
 
-#include "msinterfaces.h"
-
+#include "mediastreamer2/msinterfaces.h"
+#include "mediastreamer2/msfactory.h"
 /* used by awk script in Makefile.am to generate alldescs.c */
 #define MS_FILTER_DESC_EXPORT(desc)
 

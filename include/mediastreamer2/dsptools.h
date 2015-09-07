@@ -381,6 +381,7 @@ void ms_ifft(void *table, ms_word16_t *in, ms_word16_t *out);
 /** digital filtering api*/
 void ms_fir_mem16(const ms_word16_t *x, const ms_coef_t *num, ms_word16_t *y, int N, int ord, ms_mem_t *mem);
 
+
 #ifdef __cplusplus
 }
 #endif

@@ -485,6 +485,9 @@ public:
 	void setFps(float fps){
 		_fps=fps;
 	}
+	float getFps(){
+		return _fps;
+	}
 	MSPixFmt getPixFmt(){
 		if (!_ready) createDshowGraph(); /* so that _pixfmt is updated*/
 		return _pixfmt;
@@ -492,6 +495,7 @@ public:
 	void setDeviceIndex(int index){
 		_devid=index;
 	}
+	MSAverageFPS avgfps;
 protected:
   	long m_refCount;
 private:
@@ -537,30 +541,23 @@ STDMETHODIMP_(ULONG) DSCapture::Release()
 	return m_refCount;
 }
 
-static void dummy(void*p){
-}
-
 STDMETHODIMP DSCapture::SampleCB( double par1 , IMediaSample * sample)
 {
 	uint8_t *p;
 	unsigned int size;
+	
 	if (sample->GetPointer(&p)!=S_OK){
 		ms_error("error in GetPointer()");
 		return S_OK;
 	}
 	size=sample->GetSize();
 	//ms_message( "DSCapture::SampleCB pointer=%p, size=%i",p,size);
-	mblk_t *m;
-	if (_pixfmt!=MS_RGB24_REV){
-		m=esballoc(p,size,0,dummy);
-		m->b_wptr+=size;
-	}else{
-		/* make a copy for BGR24 buffers into a new end-padded buffer, because swscale
-		is doing invalid reads past the end of the original buffers */
-		m=allocb(size+128,0);
-		memcpy(m->b_wptr,p,size);
-		m->b_wptr+=size;
-	}
+	mblk_t *m=allocb(size+128,0);
+	/* make a copy into new buffer with extra bytes, because swscale
+	is doing invalid reads past the end of the original buffers due to mmx optimisations */
+	memcpy(m->b_wptr,p,size);
+	m->b_wptr+=size;
+	
 	ms_mutex_lock(&_mutex);
 	putq(&_rq,ms_yuv_buf_alloc_from_buffer(_vsize.width,_vsize.height,m));
 	ms_mutex_unlock(&_mutex);
@@ -611,7 +608,7 @@ static int find_best_format(SharedComPtr<IAMStreamConfig> streamConfig, int coun
 			mediaType->formattype == FORMAT_VideoInfo &&
 			mediaType->cbFormat >= sizeof(VIDEOINFOHEADER) ) {
 			VIDEOINFOHEADER *infoHeader = (VIDEOINFOHEADER*)mediaType->pbFormat;
-			ms_message("Seeing format %ix%i %s",infoHeader->bmiHeader.biWidth,infoHeader->bmiHeader.biHeight,
+			ms_message("Seeing format %ix%i %s",(int)infoHeader->bmiHeader.biWidth,(int)infoHeader->bmiHeader.biHeight,
 					fourcc_to_char(fccstr,infoHeader->bmiHeader.biCompression));
 			if (ms_fourcc_to_pix_fmt(infoHeader->bmiHeader.biCompression)==requested_fmt){
 				MSVideoSize cur;
@@ -807,7 +804,7 @@ int DSCapture::startDshowGraph(){
 	}
 	HRESULT r=_mediaControl->Run();
 	if (r!=S_OK && r!=S_FALSE){
-		ms_error("Error starting graph (%i)",r);
+		ms_error("Error starting graph (%i)",(int)r);
 		return -1;
 	}
 	ms_message("Graph started");
@@ -877,6 +874,7 @@ SharedComPtr< IPin > DSCapture::findPin( SharedComPtr<IBaseFilter> &filter, PIN_
 
 static void dscap_preprocess(MSFilter * obj){
 	DSCapture *s=(DSCapture*)obj->data;
+	ms_average_fps_init(&s->avgfps,"msdscap: fps=%f");
 	s->startDshowGraph();
 }
 
@@ -901,6 +899,7 @@ static void dscap_process(MSFilter * obj){
 			timestamp=(uint32_t)(obj->ticker->time*90);/* rtp uses a 90000 Hz clockrate for video*/
 			mblk_set_timestamp_info(om,timestamp);
 			ms_queue_put(obj->outputs[0],om);
+			ms_average_fps_update(&s->avgfps,obj->ticker->time);
 		}
 	}
 }
@@ -908,6 +907,16 @@ static void dscap_process(MSFilter * obj){
 static int dscap_set_fps(MSFilter *f, void *arg){
 	DSCapture *s=(DSCapture*)f->data;
 	s->setFps(*(float*)arg);
+	return 0;
+}
+
+static int dscap_get_fps(MSFilter *f, void *arg){
+	DSCapture *s=(DSCapture*)f->data;
+	if (f->ticker){
+		*((float*)arg)=ms_average_fps_get(&s->avgfps);
+	} else {
+		*((float*)arg)=s->getFps();
+	}
 	return 0;
 }
 
@@ -932,6 +941,7 @@ static int dscap_get_vsize(MSFilter *f, void *arg){
 
 static MSFilterMethod methods[]={
 	{	MS_FILTER_SET_FPS	,	dscap_set_fps	},
+	{	MS_FILTER_GET_FPS	,	dscap_get_fps	},
 	{	MS_FILTER_GET_PIX_FMT	,	dscap_get_pix_fmt	},
 	{	MS_FILTER_SET_VIDEO_SIZE, dscap_set_vsize	},
 	{	MS_FILTER_GET_VIDEO_SIZE, dscap_get_vsize	},

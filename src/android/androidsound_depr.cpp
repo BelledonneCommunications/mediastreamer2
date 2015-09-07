@@ -28,9 +28,11 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
-#include "ortp/zrtp.h"
+#include "mediastreamer2/zrtp.h"
 #include <cpu-features.h>
 
+#include "audiofilters/devices.h"
+#include "hardware_echo_canceller.h"
 
 static const float sndwrite_flush_threshold=0.020;	//ms
 static const float sndread_flush_threshold=0.020; //ms
@@ -48,7 +50,7 @@ JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasNeon(J
 }
 
 JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasZrtp(JNIEnv *env, jclass c) {
-	return ortp_zrtp_available();
+	return ms_zrtp_available();
 }
 
 JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasVideo(JNIEnv *env, jclass c) {
@@ -61,11 +63,11 @@ JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasVideo(
 
 #ifdef __cplusplus
 }
-#endif 
+#endif
 
 static void set_high_prio(void){
 	/*
-		This pthread based code does nothing on linux. The linux kernel has 
+		This pthread based code does nothing on linux. The linux kernel has
 		sched_get_priority_max(SCHED_OTHER)=sched_get_priority_max(SCHED_OTHER)=0.
 		As long as we can't use SCHED_RR or SCHED_FIFO, the only way to increase priority of a calling thread
 		is to use setpriority().
@@ -146,8 +148,15 @@ MSSndCard *msandroid_sound_duplicate(MSSndCard *obj){
 }
 
 MSSndCard *msandroid_sound_card_new(){
+	SoundDeviceDescription *d;
 	MSSndCard *card=ms_snd_card_new(&msandroid_sound_card_desc);
 	card->name=ms_strdup("Android Sound card");
+
+	d = sound_device_description_get();
+	if (d->flags & DEVICE_HAS_BUILTIN_AEC) {
+		card->capabilities |= MS_SND_CARD_CAP_BUILTIN_ECHO_CANCELLER;
+	}
+	card->data = d;
 	return card;
 }
 
@@ -161,7 +170,7 @@ void msandroid_sound_detect(MSSndCardManager *m){
 /*************filter commun functions*********/
 class msandroid_sound_data {
 public:
-	msandroid_sound_data() : bits(16),rate(8000),nchannels(1),started(false),thread_id(0){
+	msandroid_sound_data() : bits(16),rate(8000),nchannels(1),started(false),thread_id(0),forced_rate(false){
 		ms_mutex_init(&mutex,NULL);
 	};
 	~msandroid_sound_data() {
@@ -174,6 +183,7 @@ public:
 	ms_thread_t     thread_id;
 	ms_mutex_t		mutex;
 	int	buff_size; /*buffer size in bytes*/
+	bool	forced_rate;
 };
 
 
@@ -188,6 +198,13 @@ static int set_nchannels(MSFilter *f, void *arg){
 	ms_debug("set_nchannels %d", *((int*)arg));
 	msandroid_sound_data *d=(msandroid_sound_data*)f->data;
 	d->nchannels=*(int*)arg;
+	return 0;
+}
+
+static int get_nchannels(MSFilter *f, void *arg){
+	ms_debug("get_nchannels %d", *((int*)arg));
+	msandroid_sound_data *d=(msandroid_sound_data*)f->data;
+	*(int*)arg = d->nchannels;
 	return 0;
 }
 
@@ -231,6 +248,11 @@ static int set_read_rate(MSFilter *f, void *arg){
 	unsigned int proposed_rate = *((unsigned int*)arg);
 	ms_debug("set_rate %d",proposed_rate);
 	msandroid_sound_data *d=(msandroid_sound_data*)f->data;
+	if (d->forced_rate) {
+		ms_warning("sample rate is forced by mediastreamer2 device table, skipping...");
+		return -1;
+	}
+
 	d->rate=get_supported_rate(proposed_rate);
 	if (d->rate == proposed_rate)
 		return 0;
@@ -253,6 +275,7 @@ MSFilterMethod msandroid_sound_read_methods[]={
 	{	MS_FILTER_SET_SAMPLE_RATE	, set_read_rate	},
 	{	MS_FILTER_GET_SAMPLE_RATE	, get_rate	},
 	{	MS_FILTER_SET_NCHANNELS		, set_nchannels	},
+	{	MS_FILTER_GET_NCHANNELS		, get_nchannels	},
 	{	MS_FILTER_GET_LATENCY	, get_latency},
 	{	MS_AUDIO_CAPTURE_FORCE_SPEAKER_STATE,	msandroid_hack_speaker_state	},
 	{	0				, NULL		}
@@ -263,6 +286,7 @@ class msandroid_sound_read_data : public msandroid_sound_data{
 public:
 	msandroid_sound_read_data() : audio_record(0),audio_record_class(0),read_buff(0),read_chunk_size(0) {
 		ms_bufferizer_init(&rb);
+		aec=NULL;
 	}
 	~msandroid_sound_read_data() {
 		ms_bufferizer_uninit (&rb);
@@ -278,6 +302,8 @@ public:
 	int64_t start_time;
 	int64_t read_samples;
 	MSTickerSynchronizer *ticker_synchronizer;
+	jobject aec;
+	bool builtin_aec;
 };
 
 static void compute_timespec(msandroid_sound_read_data *d) {
@@ -306,6 +332,7 @@ static void* msandroid_read_cb(msandroid_sound_read_data* d) {
 		goto end;
 	}
 	//start recording
+	ms_message("Start recording");
 	jni_env->CallVoidMethod(d->audio_record,record_id);
 
 	// int read (byte[] audioData, int offsetInBytes, int sizeInBytes)
@@ -360,7 +387,7 @@ static void sound_read_setup(MSFilter *f){
 		return;
 	}
 	d->buff_size = jni_env->CallStaticIntMethod(d->audio_record_class,min_buff_size_id,d->rate,2/*CHANNEL_CONFIGURATION_MONO*/,2/*  ENCODING_PCM_16BIT */);
-	d->read_chunk_size = d->buff_size/4;	
+	d->read_chunk_size = d->buff_size/4;
 	d->buff_size*=2;/*double the size for configuring the recorder: this does not affect latency but prevents "AudioRecordThread: buffer overflow"*/
 
 	if (d->buff_size > 0) {
@@ -422,6 +449,23 @@ static void sound_read_preprocess(MSFilter *f){
 	if (!d->started)
 		sound_read_setup(f);
 	ms_ticker_set_time_func(f->ticker,(uint64_t (*)(void*))ms_ticker_synchronizer_get_corrected_time, d->ticker_synchronizer);
+
+	if (d->builtin_aec && d->audio_record) {
+		JNIEnv *env=ms_get_jni_env();
+		jmethodID getsession_id=0;
+		int sessionId=-1;
+		getsession_id = env->GetMethodID(d->audio_record_class,"getAudioSessionId", "()I");
+		if(getsession_id==0) {
+			ms_error("cannot find AudioRecord.getAudioSessionId() method");
+			return;
+		}
+		sessionId = env->CallIntMethod(d->audio_record,getsession_id);
+		ms_message("AudioRecord.getAudioSessionId() returned %i", sessionId);
+		if (sessionId==-1) {
+			return;
+		}
+		d->aec = enable_hardware_echo_canceller(env, sessionId);
+	}
 }
 
 static void sound_read_postprocess(MSFilter *f){
@@ -439,6 +483,11 @@ static void sound_read_postprocess(MSFilter *f){
 	if(stop_id==0) {
 		ms_error("cannot find AudioRecord.stop() method");
 		goto end;
+	}
+
+	if (d->aec) {
+		delete_hardware_echo_canceller(jni_env, d->aec);
+		d->aec = NULL;
 	}
 
 	d->started = false;
@@ -521,7 +570,17 @@ static MSFilterDesc msandroid_sound_read_desc={
 MSFilter *msandroid_sound_read_new(MSSndCard *card){
 	ms_debug("msandroid_sound_read_new");
 	MSFilter *f=ms_filter_new_from_desc(&msandroid_sound_read_desc);
-	f->data=new msandroid_sound_read_data();
+	msandroid_sound_read_data *data=new msandroid_sound_read_data();
+	data->builtin_aec = card->capabilities & MS_SND_CARD_CAP_BUILTIN_ECHO_CANCELLER;
+	if (card->data != NULL) {
+		SoundDeviceDescription *d = (SoundDeviceDescription *)card->data;
+		if (d->recommended_rate > 0) {
+			data->rate = d->recommended_rate;
+			data->forced_rate = true;
+			ms_warning("Using forced sample rate %i", data->rate);
+		}
+	}
+	f->data=data;
 	return f;
 }
 
@@ -531,6 +590,11 @@ MS_FILTER_DESC_EXPORT(msandroid_sound_read_desc)
 static int set_write_rate(MSFilter *f, void *arg){
 #ifndef USE_HARDWARE_RATE
 	msandroid_sound_data *d=(msandroid_sound_data*)f->data;
+	if (d->forced_rate) {
+		ms_warning("sample rate is forced by mediastreamer2 device table, skipping...");
+		return -1;
+	}
+
 	int proposed_rate = *((int*)arg);
 	ms_debug("set_rate %d",proposed_rate);
 	d->rate=proposed_rate;
@@ -546,6 +610,7 @@ MSFilterMethod msandroid_sound_write_methods[]={
 	{	MS_FILTER_SET_SAMPLE_RATE	, set_write_rate	},
 	{	MS_FILTER_GET_SAMPLE_RATE	, get_rate	},
 	{	MS_FILTER_SET_NCHANNELS		, set_nchannels	},
+	{	MS_FILTER_GET_NCHANNELS		, get_nchannels	},
 	{	0				, NULL		}
 };
 
@@ -683,7 +748,7 @@ void msandroid_sound_write_preprocess(MSFilter *f){
 	jmethodID min_buff_size_id;
 
 	JNIEnv *jni_env = ms_get_jni_env();
-	
+
 	if (d->audio_track_class == 0) {
 		return;
 	}
@@ -796,7 +861,7 @@ end: {
 
 void msandroid_sound_write_process(MSFilter *f){
 	msandroid_sound_write_data *d=(msandroid_sound_write_data*)f->data;
-	
+
 	mblk_t *m;
 	while((m=ms_queue_get(f->inputs[0]))!=NULL){
 		if (d->started){
@@ -831,7 +896,16 @@ static MSFilterDesc msandroid_sound_write_desc={
 MSFilter *msandroid_sound_write_new(MSSndCard *card){
 	ms_debug("msandroid_sound_write_new");
 	MSFilter *f=ms_filter_new_from_desc(&msandroid_sound_write_desc);
-	f->data=new msandroid_sound_write_data();
+	msandroid_sound_write_data *data = new msandroid_sound_write_data();
+	if (card->data != NULL) {
+		SoundDeviceDescription *d = (SoundDeviceDescription *)card->data;
+		if (d->recommended_rate > 0) {
+			data->rate = d->recommended_rate;
+			data->forced_rate = true;
+			ms_warning("Using forced sample rate %i", data->rate);
+		}
+	}
+	f->data = data;
 	return f;
 }
 

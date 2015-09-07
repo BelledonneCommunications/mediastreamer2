@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "cpu-features.h"
 #endif
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <malloc.h> /* for alloca */
 #endif
 
@@ -46,9 +46,9 @@ typedef struct SpeexEncState{
 } SpeexEncState;
 
 static void enc_init(MSFilter *f){
-	SpeexEncState *s=(SpeexEncState *)ms_new(SpeexEncState,1);
+	SpeexEncState *s=ms_new0(SpeexEncState,1);
 #ifdef SPEEX_LIB_SET_CPU_FEATURES
-    int cpuFeatures = 0;
+	int cpuFeatures = 0;
 #endif
 	s->rate=8000;
 	s->bitrate=-1;
@@ -66,19 +66,19 @@ static void enc_init(MSFilter *f){
 
 #ifdef SPEEX_LIB_SET_CPU_FEATURES
 #ifdef __ARM_NEON__
-        #ifdef ANDROID
-        if (android_getCpuFamily() == ANDROID_CPU_FAMILY_ARM
-                && (android_getCpuFeatures() & ANDROID_CPU_ARM_FEATURE_NEON) != 0) {
-                cpuFeatures = SPEEX_LIB_CPU_FEATURE_NEON;
-        }
-        #else
-        cpuFeatures = SPEEX_LIB_CPU_FEATURE_NEON;
-        #endif
+	#ifdef ANDROID
+	if (android_getCpuFamily() == ANDROID_CPU_FAMILY_ARM
+		&& (android_getCpuFeatures() & ANDROID_CPU_ARM_FEATURE_NEON) != 0) {
+		cpuFeatures = SPEEX_LIB_CPU_FEATURE_NEON;
+	}
+	#else
+	cpuFeatures = SPEEX_LIB_CPU_FEATURE_NEON;
+	#endif
 #endif
-        ms_message("speex_lib_ctl init with neon ? %d", (cpuFeatures == SPEEX_LIB_CPU_FEATURE_NEON));
-        speex_lib_ctl(SPEEX_LIB_SET_CPU_FEATURES, &cpuFeatures);
+	ms_message("speex_lib_ctl init %s neon", (cpuFeatures == SPEEX_LIB_CPU_FEATURE_NEON)?"with":"without");
+	speex_lib_ctl(SPEEX_LIB_SET_CPU_FEATURES, &cpuFeatures);
 #else
-        ms_message("speex_lib_ctl does not support SPEEX_LIB_CPU_FEATURE_NEON");
+	ms_message("speex_lib_ctl does not support SPEEX_LIB_CPU_FEATURE_NEON");
 #endif
 }
 
@@ -109,7 +109,7 @@ static void apply_max_bitrate(SpeexEncState *s){
 	}else{
 		/*convert from codec bitrate to network bitrate */
 		s->ip_bitrate=( (s->bitrate/(pps*8))+20+12+8)*8*pps;
-		ms_message("Using bitrate %i for speex encoder, ip bitrate is %i",s->bitrate,s->ip_bitrate);		
+		ms_message("Using bitrate %i for speex encoder, ip bitrate is %i",s->bitrate,s->ip_bitrate);
 	}
 }
 
@@ -273,6 +273,7 @@ static void enc_process(MSFilter *f){
 		om->b_wptr+=k;
 
 		mblk_set_timestamp_info(om,s->ts-s->frame_size);
+		ms_bufferizer_fill_current_metas(s->bufferizer, om);
 		ms_queue_put(f->outputs[0],om);
 		speex_bits_destroy(&bits);
 	}
@@ -317,7 +318,7 @@ static int enc_set_ptime(MSFilter *f, void *arg){
 	s->ptime=*(int*)arg;
 	/*if the ptime is not a mulptiple of 20, go to the next multiple*/
 	if (s->ptime%20)
-		s->ptime = s->ptime - s->ptime%20 + 20; 
+		s->ptime = s->ptime - s->ptime%20 + 20;
 	ms_message("MSSpeexEnc: got ptime=%i",s->ptime);
 	return 0;
 }
@@ -379,7 +380,7 @@ static int enc_add_fmtp(MSFilter *f, void *arg){
 		int val=atoi(buf);
 		enc_set_ptime(f,&val);
 	}
-	
+
 	return 0;
 }
 
@@ -418,6 +419,11 @@ static int enc_add_attr(MSFilter *f, void *arg){
 	return 0;
 }
 
+static int get_channels(MSFilter *f, void *arg) {
+	*((int *)arg) = 1;
+	return 0;
+}
+
 static MSFilterMethod enc_methods[]={
 	{	MS_FILTER_SET_SAMPLE_RATE	,	enc_set_sr	},
 	{	MS_FILTER_GET_SAMPLE_RATE	,	enc_get_sr	},
@@ -427,6 +433,7 @@ static MSFilterMethod enc_methods[]={
 	{	MS_FILTER_ADD_ATTR		,	enc_add_attr	},
 	{	MS_AUDIO_ENCODER_SET_PTIME	,	enc_set_ptime	},
 	{	MS_AUDIO_ENCODER_GET_PTIME	,	enc_get_ptime	},
+	{	MS_FILTER_GET_NCHANNELS		,	get_channels},
 	{	0				,	NULL		}
 };
 
@@ -481,7 +488,7 @@ typedef struct DecState{
 } DecState;
 
 static void dec_init(MSFilter *f){
-	DecState *s=(DecState *)ms_new(DecState,1);
+	DecState *s=ms_new0(DecState,1);
 	s->rate=8000;
 	s->frsz=0;
 	s->state=NULL;
@@ -494,9 +501,7 @@ static void dec_init(MSFilter *f){
 
 static void dec_uninit(MSFilter *f){
 	DecState *s=(DecState*)f->data;
-    if (s==NULL)
-		return;
-    if (s->state!=NULL)
+	if (s->state!=NULL)
 		speex_decoder_destroy(s->state);
 	ms_free(s);
 }
@@ -565,17 +570,17 @@ static void dec_process(MSFilter *f){
 	SpeexBits bits;
 	int bytes=s->frsz*2;
 	bool_t bits_initd=FALSE;
-	
+
 	while((im=ms_queue_get(f->inputs[0]))!=NULL){
 		int rem_bits=(im->b_wptr-im->b_rptr)*8;
-		
+
 		if (!bits_initd) {
 			speex_bits_init(&bits);
 			bits_initd=TRUE;
 		}else speex_bits_reset(&bits);
 
 		speex_bits_read_from(&bits,(char*)im->b_rptr,im->b_wptr-im->b_rptr);
-		
+
 		/* support for multiple frame  in one RTP packet */
  		do{
 			om=allocb(bytes,0);
@@ -588,10 +593,10 @@ static void dec_process(MSFilter *f){
 				if (s->sample_time==0) s->sample_time=f->ticker->time;
 				s->sample_time+=20;
 				if (s->plc_count>0){
-					ms_warning("Did speex packet loss concealment during %i ms",s->plc_count*20);
+					// ms_warning("Did speex packet loss concealment during %i ms",s->plc_count*20);
 					s->plc_count=0;
 				}
-				
+
 			}else {
 				if (err==-1)
 					ms_warning("speex end of stream");
@@ -610,7 +615,7 @@ static void dec_process(MSFilter *f){
 		om->b_wptr+=bytes;
 		mblk_set_plc_flag(om, 1);
 		ms_queue_put(f->outputs[0],om);
-		
+
 		s->sample_time+=20;
 		s->plc_count++;
 		if (s->plc_count>=plc_max){
@@ -631,6 +636,7 @@ static MSFilterMethod dec_methods[]={
 	{	MS_FILTER_GET_SAMPLE_RATE	,	dec_get_sr	},
 	{	MS_FILTER_ADD_FMTP		,	dec_add_fmtp	},
 	{ 	MS_DECODER_HAVE_PLC		, 	dec_have_plc	},
+	{	MS_FILTER_GET_NCHANNELS		,	get_channels},
 	{	0				,	NULL		}
 };
 

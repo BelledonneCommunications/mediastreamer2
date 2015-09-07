@@ -21,6 +21,7 @@
 
 #include "audio.h"
 #include "loader.h"
+#include "AudioSystem.h"
 
 namespace fake_android {
 
@@ -29,10 +30,13 @@ namespace fake_android {
 
 // ----------------------------------------------------------------------------
 
-typedef void * audio_offload_info_t;
+typedef struct _audio_offload_info * audio_offload_info_t;
 
-class AudioTrack
+typedef struct _audio_attributes * audio_attributes_t;
+
+class AudioTrack : public RefBase
 {
+	friend class AudioTrackImpl;
 public:
     enum channel_index {
         MONO   = 0,
@@ -180,7 +184,9 @@ public:
                                     int sessionId        = 0,
 									transfer_type transferType = TRANSFER_DEFAULT,
                                     const audio_offload_info_t *offloadInfo = NULL,
-                                    int uid = -1);
+                                    int uid = -1,
+									pid_t pid = -1,
+									const audio_attributes_t* pAttributes = NULL);
 
                         // DEPRECATED
                         explicit AudioTrack( int streamType,
@@ -427,10 +433,14 @@ public:
      */
             ssize_t     write(const void* buffer, size_t size);
 
+	/* ms2 addition:*/
+protected:
+	virtual void *getRealThis()const;
+	virtual bool isRefCounted()const;
+	virtual void destroy()const;
 private:
-	uint8_t *mThis;
 	class AudioTrackImpl *mImpl;
-
+	uint8_t *mThis;
 };
 
 
@@ -440,7 +450,7 @@ public:
 	static AudioTrackImpl *get(){
 		return sImpl;
 	}
-	Function14<void,
+	Function16<void,
 		void*,
 		audio_stream_type_t ,
 		uint32_t,
@@ -454,8 +464,11 @@ public:
 		int,
 		int,
 		void*,
-		int> mCtor;
+		int,
+		int,
+		const void*> mCtor;
 	Function1<void,void*> mDtor;
+	Function1<void,void*> mDefaultCtor;
 	Function1<status_t,const void *> mInitCheck;
 	Function1<void,void *> mStop;
 	Function1<void, void *> mStart;
@@ -464,6 +477,10 @@ public:
 	Function3<status_t,int*,audio_stream_type_t,int> mGetMinFrameCount;
 	Function1<uint32_t,void*> mLatency;
 	Function2<status_t,void*,uint32_t*> mGetPosition;
+	int mSdkVersion;
+	ptrdiff_t mRefBaseOffset;
+	bool mUseRefCount;
+	static const int sObjSize=1024;
 private:
 	AudioTrackImpl(Library *lib);
 	static AudioTrackImpl *sImpl;

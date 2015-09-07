@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "mediastreamer2/msticker.h"
 
-#ifndef WIN32
+#ifndef _WIN32
 #include <sys/time.h>
 #include <sys/resource.h>
 #endif
@@ -30,11 +30,11 @@ static const double smooth_coef=0.9;
 
 #define TICKER_MEASUREMENTS 1
 
-#if defined(__ARM_ARCH__) 
+#if defined(__ARM_ARCH__)
 #	if __ARM_ARCH__ < 7
 /* as MSTicker load computation requires floating point, we prefer to disable it on ARM processors without FPU*/
 #		undef TICKER_MEASUREMENTS
-#		define TICKER_MEASUREMENTS 0 
+#		define TICKER_MEASUREMENTS 0
 #	endif
 #endif
 
@@ -69,6 +69,9 @@ static void ms_ticker_init(MSTicker *ticker, const MSTickerParams *params)
 	ticker->prio=params->prio;
 	ticker->wait_next_tick=wait_next_tick;
 	ticker->wait_next_tick_data=ticker;
+	ticker->late_event.lateMs = 0;
+	ticker->late_event.time = 0;
+	ticker->late_event.current_late_ms = 0;
 	ms_ticker_start(ticker);
 }
 
@@ -80,7 +83,7 @@ MSTicker *ms_ticker_new(){
 }
 
 MSTicker *ms_ticker_new_with_params(const MSTickerParams *params){
-	MSTicker *obj=(MSTicker *)ms_new(MSTicker,1);
+	MSTicker *obj=(MSTicker *)ms_new0(MSTicker,1);
 	ms_ticker_init(obj,params);
 	return obj;
 }
@@ -154,7 +157,7 @@ int ms_ticker_attach_multiple(MSTicker *ticker,MSFilter *f,...)
 			for(it=filters;it!=NULL;it=it->next)
 				ms_filter_preprocess((MSFilter*)it->data,ticker);
 			ms_list_free(filters);
-			total_sources=ms_list_concat(total_sources,sources);			
+			total_sources=ms_list_concat(total_sources,sources);
 		}else ms_message("Filter %s is already being scheduled; nothing to do.",f->desc->name);
 	}while ((f=va_arg(l,MSFilter*))!=NULL);
 	va_end(l);
@@ -239,8 +242,8 @@ static void run_graph(MSFilter *f, MSTicker *s, MSList **unschedulable, bool_t f
 		if (filter_can_process(f,s->ticks) || force_schedule) {
 			/* this is a candidate */
 			f->last_tick=s->ticks;
-			call_process(f);	
-			/* now recurse to next filters */		
+			call_process(f);
+			/* now recurse to next filters */
 			for(i=0;i<f->desc->noutputs;i++){
 				l=f->outputs[i];
 				if (l!=NULL){
@@ -261,7 +264,7 @@ static void run_graphs(MSTicker *s, MSList *execution_list, bool_t force_schedul
 		run_graph((MSFilter*)it->data,s,&unschedulable,force_schedule);
 	}
 	/* filters that are part of a loop haven't been called in process() because one of their input refers to a filter that could not be scheduled (because they could not be scheduled themselves)... Do you understand ?*/
-	/* we resolve this by simply assuming that they must be called anyway 
+	/* we resolve this by simply assuming that they must be called anyway
 	for the loop to run correctly*/
 	/* we just recall run_graphs on them, as if they were source filters */
 	if (unschedulable!=NULL) {
@@ -296,28 +299,16 @@ static void remove_tasks_for_filter(MSTicker *ticker, MSFilter *f){
 }
 
 static uint64_t get_cur_time_ms(void *unused){
-	MSTimeSpec ts;
-	ms_get_cur_time(&ts);
-	return (ts.tv_sec*1000LL) + ((ts.tv_nsec+500000LL)/1000000LL);
-}
-
-static void sleepMs(int ms){
-#ifdef WIN32
-	Sleep(ms);
-#else
-	struct timespec ts;
-	ts.tv_sec=0;
-	ts.tv_nsec=ms*1000000LL;
-	nanosleep(&ts,NULL);
-#endif
+	return ms_get_cur_time_ms();
 }
 
 static int set_high_prio(MSTicker *obj){
 	int precision=2;
 	int prio=obj->prio;
-	
+
 	if (prio>MS_TICKER_PRIO_NORMAL){
-#ifdef WIN32
+#ifdef _WIN32
+#ifdef MS2_WINDOWS_DESKTOP
 		MMRESULT mm;
 		TIMECAPS ptc;
 		mm=timeGetDevCaps(&ptc,sizeof(ptc));
@@ -338,17 +329,18 @@ static int set_high_prio(MSTicker *obj){
 		if(!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST)){
 			ms_warning("SetThreadPriority() failed (%d)\n", (int)GetLastError());
 		}
+#endif
 #else
 		struct sched_param param;
 		int policy=SCHED_RR;
-		memset(&param,0,sizeof(param));
 		int result=0;
 		char* env_prio_c=NULL;
 		int min_prio, max_prio, env_prio;
 
+		memset(&param,0,sizeof(param));
 		if (prio==MS_TICKER_PRIO_REALTIME)
 			policy=SCHED_FIFO;
-		
+
 		min_prio = sched_get_priority_min(policy);
 		max_prio = sched_get_priority_max(policy);
 		env_prio_c = getenv("MS_TICKER_SCHEDPRIO");
@@ -362,7 +354,7 @@ static int set_high_prio(MSTicker *obj){
 		if((result=pthread_setschedparam(pthread_self(),policy, &param))) {
 			if (result==EPERM){
 				/*
-					The linux kernel has 
+					The linux kernel has
 					sched_get_priority_max(SCHED_OTHER)=sched_get_priority_max(SCHED_OTHER)=0.
 					As long as we can't use SCHED_RR or SCHED_FIFO, the only way to increase priority of a calling thread
 					is to use setpriority().
@@ -383,11 +375,13 @@ static int set_high_prio(MSTicker *obj){
 }
 
 static void unset_high_prio(int precision){
-#ifdef WIN32
+#ifdef _WIN32
+#ifdef MS2_WINDOWS_DESKTOP
 	if(!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL)){
 		ms_warning("SetThreadPriority() failed (%d)\n", (int)GetLastError());
 	}
 	timeEndPeriod(precision);
+#endif
 #endif
 }
 
@@ -396,13 +390,13 @@ static int wait_next_tick(void *data, uint64_t virt_ticker_time){
 	uint64_t realtime;
 	int64_t diff;
 	int late;
-	
+
 	while(1){
 		realtime=s->get_cur_time_ptr(s->get_cur_time_data)-s->orig;
 		diff=s->time-realtime;
 		if (diff>0){
 			/* sleep until next tick */
-			sleepMs((int)diff);
+			ortp_sleep_ms((int)diff);
 		}else{
 			late=(int)-diff;
 			break; /*exit the while loop */
@@ -418,15 +412,17 @@ void * ms_ticker_run(void *arg)
 	int lastlate=0;
 	int precision=2;
 	int late;
-	
-	precision = set_high_prio(s);
 
+	precision = set_high_prio(s);
+	s->thread_id = ms_thread_self();
 	s->ticks=1;
 	s->orig=s->get_cur_time_ptr(s->get_cur_time_data);
 
 	ms_mutex_lock(&s->lock);
-	
+
 	while(s->run){
+		uint64_t late_tick_time=0;
+		
 		s->ticks++;
 		/*Step 1: run the graphs*/
 		{
@@ -450,27 +446,34 @@ void * ms_ticker_run(void *arg)
 		late=s->wait_next_tick(s->wait_next_tick_data,s->time);
 		if (late>s->interval*5 && late>lastlate){
 			ms_warning("%s: We are late of %d miliseconds.",s->name,late);
+			late_tick_time=ms_get_cur_time_ms();
 		}
 		lastlate=late;
 		ms_mutex_lock(&s->lock);
+		if (late_tick_time){
+			s->late_event.lateMs=late;
+			s->late_event.time=late_tick_time;
+		}
+		s->late_event.current_late_ms = late;
 	}
 	ms_mutex_unlock(&s->lock);
 	unset_high_prio(precision);
 	ms_message("%s thread exiting",s->name);
 
 	ms_thread_exit(NULL);
+	s->thread_id = 0;
 	return NULL;
 }
 
 void ms_ticker_set_time_func(MSTicker *ticker, MSTickerTimeFunc func, void *user_data){
 	if (func==NULL) func=get_cur_time_ms;
-	
+
 	ticker->get_cur_time_ptr=func;
 	ticker->get_cur_time_data=user_data;
 	/*re-set the origin to take in account that previous function ptr and the
 	new one may return different times*/
 	ticker->orig=func(user_data)-ticker->time;
-	
+
 	ms_message("ms_ticker_set_time_func: ticker's time method updated.");
 }
 
@@ -495,7 +498,7 @@ static void print_graph(MSFilter *f, MSTicker *s, MSList **unschedulable, bool_t
 			/* this is a candidate */
 			f->last_tick=s->ticks;
 			ms_message("print_graphs: %s", f->desc->name);
-			/* now recurse to next filters */		
+			/* now recurse to next filters */
 			for(i=0;i<f->desc->noutputs;i++){
 				l=f->outputs[i];
 				if (l!=NULL){
@@ -516,7 +519,7 @@ static void print_graphs(MSTicker *s, MSList *execution_list, bool_t force_sched
 		print_graph((MSFilter*)it->data,s,&unschedulable,force_schedule);
 	}
 	/* filters that are part of a loop haven't been called in process() because one of their input refers to a filter that could not be scheduled (because they could not be scheduled themselves)... Do you understand ?*/
-	/* we resolve this by simply assuming that they must be called anyway 
+	/* we resolve this by simply assuming that they must be called anyway
 	for the loop to run correctly*/
 	/* we just recall run_graphs on them, as if they were source filters */
 	if (unschedulable!=NULL) {
@@ -541,6 +544,14 @@ float ms_ticker_get_average_load(MSTicker *ticker){
 }
 
 
+
+void ms_ticker_get_last_late_tick(MSTicker *ticker, MSTickerLateEvent *ev){
+	bool_t need_lock = ms_thread_self() != ticker->thread_id;
+	if (need_lock) ms_mutex_lock(&ticker->lock);
+	memcpy(ev,&ticker->late_event,sizeof(MSTickerLateEvent));
+	if (need_lock) ms_mutex_unlock(&ticker->lock);
+}
+
 static uint64_t get_ms(const MSTimeSpec *ts){
 	return (ts->tv_sec*1000LL) + ((ts->tv_nsec+500000LL)/1000000LL);
 }
@@ -554,7 +565,7 @@ static uint64_t get_wallclock_ms(void){
 static const double clock_coef = .01;
 
 MSTickerSynchronizer* ms_ticker_synchronizer_new(void) {
-	MSTickerSynchronizer *obj=(MSTickerSynchronizer *)ms_new(MSTickerSynchronizer,1);
+	MSTickerSynchronizer *obj=(MSTickerSynchronizer *)ms_new0(MSTickerSynchronizer,1);
 	obj->av_skew = 0;
 	obj->offset = 0;
 	return obj;

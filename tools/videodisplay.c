@@ -17,9 +17,6 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
-#ifdef HAVE_CONFIG_H
-#include "mediastreamer-config.h"
-#endif
 
 #include <signal.h>
 
@@ -60,7 +57,7 @@ int main(int argc, char *argv[]){
         for(n=0;n<60000 && !stopped;++n){
 #ifdef WIN32
 			MSG msg;
-    		Sleep(100);
+			Sleep(100);
 			while (PeekMessage(&msg, NULL, 0, 0,1)){
         			TranslateMessage(&msg);
         			DispatchMessage(&msg);
@@ -77,7 +74,7 @@ int main(int argc, char *argv[]){
 /* test code */
 			if (n==400)
 			  {
-			    ms_ticker_detach (vs->ms.ticker, vs->source);
+			    ms_ticker_detach (vs->ms.sessions.ticker, vs->source);
 
 			    vs->tee = ms_filter_new(MS_TEE_ID);
 
@@ -88,7 +85,7 @@ int main(int argc, char *argv[]){
 			    ms_filter_link(vs->tee,1,vs->output2,1);
 			    
 			    //ms_filter_unlink(vs->tee,0,vs->output,0);
-			    ms_ticker_attach (vs->ms.ticker, vs->source);
+			    ms_ticker_attach (vs->ms.sessions.ticker, vs->source);
 
 			  }
 			if (n==500)
@@ -113,7 +110,7 @@ int main(int argc, char *argv[]){
 			  }
 			if (n==900)
 			  {
-			    ms_ticker_detach (vs->ms.ticker, vs->source);
+			    ms_ticker_detach (vs->ms.sessions.ticker, vs->source);
 
 			    ms_filter_unlink(vs->pixconv,0,vs->tee,0);
 			    ms_filter_unlink(vs->tee,0,vs->output2,0);
@@ -124,7 +121,7 @@ int main(int argc, char *argv[]){
 			    ms_filter_link(vs->pixconv,0, vs->output2,0);
 
 			    
-			    ms_ticker_attach (vs->ms.ticker, vs->source);
+			    ms_ticker_attach (vs->ms.sessions.ticker, vs->source);
 			  }
 		}
 		video_preview_stop(vs);

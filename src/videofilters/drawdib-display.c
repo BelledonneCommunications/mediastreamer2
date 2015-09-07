@@ -150,6 +150,10 @@ static LRESULT CALLBACK window_proc(
 {
 	DDDisplay *wd=(DDDisplay*)GetWindowLongPtr(hwnd,GWLP_USERDATA);
 	switch(uMsg){
+		case WM_CREATE:
+			wd=(DDDisplay*)((LPCREATESTRUCT)lParam)->lpCreateParams;
+			SetWindowLongPtr(hwnd,GWL_USERDATA,(long)wd);
+			break;
 		case WM_DESTROY:
 			if (wd){
 				wd->window=NULL;
@@ -181,7 +185,7 @@ static LRESULT CALLBACK window_proc(
 	return 0;
 }
 
-static HWND create_window(int w, int h)
+static HWND create_window(int w, int h, DDDisplay *dd)
 {
 	WNDCLASS wc;
 	HINSTANCE hInstance = GetModuleHandle(NULL);
@@ -213,7 +217,7 @@ static HWND create_window(int w, int h)
 	hwnd=CreateWindow("Video Window", "Video window", 
 		WS_OVERLAPPEDWINDOW /*WS_THICKFRAME*/ | WS_VISIBLE ,
 		CW_USEDEFAULT, CW_USEDEFAULT, rect.right-rect.left,rect.bottom-rect.top,
-													NULL, NULL, hInstance, NULL);
+													NULL, NULL, hInstance, dd);
 	if (hwnd==NULL){
 		ms_error("Fail to create video window");
 	}
@@ -246,9 +250,8 @@ static void dd_display_prepare(MSFilter *f){
 	DDDisplay *dd=(DDDisplay*)f->data;
 	
 	if (dd->window==NULL) {
-		if(dd->auto_window) {
-			dd->window=create_window(dd->wsize.width,dd->wsize.height);
-			SetWindowLong(dd->window,GWL_USERDATA,(long)dd);
+		if (dd->auto_window) {
+			dd->window=create_window(dd->wsize.width,dd->wsize.height,dd);
 		}
 	}
 	if (dd->ddh==NULL)
@@ -282,7 +285,7 @@ static void dd_display_uninit(MSFilter *f){
 }
 
 static void dd_display_preprocess(MSFilter *f){
-	dd_display_prepare(f);
+	
 }
 
 
@@ -373,6 +376,12 @@ static void dd_display_process(MSFilter *f){
 	int corner=obj->sv_corner;
 	float scalefactor=obj->sv_scalefactor;
 
+	/* this creates the window if not given by the application. This must be done within the process() function because
+	 it is not possible on windows to create a windows in one thread and modify it from another one.
+	 Previously, window creation was done from preprocess() (so main thread) but it was deadlocking when process() function
+	 was doing MoveWindow() to resize the window*/
+	dd_display_prepare(f);
+	
 	if (obj->window==NULL){
 		goto end;
 	}
@@ -382,6 +391,8 @@ static void dd_display_process(MSFilter *f){
 
 	wsize.width=rect.right;
 	wsize.height=rect.bottom;
+	if (!ms_video_size_equal(wsize,obj->wsize))
+		obj->need_repaint=TRUE;
 	obj->wsize=wsize;
 	/*get most recent message and draw it*/
 	if (corner!=-1 && f->inputs[1]!=NULL && (local_im=ms_queue_peek_last(f->inputs[1]))!=NULL) {
@@ -478,7 +489,13 @@ static void dd_display_process(MSFilter *f){
 	}
 	
 	end:
-		
+	{
+		MSG msg;
+		while (PeekMessage(&msg, NULL, 0, 0,1)){
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+	}
 	if (f->inputs[0]!=NULL)
 		ms_queue_flush(f->inputs[0]);
 	if (f->inputs[1]!=NULL)

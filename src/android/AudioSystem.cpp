@@ -59,6 +59,15 @@ status_t AudioSystem::setForceUse(audio_policy_force_use_t usage, audio_policy_f
 	return AudioSystemImpl::get()->mSetForceUse.invoke(usage, config);
 }
 
+int AudioSystem::newAudioSessionId(){
+	if (AudioSystemImpl::get()->mNewAudioSessionId.isFound())
+		return AudioSystemImpl::get()->mNewAudioSessionId.invoke();
+	else{
+		ms_warning("AudioSystem::newAudioSessionId() not found.");
+		return -1;
+	}
+}
+
 audio_io_handle_t AudioSystem::getInput(audio_source_t inputSource,
                                     uint32_t samplingRate,
                                     audio_format_t format,
@@ -78,7 +87,8 @@ AudioSystemImpl::AudioSystemImpl(Library *lib) :
 	mGetOutputLatency(lib, "_ZN7android11AudioSystem16getOutputLatencyEPji"),
 	mSetParameters(lib,"_ZN7android11AudioSystem13setParametersEiRKNS_7String8E"),
 	mSetPhoneState(lib, "_ZN7android11AudioSystem13setPhoneStateEi"),
-	mSetForceUse(lib, "_ZN7android11AudioSystem11setForceUseENS0_9force_useENS0_13forced_configE") {
+	mSetForceUse(lib, "_ZN7android11AudioSystem11setForceUseENS0_9force_useENS0_13forced_configE"),
+	mNewAudioSessionId(lib,"_ZN7android11AudioSystem17newAudioSessionIdEv"){
 	//mGetInput(lib,"_ZN7android11AudioSystem8getInputEijjjNS0_18audio_in_acousticsE"){
 	mApi18=false;
 	// Try some Android 4.0 symbols if not found
@@ -104,6 +114,10 @@ AudioSystemImpl::AudioSystemImpl(Library *lib) :
 	}
 	if (!mSetPhoneState.isFound()) {
 		mSetPhoneState.load(lib, "_ZN7android11AudioSystem13setPhoneStateE12audio_mode_t");
+	}
+	if (!mNewAudioSessionId.isFound()){
+		//android 5.0 symbol
+		mNewAudioSessionId.load(lib, "_ZN7android11AudioSystem16newAudioUniqueIdEv");
 	}
 }
 
@@ -147,6 +161,103 @@ bool AudioSystemImpl::init(Library *lib){
 }
 
 AudioSystemImpl *AudioSystemImpl::sImpl=NULL;
+
+bool RefBaseImpl::init(Library *lib){
+	RefBaseImpl *impl=new RefBaseImpl(lib);
+	bool fail=false;
+	
+	if (!impl->mIncStrong.isFound()){
+		ms_error("RefBase::incStrong() not found");
+		fail=true;
+	}
+	if (!impl->mDecStrong.isFound()){
+		ms_error("RefBase::decStrong() not found");
+		fail=true;
+	}
+	if (fail){
+		delete impl;
+		return false;
+	}else{
+		sImpl=impl;
+		return true;
+	}
+}
+
+RefBaseImpl * RefBaseImpl::sImpl=0;
+
+
+RefBaseImpl::RefBaseImpl(Library *lib) :
+	mCtor(lib,"_ZN7android7RefBaseC2Ev"),
+	mIncStrong(lib,"_ZNK7android7RefBase9incStrongEPKv"),
+	mDecStrong(lib,"_ZNK7android7RefBase9decStrongEPKv"),
+	mGetStrongCount(lib,"_ZNK7android7RefBase14getStrongCountEv")
+{
+	
+}
+
+RefBase::RefBase(){
+	mImpl=RefBaseImpl::get();
+	mCnt=0;
+}
+
+RefBase::~RefBase(){
+}
+
+void RefBase::incStrong(const void* id) const{
+	mCnt++;
+	if (isRefCounted()) {
+		ms_message("incStrong(%p)",getRealThis());
+		mImpl->mIncStrong.invoke(getRealThis(),this);
+	}
+}
+
+void RefBase::decStrong(const void* id) const{
+	if (isRefCounted()) {
+		ms_message("decStrong(%p)",getRealThis());
+		mImpl->mDecStrong.invoke(getRealThis(),this);
+	}
+	mCnt--;
+	if (mCnt==0){
+		if (!isRefCounted()){
+			destroy();
+		}
+		delete this;
+	}
+}
+
+int32_t RefBase::getStrongCount() const{
+	return mImpl->mGetStrongCount.invoke(getRealThis());
+}
+
+ptrdiff_t findRefbaseOffset(void *obj, size_t size){
+	uint8_t *base_vptr=(uint8_t*)*(void **)obj;
+	const long vptrMemRange=0x1000000;
+	size_t i;
+	int ret=-1;
+	
+	if (base_vptr==NULL){
+		ms_warning("findRefbaseOffset(): no base vptr");
+	}
+	ms_message("base_vptr is %p for obj %p",base_vptr, obj);
+	for (i=((size/sizeof(void*))-1)*sizeof(void*);i>0;i-=sizeof(void*)){
+		uint8_t *ptr= ((uint8_t*)obj) + i;
+		uint8_t *candidate=(uint8_t*)*(void**)ptr;
+		if (i!=0 && labs((ptrdiff_t)(candidate-base_vptr))<vptrMemRange){
+			ret=i;
+			break;
+		}
+	}
+	if (ret==-1) ms_message("findRefbaseOffset(): no refbase vptr found");
+	return ret;
+}
+
+void dumpMemory(void *obj, size_t size){
+	size_t i;
+	ms_message("Dumping memory at %p",obj);
+	for (i=0;i<size;i+=sizeof(long)){
+		ms_message("%4i\t%lx",i,*(long*)(((uint8_t*)obj)+i));
+	}
+}
 
 }
 

@@ -23,6 +23,7 @@
 #endif
 
 #include <errno.h>
+#include <audio/audio_manager_routing.h>
 #include <sys/asoundlib.h>
 #include <sys/select.h>
 #include <sys/time.h>
@@ -175,7 +176,7 @@ static void ms_qsa_read_process(MSFilter *f) {
 		params.channel = SND_PCM_CHANNEL_CAPTURE;
 		params.mode = SND_PCM_MODE_BLOCK;
 		params.start_mode = SND_PCM_START_DATA;
-		params.stop_mode = SND_PCM_STOP_STOP;
+		params.stop_mode = SND_PCM_STOP_ROLLOVER;
 		params.buf.block.frag_size = pi.max_fragment_size;
 		params.buf.block.frags_min = 1;
 		params.buf.block.frags_max = -1;
@@ -213,9 +214,13 @@ static void ms_qsa_read_process(MSFilter *f) {
 			}
 		}
 
+		ms_message("PCM capture device %s", d->pcmdev);
 		ms_message("Format %s", snd_pcm_get_format_name(setup.format.format));
 		ms_message("Frag Size %d", setup.buf.block.frag_size);
+		ms_message("Total Frags %d", setup.buf.block.frags);
 		ms_message("Rate %d", setup.format.rate);
+		ms_message("Voices %d", setup.format.voices);
+		ms_message("Mixer Pcm Group [%s]", group.gid.name);
 	}
 
 	if (d->handle == NULL) goto setup_failure;
@@ -233,19 +238,10 @@ static void ms_qsa_read_process(MSFilter *f) {
 		om = allocb(size, 0);
 		readbytes = snd_pcm_plugin_read(d->handle, om->b_wptr, size);
 		if (readbytes < size) {
-			memset(&status, 0, sizeof(status));
-			status.channel = SND_PCM_CHANNEL_CAPTURE;
-			err = snd_pcm_plugin_status(d->handle, &status);
-			if (err != 0) {
-				ms_error("%s: snd_pcm_plugin_status() failed: %s", __FUNCTION__, snd_strerror(err));
+			ms_warning("%s: snd_pcm_plugin_read(%i) failed: %s", __FUNCTION__, readbytes, snd_strerror(errno));
+			if (readbytes == -5) { // IOError
+				ms_queue_put(f->outputs[0], om);
 				goto setup_failure;
-			}
-			if ((status.status == SND_PCM_STATUS_READY) || (status.status == SND_PCM_STATUS_UNDERRUN)) {
-				err = snd_pcm_plugin_prepare(d->handle, SND_PCM_CHANNEL_CAPTURE);
-				if (err != 0) {
-					ms_error("%s: snd_pcm_plugin_prepare() failed: %s", __FUNCTION__, snd_strerror(err));
-					goto setup_failure;
-				}
 			}
 			if (readbytes < 0) readbytes = 0;
 		}
@@ -307,9 +303,8 @@ static int ms_qsa_read_set_nchannels(MSFilter *f, void *arg) {
 	int nchannels = *((int *)arg);
 	if ((nchannels >= d->info.min_voices) && (nchannels <= d->info.max_voices)) {
 		d->nchannels = nchannels;
-		return 0;
 	}
-	return -1;
+	return 0; // Return 0 even if set didn't work to force the app to call the getter to have the correct value
 }
 
 static int ms_qsa_read_get_nchannels(MSFilter *f, void *arg) {
@@ -367,6 +362,7 @@ typedef struct _MSQSAWriteData {
 	int rate;
 	int nchannels;
 	bool_t initialized;
+	unsigned int audioman_handle;
 } MSQSAWriteData;
 
 static int ms_qsa_write_set_sample_rate(MSFilter *f, void *arg);
@@ -384,7 +380,7 @@ static MSFilter * ms_qsa_write_new(MSSndCard *card) {
 	d->pcmdev = ms_strdup(card->name);
 	err = snd_pcm_open_name(&handle, d->pcmdev, SND_PCM_OPEN_PLAYBACK | SND_PCM_OPEN_NONBLOCK);
 	if (err != 0) {
-		ms_error("%s: snd_pcm_open_preferred() failed: %s", __FUNCTION__, snd_strerror(err));
+		ms_error("%s: audio_manager_snd_pcm_open_name() failed: %s", __FUNCTION__, snd_strerror(err));
 	} else {
 		memset(&d->info, 0, sizeof(d->info));
 		d->info.channel = SND_PCM_CHANNEL_PLAYBACK;
@@ -425,9 +421,9 @@ static void ms_qsa_write_process(MSFilter *f) {
 	if (d->initialized != TRUE) goto setup_failure;
 
 	if ((d->handle == NULL) && (d->pcmdev != NULL)) {
-		err = snd_pcm_open_name(&d->handle, d->pcmdev, SND_PCM_OPEN_PLAYBACK);
+		err = audio_manager_snd_pcm_open_name(AUDIO_TYPE_VOICE, &d->handle, &d->audioman_handle, d->pcmdev, SND_PCM_OPEN_PLAYBACK);
 		if (err != 0) {
-			ms_error("%s: snd_pcm_open_name(%s) failed: %s", __FUNCTION__, d->pcmdev, snd_strerror(err));
+			ms_error("%s: audio_manager_snd_pcm_open_name(%s) failed: %s", __FUNCTION__, d->pcmdev, snd_strerror(err));
 			goto setup_failure;
 		}
 		err = snd_pcm_info(d->handle, &info);
@@ -457,8 +453,12 @@ static void ms_qsa_write_process(MSFilter *f) {
 		memset(&params, 0, sizeof(params));
 		params.channel = SND_PCM_CHANNEL_PLAYBACK;
 		params.mode = SND_PCM_MODE_BLOCK;
-		params.start_mode = SND_PCM_START_FULL;
-		params.stop_mode = SND_PCM_STOP_STOP;
+		if (strcmp(d->pcmdev, "voice") == 0) {
+			params.start_mode = SND_PCM_START_FULL;
+		} else {
+			params.start_mode = SND_PCM_START_DATA;
+		}
+		params.stop_mode = SND_PCM_STOP_STOP; 
 		params.buf.block.frag_size = pi.max_fragment_size;
 		params.buf.block.frags_min = 1;
 		params.buf.block.frags_max = -1;
@@ -496,12 +496,13 @@ static void ms_qsa_write_process(MSFilter *f) {
 			goto setup_failure;
 		}
 
+		ms_message("PCM playback device %s", d->pcmdev);
 		ms_message("Format %s", snd_pcm_get_format_name(setup.format.format));
 		ms_message("Frag Size %d", setup.buf.block.frag_size);
 		ms_message("Total Frags %d", setup.buf.block.frags);
 		ms_message("Rate %d", setup.format.rate);
 		ms_message("Voices %d", setup.format.voices);
-		ms_message("%s: Mixer Pcm Group [%s]", __FUNCTION__, group.gid.name);
+		ms_message("Mixer Pcm Group [%s]", group.gid.name);
 
 		d->buffer_size = setup.buf.block.frag_size;
 		d->buffer = ms_malloc(d->buffer_size);
@@ -521,25 +522,26 @@ static void ms_qsa_write_process(MSFilter *f) {
 	}
 	if (FD_ISSET(d->fd, &fdset) > 0) {
 		if (ms_bufferizer_get_avail(d->bufferizer) >= d->buffer_size) {
-			ms_bufferizer_read(d->bufferizer, d->buffer, d->buffer_size);
-			written = snd_pcm_plugin_write(d->handle, d->buffer, d->buffer_size);
-			if (written < d->buffer_size) {
-				ms_warning("%s: snd_pcm_plugin_write(%d) failed: %d", __FUNCTION__, d->buffer_size, errno);
-				memset(&status, 0, sizeof(status));
-				status.channel = SND_PCM_CHANNEL_PLAYBACK;
-				err = snd_pcm_plugin_status(d->handle, &status);
+			memset(&status, 0, sizeof(status));
+			status.channel = SND_PCM_CHANNEL_PLAYBACK;
+			err = snd_pcm_plugin_status(d->handle, &status);
+			if (err != 0) {
+				ms_error("%s: snd_pcm_plugin_status() failed: %s", __FUNCTION__, snd_strerror(err));
+				goto setup_failure;
+			}
+			if ((status.status == SND_PCM_STATUS_PREPARED) || (status.status == SND_PCM_STATUS_RUNNING)) {
+				ms_bufferizer_read(d->bufferizer, d->buffer, d->buffer_size);
+				written = snd_pcm_plugin_write(d->handle, d->buffer, d->buffer_size);
+				if (written < d->buffer_size) {
+					ms_warning("%s: snd_pcm_plugin_write(%d) failed: %s", __FUNCTION__, d->buffer_size, strerror(errno));
+					if (written < 0) written = 0;
+				}
+			} else if ((status.status == SND_PCM_STATUS_READY) || (status.status == SND_PCM_STATUS_UNDERRUN)) {
+				err = snd_pcm_plugin_prepare(d->handle, SND_PCM_CHANNEL_PLAYBACK);
 				if (err != 0) {
-					ms_error("%s: snd_pcm_plugin_status() failed: %s", __FUNCTION__, snd_strerror(err));
+					ms_error("%s: snd_pcm_plugin_prepare() failed: %s", __FUNCTION__, snd_strerror(err));
 					goto setup_failure;
 				}
-				if ((status.status == SND_PCM_STATUS_READY) || (status.status == SND_PCM_STATUS_UNDERRUN)) {
-					err = snd_pcm_plugin_prepare(d->handle, SND_PCM_CHANNEL_PLAYBACK);
-					if (err != 0) {
-						ms_error("%s: snd_pcm_plugin_prepare() failed: %s", __FUNCTION__, snd_strerror(err));
-						goto setup_failure;
-					}
-				}
-				if (written < 0) written = 0;
 			}
 		}
 	}
@@ -574,6 +576,9 @@ static void ms_qsa_write_postprocess(MSFilter *f) {
 		snd_pcm_close(d->handle);
 		d->handle = NULL;
 	}
+	if (d->audioman_handle != NULL) {
+		d->audioman_handle = NULL;
+	}
 }
 
 static void ms_qsa_write_uninit(MSFilter *f) {
@@ -589,7 +594,6 @@ static void ms_qsa_write_uninit(MSFilter *f) {
 	ms_bufferizer_destroy(d->bufferizer);
 	ms_free(d);
 }
-
 
 /******************************************************************************
  * Methods to configure the QSA playback filter                               *
@@ -617,9 +621,8 @@ static int ms_qsa_write_set_nchannels(MSFilter *f, void *arg) {
 	int nchannels = *((int *)arg);
 	if ((nchannels >= d->info.min_voices) && (nchannels <= d->info.max_voices)) {
 		d->nchannels = nchannels;
-		return 0;
 	}
-	return -1;
+	return 0; // Return 0 even if set didn't work to force the app to call the getter to have the correct value
 }
 
 static int ms_qsa_write_get_nchannels(MSFilter *f, void *arg) {
@@ -628,12 +631,35 @@ static int ms_qsa_write_get_nchannels(MSFilter *f, void *arg) {
 	return 0;
 }
 
+static int ms_qsa_write_set_route(MSFilter *f, void *arg) {
+	MSQSAWriteData *d = (MSQSAWriteData *)f->data;
+	MSAudioRoute audio_route = *((MSAudioRoute *)arg);
+	int err;
+	
+	if (d->audioman_handle) {
+		audio_manager_device_t output_device = AUDIO_DEVICE_DEFAULT;
+		if (audio_route == MSAudioRouteSpeaker) {
+			output_device = AUDIO_DEVICE_SPEAKER;
+		}
+		
+		err = audio_manager_set_handle_type(d->audioman_handle, AUDIO_TYPE_VOICE, output_device, AUDIO_DEVICE_UNCHANGED);
+		if (err != 0) {
+			ms_error("%s: audio_manager_set_handle_type(%i) failed: %s", __FUNCTION__, output_device, snd_strerror(err));
+			return -1;
+		}
+		return 0;
+	}
+	
+	return -1;
+}
+
 static MSFilterMethod ms_qsa_write_methods[] = {
-	{ MS_FILTER_SET_SAMPLE_RATE, ms_qsa_write_set_sample_rate },
-	{ MS_FILTER_GET_SAMPLE_RATE, ms_qsa_write_get_sample_rate },
-	{ MS_FILTER_GET_NCHANNELS,   ms_qsa_write_get_nchannels   },
-	{ MS_FILTER_SET_NCHANNELS,   ms_qsa_write_set_nchannels   },
-	{ 0,                         NULL                         }
+	{ MS_FILTER_SET_SAMPLE_RATE,		ms_qsa_write_set_sample_rate },
+	{ MS_FILTER_GET_SAMPLE_RATE,		ms_qsa_write_get_sample_rate },
+	{ MS_FILTER_GET_NCHANNELS,			ms_qsa_write_get_nchannels   },
+	{ MS_FILTER_SET_NCHANNELS,			ms_qsa_write_set_nchannels   },
+	{ MS_AUDIO_PLAYBACK_SET_ROUTE,		ms_qsa_write_set_route       },
+	{ 0,								NULL						 }
 };
 
 

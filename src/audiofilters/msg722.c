@@ -17,7 +17,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <malloc.h>  // for alloca
 #endif
 
@@ -41,7 +41,7 @@ struct EncState {
 
 static void enc_init(MSFilter *f)
 {
-	struct EncState *s=(struct EncState*)ms_new(struct EncState,1);
+	struct EncState *s=ms_new0(struct EncState,1);
 	s->state = g722_encode_init(NULL, 64000, 0);
 	s->ts=0;
 	s->bufferizer=ms_bufferizer_new();
@@ -99,7 +99,8 @@ static void enc_process(MSFilter *f)
 		scale_down((int16_t *)buf,chunksize/2);
 		k = g722_encode(s->state, om->b_wptr, (int16_t *)buf, chunksize/2);		
 		om->b_wptr += k;
-		mblk_set_timestamp_info(om,s->ts);		
+		ms_bufferizer_fill_current_metas(s->bufferizer, om);
+		mblk_set_timestamp_info(om,s->ts);
 		ms_queue_put(f->outputs[0],om);
 		s->ts += chunksize/4;  // Nr of samples is really chunksize/2 but for G722 we must 
 		                       // pretend we have a 8KHZ sampling rate
@@ -184,7 +185,7 @@ struct DecState {
 };
 
 static void dec_init(MSFilter *f){
-	struct DecState *s=(struct DecState*)ms_new(struct DecState,1);
+	struct DecState *s=ms_new0(struct DecState,1);
 	f->data=s;
 
 	s->state = g722_decode_init(NULL, 64000, 0);

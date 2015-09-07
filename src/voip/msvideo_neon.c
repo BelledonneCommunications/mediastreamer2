@@ -21,11 +21,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "mediastreamer2/msvideo.h"
 
-#ifdef __arm__
+#if MS_HAS_ARM
 
 #ifdef __ARM_NEON__
 #include <arm_neon.h>
 #endif
+
+#if defined(__arm__)
+
 #define MATRIX_LOAD_8X8 \
 	/*load 8x8 pixel \
 	[  0,  1,  2,  3,  4,  5,  6,  7] \
@@ -183,7 +186,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 			"vld2.8 {d7,d8},[r4] \n\t"
 
 
-static inline void rotate_block_8x8_clockwise(unsigned char* src, int src_width, unsigned char* dest,int dest_width) {
+static MS2_INLINE void rotate_block_8x8_clockwise(const unsigned char* src, int src_width, unsigned char* dest,int dest_width) {
 #ifdef __ARM_NEON__
 	__asm  (MATRIX_LOAD_8X8
 			MATRIX_TRANSPOSE_8X8
@@ -196,7 +199,7 @@ static inline void rotate_block_8x8_clockwise(unsigned char* src, int src_width,
 #endif
 }
 /*rotate and scale down blocks of 16x16 into 8x8*/
-static inline void rotate_and_scale_down_block_16x16_clockwise(unsigned char* src, int src_width, unsigned char* dest,int dest_width) {
+static MS2_INLINE void rotate_and_scale_down_block_16x16_clockwise(const unsigned char* src, int src_width, unsigned char* dest,int dest_width) {
 	
 #ifdef __ARM_NEON__
 	__asm  (
@@ -212,7 +215,7 @@ static inline void rotate_and_scale_down_block_16x16_clockwise(unsigned char* sr
 }
 
 /*rotate and scale down blocks of 16x16 into 8x8*/
-static inline void rotate_and_scale_down_block_8x8_anticlockwise(unsigned char* src, int src_width, unsigned char* dest,int dest_width) {
+static MS2_INLINE void rotate_and_scale_down_block_8x8_anticlockwise(const unsigned char* src, int src_width, unsigned char* dest,int dest_width) {
 	
 #ifdef __ARM_NEON__
 	__asm  (
@@ -226,7 +229,7 @@ static inline void rotate_and_scale_down_block_8x8_anticlockwise(unsigned char* 
 #endif
 }
 
-static inline void rotate_block_8x8_anticlockwise(unsigned char* src, int src_width, unsigned char* dest,int dest_width) {
+static MS2_INLINE void rotate_block_8x8_anticlockwise(const unsigned char* src, int src_width, unsigned char* dest,int dest_width) {
 #ifdef __ARM_NEON__
 	__asm  (MATRIX_LOAD_8X8
 			MATRIX_TRANSPOSE_8X8
@@ -238,18 +241,17 @@ static inline void rotate_block_8x8_anticlockwise(unsigned char* src, int src_wi
 #endif
 }
 
-void rotate_down_scale_plane_neon_clockwise(int wDest, int hDest, int full_width, uint8_t* src, uint8_t* dst,bool_t down_scale) {
+void rotate_down_scale_plane_neon_clockwise(int wDest, int hDest, int full_width, const uint8_t* src, uint8_t* dst, bool_t down_scale) {
 #ifdef __ARM_NEON__
 	char src_block_width=down_scale?16:8;
 	char dest_block_width=down_scale?src_block_width/2:src_block_width;
 	int hSrc = down_scale?wDest*2:wDest;
 	int wSrc = down_scale?hDest*2:hDest;
 	int src_incr = full_width*src_block_width;
-
+	int x,y;
 	dst += wDest - dest_block_width;
 	
 
-	int y,x;
 	for (y=0; y<hSrc; y+=src_block_width) {
 		uint8_t* dst2 = dst;
 		for (x=0; x<wSrc; x+=src_block_width) {
@@ -268,17 +270,17 @@ void rotate_down_scale_plane_neon_clockwise(int wDest, int hDest, int full_width
 #endif
 }
 
-void rotate_down_scale_plane_neon_anticlockwise(int wDest, int hDest, int full_width, uint8_t* src, uint8_t* dst,bool_t down_scale) {
+void rotate_down_scale_plane_neon_anticlockwise(int wDest, int hDest, int full_width, const uint8_t* src, uint8_t* dst,bool_t down_scale) {
 #ifdef __ARM_NEON__
 	char src_block_width=down_scale?16:8;
 	char dest_block_width=down_scale?src_block_width/2:src_block_width;
 	int hSrc = down_scale?wDest*2:wDest;
 	int wSrc = down_scale?hDest*2:hDest;
 	int src_incr = full_width*src_block_width;
+	int x,y;
 
 	dst += wDest * (hDest - dest_block_width);
 
-	int y,x;
 	for (y=0; y<hSrc; y+=src_block_width) {
 		uint8_t* dst2 = dst;
 		for (x=0; x<wSrc; x+=src_block_width) {
@@ -297,7 +299,7 @@ void rotate_down_scale_plane_neon_anticlockwise(int wDest, int hDest, int full_w
 #endif
 }
 
-void rotate_down_scale_cbcr_to_cr_cb(int wDest, int hDest, int full_width, uint8_t* cbcr_src, uint8_t* cr_dst, uint8_t* cb_dst,bool_t clockWise,bool_t down_scale) {
+void rotate_down_scale_cbcr_to_cr_cb(int wDest, int hDest, int full_width, const uint8_t* cbcr_src, uint8_t* cr_dst, uint8_t* cb_dst,bool_t clockWise,bool_t down_scale) {
 #ifdef __ARM_NEON__
 	int hSrc = down_scale?wDest*2:wDest;
 	int wSrc = down_scale?hDest*2:hDest;
@@ -306,7 +308,7 @@ void rotate_down_scale_cbcr_to_cr_cb(int wDest, int hDest, int full_width, uint8
 	int signed_dst_stride;
 	int incr;
 	int y_step=down_scale?2:1;
-
+	int x,y;
 
 	if (clockWise) {
 		/* ms_warning("start writing destination buffer from top right");*/
@@ -322,7 +324,6 @@ void rotate_down_scale_cbcr_to_cr_cb(int wDest, int hDest, int full_width, uint8
 		signed_dst_stride = -wDest;
 	}
 
-	int x,y;
 	for (y=0; y<hSrc; y+=y_step) {
 		uint8_t* cb_dst2 = cb_dst;
 		uint8_t* cr_dst2 = cr_dst;
@@ -379,7 +380,7 @@ void rotate_down_scale_cbcr_to_cr_cb(int wDest, int hDest, int full_width, uint8
 #endif
 }
 
-static void reverse_and_down_scale_32bytes_neon(unsigned char* src, unsigned char* dest) {
+static void reverse_and_down_scale_32bytes_neon(const unsigned char* src, unsigned char* dest) {
 #ifdef __ARM_NEON__
 	__asm  (/*load 16x1 pixel
 			 [  0,  1,  2,  3,  4,  5,  6,  7, 8, 9, 10, 11, 12, 13, 14, 15]*/
@@ -398,7 +399,7 @@ static void reverse_and_down_scale_32bytes_neon(unsigned char* src, unsigned cha
 #endif
 }
 
-static void reverse_16bytes_neon(unsigned char* src, unsigned char* dest) {
+static void reverse_16bytes_neon(const unsigned char* src, unsigned char* dest) {
 #ifdef __ARM_NEON__
 	__asm  (/*load 16x1 pixel
 			[  0,  1,  2,  3,  4,  5,  6,  7, 8, 9, 10, 11, 12, 13, 14, 15]*/
@@ -417,7 +418,7 @@ static void reverse_16bytes_neon(unsigned char* src, unsigned char* dest) {
 #endif
 }
 
-static void deinterlace_and_reverse_2x8bytes_neon(unsigned char* src, unsigned char* udest, unsigned char* vdest) {
+static void deinterlace_and_reverse_2x8bytes_neon(const unsigned char* src, unsigned char* udest, unsigned char* vdest) {
 #ifdef __ARM_NEON__
 	__asm  (/*load 16x1 values
 			[  U0, V0, U1, V1, U2, V2, U3, V3, U4, V4, U5, V5, U6, V6, U7, V7]
@@ -436,7 +437,7 @@ static void deinterlace_and_reverse_2x8bytes_neon(unsigned char* src, unsigned c
 		   );
 #endif
 }
-static void deinterlace_down_scale_and_reverse_2x16bytes_neon(unsigned char* src, unsigned char* udest, unsigned char* vdest) {
+static void deinterlace_down_scale_and_reverse_2x16bytes_neon(const unsigned char* src, unsigned char* udest, unsigned char* vdest) {
 #ifdef __ARM_NEON__
 	__asm  (/*load 32x1 values*/
 			
@@ -456,74 +457,8 @@ static void deinterlace_down_scale_and_reverse_2x16bytes_neon(unsigned char* src
 #endif
 }
 
-void deinterlace_down_scale_neon(uint8_t* ysrc, uint8_t* cbcrsrc, uint8_t* ydst, uint8_t* u_dst, uint8_t* v_dst, int w, int h, int y_byte_per_row,int cbcr_byte_per_row,bool_t down_scale) {
-#ifdef __ARM_NEON__
-	char y_inc=down_scale?2:1;
-	char x_inc=down_scale?32:16;
-	int src_h=down_scale?2*h:h;
-	int src_w=down_scale?2*w:w;
-	int x,y;
-	// plain copy
-	uint8_t* ysrc_ptr = ysrc;
-	uint8_t* ydest_ptr = ydst;
-	uint8_t* cbcrsrc_ptr = cbcrsrc;
-	uint8_t* udest_ptr = u_dst;	
-	uint8_t* vdest_ptr = v_dst;
-    int crcb_dest_offset=0;
-	
-	for(y=0; y<src_h; y+=y_inc) {
-		if (down_scale) {
-			for(x=0;x<src_w;x+=x_inc) {
-				__asm  volatile ("vld2.8 {q0,q1},[%0]! \n\t"
-								/* store in dest */
-								"vst1.8 {d0,d1},[%1]! \n\t"
-								:"+r"(ysrc_ptr),"+r"(ydest_ptr) /*out*/
-								: "r"(ysrc_ptr),"r"(ydest_ptr)/*in*/
-								: "q0","q1" /*modified*/
-								);
-			}
-			
-		} else {
-			memcpy(ydest_ptr,ysrc_ptr,w);
-			ydest_ptr+=w;
-		}
-		ysrc_ptr= ysrc +  y* y_byte_per_row;
-		
-	}
-	// de-interlace u/v
-	for(y=0; y<src_h>>1; y+=y_inc) {
-		for(x=0;x<src_w;x+=x_inc) {
-			if (down_scale) {
-				__asm  volatile ("vld4.8 {d0,d1,d2,d3},[%0]! \n\t"
-								/* store in dest */
-								"vst1.8 {d0},[%1]! \n\t"
-								"vst1.8 {d1},[%2]! \n\t"
-                                 :"=r"(cbcrsrc_ptr),"=r"(udest_ptr),"=r"(vdest_ptr) /*out*/
-                                 : "0"(cbcrsrc_ptr),"1"(udest_ptr),"2"(vdest_ptr) /*in*/	
-                                 : "q0","q1" /*modified*/
-								);
-			} else {
-				__asm  volatile ("vld2.8 {d0,d1},[%0]! \n\t"
-								/* store in dest */
-								"vst1.8 {d0},[%1]! \n\t"
-								"vst1.8 {d1},[%2]! \n\t"
-                                 :"=r"(cbcrsrc_ptr),"=r"(udest_ptr),"=r"(vdest_ptr) /*out*/
-                                 : "0"(cbcrsrc_ptr),"1"(udest_ptr),"2"(vdest_ptr) /*in*/
-								: "q0" /*modified*/
-								);
-				
-			}
-		}
-		cbcrsrc_ptr= cbcrsrc +  y * cbcr_byte_per_row;
-        crcb_dest_offset+=down_scale?(src_w>>2):(src_w>>1);
-        udest_ptr=u_dst + crcb_dest_offset;
-        vdest_ptr=v_dst + crcb_dest_offset;
-		
-	}
-#endif
-}
 
-void deinterlace_down_scale_and_rotate_180_neon(uint8_t* ysrc, uint8_t* cbcrsrc, uint8_t* ydst, uint8_t* udst, uint8_t* vdst, int w, int h, int y_byte_per_row,int cbcr_byte_per_row,bool_t down_scale) {
+void deinterlace_down_scale_and_rotate_180_neon(const uint8_t* ysrc, const uint8_t* cbcrsrc, uint8_t* ydst, uint8_t* udst, uint8_t* vdst, int w, int h, int y_byte_per_row,int cbcr_byte_per_row,bool_t down_scale) {
 #ifdef __ARM_NEON__
 	int y,x;
 	int src_h=down_scale?2*h:h;
@@ -534,12 +469,12 @@ void deinterlace_down_scale_and_rotate_180_neon(uint8_t* ysrc, uint8_t* cbcrsrc,
 	char x_dest_inc=16;
 	char y_inc=down_scale?2:1;
 	// 180° y rotation
-	
-	uint8_t* src_ptr=ysrc;
+
+	const uint8_t* src_ptr=ysrc;
 	uint8_t* dest_ptr=ydst + h*w; /*start at the end of dest*/
 	uint8_t* dest_u_ptr;
 	uint8_t* dest_v_ptr;
-	
+
 	for(y=0; y<src_h; y+=y_inc) {
 		for(x=0; x<src_w; x+=x_src_inc) {
 			dest_ptr-=x_dest_inc;
@@ -560,25 +495,86 @@ void deinterlace_down_scale_and_rotate_180_neon(uint8_t* ysrc, uint8_t* cbcrsrc,
 	for(y=0; y<src_uv_h; y+=y_inc) {
 		for(x=0; x<src_uv_w; x+=x_src_inc) {
 			dest_u_ptr-=x_dest_inc>>1;
-			dest_v_ptr-=x_dest_inc>>1;			
+			dest_v_ptr-=x_dest_inc>>1;
 			if (down_scale) {
 				deinterlace_down_scale_and_reverse_2x16bytes_neon(src_ptr, dest_u_ptr, dest_v_ptr);
 			} else {
 				deinterlace_and_reverse_2x8bytes_neon(src_ptr, dest_u_ptr, dest_v_ptr);
 			}
 			src_ptr+=x_src_inc;
-			
+
 		}
 		src_ptr=cbcrsrc+ y*cbcr_byte_per_row;
-	}	
+	}
 
 #else
 	ms_error("Neon function '%s' used without hw neon support", __FUNCTION__);
 #endif
 }
-void deinterlace_and_rotate_180_neon(uint8_t* ysrc, uint8_t* cbcrsrc, uint8_t* ydst, uint8_t* udst, uint8_t* vdst, int w, int h, int y_byte_per_row,int cbcr_byte_per_row) {
+void deinterlace_and_rotate_180_neon(const uint8_t* ysrc, const uint8_t* cbcrsrc, uint8_t* ydst, uint8_t* udst, uint8_t* vdst, int w, int h, int y_byte_per_row,int cbcr_byte_per_row) {
 	return deinterlace_down_scale_and_rotate_180_neon(ysrc, cbcrsrc, ydst, udst, vdst, w, h, y_byte_per_row,cbcr_byte_per_row,FALSE);
 }
+
+#endif /* defined(__arm__), the above functions are not used in iOS 64bits, so only the function below is implemented for __arm64__ */
+
+void deinterlace_down_scale_neon(const uint8_t* ysrc, const uint8_t* cbcrsrc, uint8_t* ydst, uint8_t* u_dst, uint8_t* v_dst, int w, int h, int y_byte_per_row,int cbcr_byte_per_row,bool_t down_scale) {
+#ifdef __ARM_NEON__
+    char y_inc  = down_scale?2:1;
+    char x_inc  = down_scale?32:16;
+    int src_h   = down_scale?2*h:h;
+    int src_w   = down_scale?2*w:w;
+	int x,y;
+	// plain copy
+	const uint8_t* ysrc_ptr = ysrc;
+	uint8_t* ydest_ptr = ydst;
+	const uint8_t* cbcrsrc_ptr = cbcrsrc;
+	uint8_t* udest_ptr = u_dst;	
+	uint8_t* vdest_ptr = v_dst;
+    int crcb_dest_offset=0;
+
+	for(y=0; y<src_h; y+=y_inc) {
+		if (down_scale) {
+			for(x=0;x<src_w;x+=x_inc) {
+				uint8x16x2_t src = vld2q_u8(ysrc_ptr);
+				vst1q_u8(ydest_ptr, src.val[0]);
+                ysrc_ptr  += 32;
+                ydest_ptr += 16;
+			}
+		} else {
+			memcpy(ydest_ptr,ysrc_ptr,w);
+			ydest_ptr+=w;
+		}
+		ysrc_ptr= ysrc +  y* y_byte_per_row;
+		
+	}
+	// de-interlace u/v
+	for(y=0; y < (src_h>>1); y+=y_inc) {
+		for(x=0;x<src_w;x+=x_inc) {
+			if (down_scale) {
+				uint8x8x4_t cbr = vld4_u8(cbcrsrc_ptr);
+				vst1_u8(udest_ptr, cbr.val[0]);
+				vst1_u8(vdest_ptr, cbr.val[1]);
+				cbcrsrc_ptr+=32;
+				vdest_ptr+=8;
+				udest_ptr+=8;
+			} else {
+				uint8x8x2_t cbr = vld2_u8(cbcrsrc_ptr);
+				vst1_u8(udest_ptr, cbr.val[0]);
+				vst1_u8(vdest_ptr, cbr.val[1]);
+				cbcrsrc_ptr+=16;
+				vdest_ptr+=8;
+				udest_ptr+=8;
+			}
+		}
+		cbcrsrc_ptr= cbcrsrc +  y * cbcr_byte_per_row;
+        crcb_dest_offset+=down_scale?(src_w>>2):(src_w>>1);
+        udest_ptr=u_dst + crcb_dest_offset;
+        vdest_ptr=v_dst + crcb_dest_offset;
+		
+	}
+#endif
+}
+
 
 #endif
 

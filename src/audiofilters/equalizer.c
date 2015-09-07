@@ -32,7 +32,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define GAIN_ZERODB 1.0
 #endif
 
-#define TAPS 128
+#define EQUALIZER_DEFAULT_RATE 8000
 
 typedef struct _EqualizerState{
 	int rate;
@@ -53,17 +53,35 @@ static void equalizer_state_flatten(EqualizerState *s){
 		s->fft_cpx[i]=val;
 }
 
-/* TODO: rate also beyond 8000 */
-static EqualizerState * equalizer_state_new(int nfft){
-	EqualizerState *s=(EqualizerState *)ms_new0(EqualizerState,1);
-	s->rate=8000;
-	s->nfft=nfft;
+static void equalizer_rate_update( EqualizerState* s, int rate ){
+	int nFFT;
+
+	if( rate < 16000 ){
+		nFFT = 128;
+	} else if( rate < 32000){
+		nFFT = 256;
+	} else {
+		nFFT = 512;
+	}
+	ms_message("Equalizer rate: %d, selecting %d steps for FFT", rate, nFFT);
+
+	s->rate=rate;
+	s->nfft=nFFT;
+	if (s->fft_cpx != NULL) ms_free(s->fft_cpx);
 	s->fft_cpx=(ms_word16_t*)ms_new0(ms_word16_t,s->nfft);
 	equalizer_state_flatten(s);
 	s->fir_len=s->nfft;
-	s->fir=(ms_word16_t*)ms_new(ms_word16_t,s->fir_len);
+	if (s->fir != NULL) ms_free(s->fir);
+	s->fir=(ms_word16_t*)ms_new0(ms_word16_t,s->fir_len);
+	if (s->mem != NULL) ms_free(s->mem);
 	s->mem=(ms_mem_t*)ms_new0(ms_mem_t,s->fir_len);
 	s->needs_update=TRUE;
+}
+
+
+static EqualizerState * equalizer_state_new(int rate){
+	EqualizerState *s=(EqualizerState *)ms_new0(EqualizerState,1);
+	equalizer_rate_update(s,rate);
 	s->active=TRUE;
 	return s;
 }
@@ -119,8 +137,13 @@ static float equalizer_compute_gainpoint(int f, int freq_0, float sqrt_gain, int
 }
 
 static void equalizer_point_set(EqualizerState *s, int i, int f, float gain){
-	ms_message("Setting gain %f for freq_index %i (%i Hz)\n",gain,i,f);
-	s->fft_cpx[1+((i-1)*2)] = (s->fft_cpx[1+((i-1)*2)]*(int)(gain*32768))/32768;
+	int index=1+((i-1)*2);
+	if (index>=0 && index <s->nfft){
+		ms_message("Setting gain %f for freq_index %i (%i Hz)\n",gain,i,f);
+		s->fft_cpx[index] = (s->fft_cpx[index]*(int)(gain*32768))/32768;
+	}else{
+		ms_error("equalizer: invalid index %i for fft table of size %i",index,s->nfft);
+	}
 }
 
 static void equalizer_state_set(EqualizerState *s, int freq_0, float gain, int freq_bw){
@@ -191,7 +214,7 @@ static void norm_and_apodize(ms_word16_t *s, int len){
 		w=0.54 - (0.46*cos(x));
 		//w=0.42 - (0.5*cos(x)) + (0.08*cos(2*x));
 		s[i]=w*(float)s[i];
-	}	
+	}
 }
 
 static void equalizer_state_compute_impulse_response(EqualizerState *s){
@@ -250,7 +273,7 @@ static void equalizer_state_run(EqualizerState *s, int16_t *samples, int nsample
 
 
 static void equalizer_init(MSFilter *f){
-	f->data=equalizer_state_new(TAPS);
+	f->data=equalizer_state_new(EQUALIZER_DEFAULT_RATE);
 }
 
 static void equalizer_uninit(MSFilter *f){
@@ -285,8 +308,7 @@ static int equalizer_get_gain(MSFilter *f, void *data){
 
 static int equalizer_set_rate(MSFilter *f, void *data){
 	EqualizerState *s=(EqualizerState*)f->data;
-	s->rate=*(int*)data;
-	s->needs_update=TRUE;
+	equalizer_rate_update(s,*(int*)data);
 	return 0;
 }
 

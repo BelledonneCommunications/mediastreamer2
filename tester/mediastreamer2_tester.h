@@ -20,26 +20,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef _MEDIASTREAMER2_TESTER_H
 #define _MEDIASTREAMER2_TESTER_H
 
+#include "bc_tester_utils.h"
 
-#include "CUnit/Basic.h"
+#include <mediastreamer2/mediastream.h>
 
+#ifdef HAVE_CONFIG_H
+#include "mediastreamer-config.h"
+#endif
 
-typedef void (*test_function_t)(void);
-typedef int (*test_suite_function_t)(const char *name);
+#include <mediastreamer2/mediastream.h>
 
-typedef struct {
-	const char *name;
-	test_function_t func;
-} test_t;
-
-typedef struct {
-	const char *name;
-	CU_InitializeFunc init_func;
-	CU_CleanupFunc cleanup_func;
-	int nb_tests;
-	test_t *tests;
-} test_suite_t;
-
+#ifdef HAVE_CONFIG_H
+#include "mediastreamer-config.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,18 +40,22 @@ extern "C" {
 
 extern test_suite_t basic_audio_test_suite;
 extern test_suite_t sound_card_test_suite;
+extern test_suite_t adaptive_test_suite;
 extern test_suite_t audio_stream_test_suite;
+extern test_suite_t video_stream_test_suite;
 extern test_suite_t framework_test_suite;
+extern test_suite_t player_test_suite;
+#ifdef __ARM_NEON__
+extern test_suite_t neon_test_suite;
+#endif
 
+#if TARGET_OS_MAC || TARGET_OS_IPHONE
+    int apple_main(int argc, char *argv[]);
+#endif
 
-extern int mediastreamer2_tester_nb_test_suites(void);
-extern int mediastreamer2_tester_nb_tests(const char *suite_name);
-extern const char * mediastreamer2_tester_test_suite_name(int suite_index);
-extern const char * mediastreamer2_tester_test_name(const char *suite_name, int test_index);
-extern void mediastreamer2_tester_init(void);
+MSWebCam* mediastreamer2_tester_get_mire_webcam(MSWebCamManager *mgr);
+extern void mediastreamer2_tester_init(void(*ftester_printf)(int level, const char *fmt, va_list args));
 extern void mediastreamer2_tester_uninit(void);
-extern int mediastreamer2_tester_run_tests(const char *suite_name, const char *test_name);
-
 
 #ifdef __cplusplus
 };

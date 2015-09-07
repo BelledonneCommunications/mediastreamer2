@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "mediastreamer2/msvolume.h"
 #include "mediastreamer2/msticker.h"
+#include "mediastreamer2/msutils.h"
 #include <math.h>
 
 #ifdef HAVE_SPEEXDSP
@@ -40,12 +41,13 @@ static const float transmit_thres=4;
 static const float min_ng_floorgain=0.005;
 static const float agc_threshold=0.5;
 
+
 typedef struct Volume{
 	float energy;
 	float level_pk;
 	float instant_energy;
 	float lt_speaker_en;
-	float gain; 				/**< the one really applied, smoothed target_gain version*/
+	float gain; 		/**< the one really applied, smoothed target_gain version*/
 	float static_gain;	/**< the one fixed by the user */
 	int dc_offset;
 	//float gain_k;
@@ -70,6 +72,8 @@ typedef struct Volume{
 	float ng_floorgain;
 	float ng_gain;
 	MSBufferizer *buffer;
+	ortp_extremum min;
+	ortp_extremum max;
 	bool_t agc_enabled;
 	bool_t noise_gate_enabled;
 	bool_t remove_dc;
@@ -105,6 +109,8 @@ static void volume_init(MSFilter *f){
 #ifdef HAVE_SPEEXDSP
 	v->speex_pp=NULL;
 #endif
+	ortp_extremum_init(&v->max,1000);
+	ortp_extremum_init(&v->min,30000);
 	f->data=v;
 }
 
@@ -118,7 +124,7 @@ static void volume_uninit(MSFilter *f){
 	ms_free(f->data);
 }
 
-static inline float linear_to_db(float linear){
+static MS2_INLINE float linear_to_db(float linear){
 	if (linear==0) return MS_VOLUME_DB_LOWEST;
 	return 10*ortp_log10f(linear);
 }
@@ -127,6 +133,20 @@ static int volume_get(MSFilter *f, void *arg){
 	float *farg=(float*)arg;
 	Volume *v=(Volume*)f->data;
 	*farg=linear_to_db(v->energy);
+	return 0;
+}
+
+static int volume_get_min(MSFilter *f, void *arg){
+	float *farg=(float*)arg;
+	Volume *v=(Volume*)f->data;
+	*farg=linear_to_db(ortp_extremum_get_current(&v->min));
+	return 0;
+}
+
+static int volume_get_max(MSFilter *f, void *arg){
+	float *farg=(float*)arg;
+	Volume *v=(Volume*)f->data;
+	*farg=linear_to_db(ortp_extremum_get_current(&v->max));
 	return 0;
 }
 
@@ -163,7 +183,7 @@ static float volume_agc_process(Volume *v, mblk_t *om) {
 
 #endif
 
-static inline float compute_gain(Volume *v, float energy, float weight) {
+static MS2_INLINE float compute_gain(Volume *v, float energy, float weight) {
 	float ret = v->static_gain / (1 + (energy * weight));
 	return ret;
 }
@@ -183,12 +203,12 @@ static float volume_echo_avoider_process(Volume *v, mblk_t *om) {
 	float mic_spk_ratio;
 	peer_e = ((Volume *)(v->peer->data))->energy;
 	peer_pk=((Volume *)(v->peer->data))->energy;
-	
+
 	if (peer_pk>v->lt_speaker_en)
 		v->lt_speaker_en=peer_pk;
 	else v->lt_speaker_en=(0.005*peer_pk)+(0.995*v->lt_speaker_en);
 	mic_spk_ratio=(v->energy/(v->lt_speaker_en+v->ea_thres));
-	
+
 	/* where v->target_gain is not set, it is kept steady - not to modify elsewhere! */
 	if (peer_e > v->ea_thres) {
 		if (mic_spk_ratio>v->ea_transmit_thres){
@@ -358,18 +378,18 @@ static int volume_remove_dc(MSFilter *f, void *arg){
 	return 0;
 }
 
-static inline int16_t saturate(int val) {
+static MS2_INLINE int16_t saturate(int val) {
 	return (val>32767) ? 32767 : ( (val<-32767) ? -32767 : val);
 }
 
 // note: number of samples should not vary much
 // with filtered peak detection, variable buffer size from volume_process call is not optimal
-static void update_energy(int16_t *signal, int numsamples, Volume *v) {
+static void update_energy(Volume *v, int16_t *signal, int numsamples, uint64_t curtime) {
 	int i;
 	float acc = 0;
 	float en;
 	int lp = 0, pk = 0;
-		
+
 	for (i=0;i<numsamples;++i){
 		int s=signal[i];
 		acc += s * s;
@@ -382,6 +402,8 @@ static void update_energy(int16_t *signal, int numsamples, Volume *v) {
 	v->energy = (en * coef) + v->energy * (1.0 - coef);
 	v->level_pk = (float)pk / max_e;
 	v->instant_energy = en;// currently non-averaged energy seems better (short artefacts)
+	ortp_extremum_record_max(&v->max,curtime,v->energy);
+	ortp_extremum_record_min(&v->min,curtime,v->energy);
 }
 
 static void apply_gain(Volume *v, mblk_t *m, float tgain) {
@@ -391,7 +413,7 @@ static void apply_gain(Volume *v, mblk_t *m, float tgain) {
 	float gain;
 
 	/* ramps with factors means linear ramps in logarithmic domain */
-	
+
 	if (v->gain < tgain) {
 		if (v->gain<v->ng_floorgain)
 			v->gain=v->ng_floorgain;
@@ -409,7 +431,7 @@ static void apply_gain(Volume *v, mblk_t *m, float tgain) {
 	intgain = gain* 4096;
 
 
-	//if (v->peer) ms_message("MSVolume:%p Applying gain %5f, v->gain=%5f, tgain=%5f, ng_gain=%5f",v,gain,v->gain,tgain,v->ng_gain); 
+	//if (v->peer) ms_message("MSVolume:%p Applying gain %5f, v->gain=%5f, tgain=%5f, ng_gain=%5f",v,gain,v->gain,tgain,v->ng_gain);
 
 	if (v->remove_dc){
 		for (	sample=(int16_t*)m->b_rptr;
@@ -449,6 +471,8 @@ static void volume_preprocess(MSFilter *f){
 		}
 #endif
 	}
+	ortp_extremum_reset(&v->min);
+	ortp_extremum_reset(&v->max);
 }
 
 static void volume_process(MSFilter *f){
@@ -468,7 +492,7 @@ static void volume_process(MSFilter *f){
 			om=allocb(nbytes,0);
 			ms_bufferizer_read(v->buffer,om->b_wptr,nbytes);
 			om->b_wptr+=nbytes;
-			update_energy((int16_t*)om->b_rptr, v->nsamples, v);
+			update_energy(v,(int16_t*)om->b_rptr, v->nsamples, f->ticker->time);
 			target_gain = v->static_gain;
 
 			if (v->peer)  /* this ptr set = echo limiter enable flag */
@@ -488,7 +512,7 @@ static void volume_process(MSFilter *f){
 	}else{
 		/*light processing: no agc. Work in place in the input buffer*/
 		while((m=ms_queue_get(f->inputs[0]))!=NULL){
-			update_energy((int16_t*)m->b_rptr, (m->b_wptr - m->b_rptr) / 2, v);
+			update_energy(v,(int16_t*)m->b_rptr, (m->b_wptr - m->b_rptr) / 2, f->ticker->time);
 			target_gain = v->static_gain;
 
 			if (v->noise_gate_enabled)
@@ -518,6 +542,8 @@ static MSFilterMethod methods[]={
 	{	MS_VOLUME_GET_GAIN	,	volume_get_gain		},
 	{	MS_VOLUME_GET_GAIN_DB	,	volume_get_gain_db		},
 	{	MS_VOLUME_REMOVE_DC, volume_remove_dc },
+	{	MS_VOLUME_GET_MIN	,	volume_get_min	},
+	{	MS_VOLUME_GET_MAX	,	volume_get_max	},
 	{	0			,	NULL			}
 };
 

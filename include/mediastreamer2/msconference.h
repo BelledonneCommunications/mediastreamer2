@@ -75,14 +75,14 @@ extern "C" {
 /**
  * Creates a conference.
  * @param params a MSAudioConferenceParams structure, containing conference parameters.
- * @returns a MSAudioConference object.
+ * @return a MSAudioConference object.
 **/
 MS2_PUBLIC MSAudioConference * ms_audio_conference_new(const MSAudioConferenceParams *params);
 
 /**
  * Gets conference's current parameters.
  * @param obj the conference.
- * @returns a read-only pointer to the conference parameters.
+ * @return a read-only pointer to the conference parameters.
 **/
 MS2_PUBLIC const MSAudioConferenceParams *ms_audio_conference_get_params(MSAudioConference *obj);
 
@@ -105,6 +105,7 @@ MS2_PUBLIC void ms_audio_conference_remove_member(MSAudioConference *obj, MSAudi
  * 
  * @param obj the conference
  * @param ep the participant, represented as a MSAudioEndpoint object
+ * @param muted true to mute the participant, false to unmute.
  *
  * By default all participants are unmuted.
 **/
@@ -174,7 +175,6 @@ MS2_PUBLIC void ms_audio_endpoint_release_from_stream(MSAudioEndpoint *obj);
 
 /**
  * Creates an audio endpoint (or virtual participant) to record the conference into a wav file.
- * @param path Path to the wav file to record.
 **/
 MS2_PUBLIC MSAudioEndpoint * ms_audio_endpoint_new_recorder(void);
 

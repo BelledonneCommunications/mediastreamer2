@@ -31,7 +31,7 @@ struct EncState {
 
 static void enc_init(MSFilter *f)
 {
-	struct EncState *s=(struct EncState*)ms_new(struct EncState,1);
+	struct EncState *s=ms_new0(struct EncState,1);
 	s->ts=0;
 	s->bufferizer=ms_bufferizer_new();
 	s->ptime = 10;
@@ -81,6 +81,7 @@ static void enc_process(MSFilter *f){
 		mblk_t *om=allocb(s->nbytes,0);
 		om->b_wptr+=ms_bufferizer_read(s->bufferizer,om->b_wptr,s->nbytes);
 		host_to_network((int16_t*)om->b_rptr,s->nbytes/2);
+		ms_bufferizer_fill_current_metas(s->bufferizer, om);
 		mblk_set_timestamp_info(om,s->ts);
 		ms_queue_put(f->outputs[0],om);
 		s->ts += s->nbytes/(2*s->nchannels);
@@ -132,11 +133,25 @@ static int enc_set_nchannels(MSFilter *f, void *arg) {
 	return 0;
 }
 
+static int enc_get_sr(MSFilter *f, void *arg){
+	struct EncState *s=(struct EncState*)f->data;
+	*(int*)arg = s->rate;
+	return 0;
+}
+
+static int enc_get_nchannels(MSFilter *f, void *arg) {
+	struct EncState *s = (struct EncState *)f->data;
+	*(int *)arg = s->nchannels;
+	return 0;
+}
+
 static MSFilterMethod enc_methods[]={
 	{	MS_FILTER_ADD_ATTR		,	enc_add_attr},
 	{	MS_FILTER_ADD_FMTP		,	enc_add_fmtp},
 	{	MS_FILTER_SET_SAMPLE_RATE	,	enc_set_sr	},
 	{	MS_FILTER_SET_NCHANNELS		,	enc_set_nchannels},
+	{	MS_FILTER_GET_SAMPLE_RATE	,	enc_get_sr	},
+	{	MS_FILTER_GET_NCHANNELS		,	enc_get_nchannels},
 	{	0				,	NULL		}
 };
 

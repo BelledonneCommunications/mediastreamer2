@@ -46,8 +46,10 @@ typedef struct GLXVideo
 	MSVideoSize wsize; /*wished window size */
 	Display *display;
 	Window window_id;
+	Window subwindow;
 	GLXContext glContext;
 	struct opengles_display *glhelper;
+	int corner;
 	bool_t show;
 	bool_t own_window;
 	bool_t ready;
@@ -56,6 +58,13 @@ typedef struct GLXVideo
 } GLXVideo;
 
 
+static bool_t x11_error = FALSE;
+
+static int x11error_handler(Display *d, XErrorEvent*ev) {
+	ms_error("X11 error reported.");
+	x11_error = TRUE;
+	return 0;
+}
 
 static Display *init_display(){
 	const char *display;
@@ -75,13 +84,15 @@ static void glxvideo_init(MSFilter	*f){
 	def_size.width=MS_VIDEO_SIZE_CIF_W;
 	def_size.height=MS_VIDEO_SIZE_CIF_H;
 	obj->display=init_display();
-	obj->own_window=FALSE;
+	obj->own_window=TRUE;
 	obj->ready=FALSE;
 	obj->vsize=def_size; /* the size of the main video*/
 	obj->wsize=def_size; /* the size of the window*/
 	obj->show=TRUE;
 	obj->autofit=TRUE;
 	f->data=obj;
+
+	XSetErrorHandler(x11error_handler);
 }
 
 
@@ -89,8 +100,17 @@ static void glxvideo_uninit(MSFilter *f){
 	GLXVideo *obj=(GLXVideo*)f->data;
 
 	glxvideo_unprepare(f);
+	
+	if (obj->glContext) {
+		glXDestroyContext(obj->display, obj->glContext);
+		obj->glContext = NULL;
+	}
 	if (obj->own_window){
-		XDestroyWindow(obj->display,obj->window_id);
+		if (obj->window_id)
+			XDestroyWindow(obj->display,obj->window_id);
+	}else{
+		if (obj->subwindow)
+			XDestroyWindow(obj->display,obj->subwindow);
 	}
 	if (obj->display){
 		XCloseDisplay(obj->display);
@@ -101,29 +121,33 @@ static void glxvideo_uninit(MSFilter *f){
 
 static void glxvideo_prepare(MSFilter *f){
 	GLXVideo *s=(GLXVideo*)f->data;
-
+	Window window=s->window_id;
 	XWindowAttributes wa;
 
 	if (s->display==NULL) return;
-	if (s->window_id==0){
-		if (createX11GLWindow(s->display, s->wsize, &s->glContext, &s->window_id)) {
-			GLenum err;
-			s->glhelper = ogl_display_new();
-			glXMakeCurrent( s->display, s->window_id, s->glContext );
-			err = glewInit();
-			if (err != GLEW_OK) {
-				ms_error("Failed to initialize GLEW");
-				return;
-			} else if (!GLEW_VERSION_2_0) {
-				ms_error("Need OpenGL 2.0+");
-				return;
-			} else {
-				ogl_display_init(s->glhelper, s->wsize.width, s->wsize.height);
-			}
+	if (s->window_id==(unsigned long)-1) return;
+
+	/* Make sure X11 window is ready to use*/
+	XSync(s->display, False);
+
+	if (createX11GLWindow(s->display, s->wsize, &s->glContext, &window)) {
+		GLenum err;
+		s->subwindow=window;
+		s->glhelper = ogl_display_new();
+		glXMakeCurrent( s->display, s->subwindow, s->glContext );
+		err = glewInit();
+		if (err != GLEW_OK) {
+			ms_error("Failed to initialize GLEW");
+			return;
+		} else if (!GLEW_VERSION_2_0) {
+			ms_error("Need OpenGL 2.0+");
+			return;
+		} else {
+			ogl_display_init(s->glhelper, s->wsize.width, s->wsize.height);
 		}
-		if (s->window_id==0) return;
-		s->own_window=TRUE;
-	}else if (s->own_window==FALSE){
+	}
+	if (s->window_id==0) return;
+	if (s->own_window==FALSE){
 		/*we need to register for resize events*/
 		XSelectInput(s->display,s->window_id,StructureNotifyMask);
 	}
@@ -159,17 +183,23 @@ static void glxvideo_process(MSFilter *f){
 	mblk_t *inm;
 	MSPicture src={0};
 	bool_t precious=FALSE;
-	
 	XWindowAttributes wa;
+	
+	ms_filter_lock(f);
+	
+	if (obj->window_id==0 || obj->window_id==(Window)-1 || x11_error==TRUE) goto end;
 	XGetWindowAttributes(obj->display,obj->window_id,&wa);
 	if (wa.width!=obj->wsize.width || wa.height!=obj->wsize.height){
 		ms_warning("Resized to %ix%i", wa.width,wa.height);
 		obj->wsize.width=wa.width;
 		obj->wsize.height=wa.height;
 		ogl_display_init(obj->glhelper, wa.width, wa.height);
+		if (obj->subwindow!=obj->window_id){
+			XResizeWindow(obj->display,obj->subwindow, wa.width,wa.height);
+		}
 	}
+
 	
-	ms_filter_lock(f);
 	if (!obj->show) {
 		goto end;
 	}
@@ -178,7 +208,7 @@ static void glxvideo_process(MSFilter *f){
 		goto end;
 	}
 
-	glXMakeCurrent( obj->display, obj->window_id, obj->glContext );
+	glXMakeCurrent( obj->display, obj->subwindow, obj->glContext );
 	if (f->inputs[0]!=NULL && (inm=ms_queue_peek_last(f->inputs[0]))!=0) {
 		if (ms_yuv_buf_init_from_mblk(&src,inm)==0){
 			MSVideoSize newsize;
@@ -190,7 +220,7 @@ static void glxvideo_process(MSFilter *f){
 				obj->vsize=newsize;
 				if (obj->autofit){
 					MSVideoSize new_window_size;
-					static const MSVideoSize min_size=MS_VIDEO_SIZE_QVGA;					
+					static const MSVideoSize min_size=MS_VIDEO_SIZE_QVGA;
 					/*don't resize less than QVGA, it is too small*/
 					if (min_size.width*min_size.height>newsize.width*newsize.height){
 						new_window_size.width=newsize.width*2;
@@ -210,12 +240,15 @@ static void glxvideo_process(MSFilter *f){
 		}
 	}
 	if (f->inputs[1]!=NULL && (inm=ms_queue_peek_last(f->inputs[1]))!=0) {
-		if (ms_yuv_buf_init_from_mblk(&src,inm)==0){
-			ogl_display_set_preview_yuv_to_display(obj->glhelper, inm);
-		}
+		if (obj->corner!=-1){
+			if (ms_yuv_buf_init_from_mblk(&src,inm)==0){
+				if (!mblk_get_precious_flag(inm)) ms_yuv_buf_mirror(&src);
+				ogl_display_set_preview_yuv_to_display(obj->glhelper, inm);
+			}
+		}else ogl_display_set_preview_yuv_to_display(obj->glhelper,NULL);
 	}
 	ogl_display_render(obj->glhelper, 0);
-	glXSwapBuffers ( obj->display, obj->window_id );
+	glXSwapBuffers ( obj->display, obj->subwindow );
 
 	end:
 		ms_filter_unlock(f);
@@ -251,7 +284,7 @@ static int glxvideo_zoom(MSFilter *f, void *arg){
 
 	ms_filter_lock(f);
 	ogl_display_zoom(s->glhelper, arg);
-	
+
 	ms_filter_unlock(f);
 	return 0;
 }
@@ -264,7 +297,26 @@ static int glxvideo_get_native_window_id(MSFilter *f, void*arg){
 }
 
 static int glxvideo_set_native_window_id(MSFilter *f, void*arg){
-	ms_error("MSGLXVideo: cannot change native window");
+	GLXVideo *s=(GLXVideo*)f->data;
+	unsigned long id=*(unsigned long*)arg;
+	ms_filter_lock(f);
+	
+	if (s->window_id!=id) {
+		if (s->display && s->subwindow!=0 && s->subwindow!=s->window_id){
+			/*if the parent window is unset, and using a subwindow, destroy the subwindow*/
+			XDestroyWindow(s->display, s->subwindow);
+			XSync(s->display,FALSE);/*required to force immediate removal of the subwindow from its parent.
+				Otherwise, if the parent is destroyed by a mouse click, it will automatically destroy child window and there will be a 
+				double destroy of the subwindow resulting in "bad match" x error.*/
+			ms_message("Subwindow destroyed");
+			s->subwindow=0;
+		}
+		glxvideo_unprepare(f);
+	}
+	s->window_id=id;
+	s->own_window=FALSE;
+	
+	ms_filter_unlock(f);
 	return 0;
 }
 
@@ -284,7 +336,15 @@ static bool_t createX11GLWindow(Display* display, MSVideoSize size, GLXContext* 
 	None
 	};
 	int glx_major, glx_minor;
- 
+	int fbcount;
+	GLXFBConfig *fbc;
+	int best_fbc = -1, worst_fbc = -1, best_num_samp = -1, worst_num_samp = 999;
+	int i;
+	GLXFBConfig bestFbc;
+	XVisualInfo *vi;
+	XSetWindowAttributes swa;
+	Colormap cmap;
+
 	// FBConfigs were added in GLX version 1.3.
 	if ( !glXQueryVersion( display, &glx_major, &glx_minor ) ||		 ( ( glx_major == 1 ) && ( glx_minor < 3 ) ) || ( glx_major < 1 ) ) {
 		ms_error( "Invalid GLX version" );
@@ -292,8 +352,7 @@ static bool_t createX11GLWindow(Display* display, MSVideoSize size, GLXContext* 
 	}
 
 	ms_message( "Getting matching framebuffer configs" );
-	int fbcount;
-	GLXFBConfig *fbc = glXChooseFBConfig( display, DefaultScreen( display ), 
+	fbc = glXChooseFBConfig( display, DefaultScreen( display ),
 							visual_attribs, &fbcount );
 	if ( !fbc ) {
 		ms_error( "Failed to retrieve a framebuffer config" );
@@ -302,20 +361,18 @@ static bool_t createX11GLWindow(Display* display, MSVideoSize size, GLXContext* 
 	ms_message( "Found %d matching FB configs.", fbcount );
 	// Pick the FB config/visual with the most samples per pixel
 	ms_message( "Getting XVisualInfos" );
-	int best_fbc = -1, worst_fbc = -1, best_num_samp = -1, worst_num_samp = 999;
- 
-	int i;
+
 	for ( i = 0; i < fbcount; i++ ) {
 		XVisualInfo *vi = glXGetVisualFromFBConfig( display, fbc[i] );
 		if ( vi ) {
 			int samp_buf, samples;
 			glXGetFBConfigAttrib( display, fbc[i], GLX_SAMPLE_BUFFERS, &samp_buf );
 			glXGetFBConfigAttrib( display, fbc[i], GLX_SAMPLES	 , &samples  );
- 
+
 			ms_message( "  Matching fbconfig %d, visual ID 0x%lu: SAMPLE_BUFFERS = %d,"
-		  " SAMPLES = %d", 
+		  " SAMPLES = %d",
 		  i, vi -> visualid, samp_buf, samples );
- 
+
 			if ( best_fbc < 0 || (samp_buf && samples > best_num_samp) )
 				best_fbc = i, best_num_samp = samples;
 			if ( worst_fbc < 0 || (!samp_buf || samples < worst_num_samp) )
@@ -323,41 +380,54 @@ static bool_t createX11GLWindow(Display* display, MSVideoSize size, GLXContext* 
 		}
 		XFree( vi );
 	}
-	GLXFBConfig bestFbc = fbc[ best_fbc ];
- 
+	bestFbc = fbc[ best_fbc ];
+
 	// Be sure to free the FBConfig list allocated by glXChooseFBConfig()
 	XFree( fbc );
 
 	// Get a visual
-	XVisualInfo *vi = glXGetVisualFromFBConfig( display, bestFbc );
+	vi = glXGetVisualFromFBConfig( display, bestFbc );
 	ms_message( "Chosen visual ID = 0x%lu", vi->visualid );
- 
+
 	ms_message( "Creating colormap" );
-	XSetWindowAttributes swa;
-	Colormap cmap;
-	swa.colormap = cmap = XCreateColormap( display,
-							 RootWindow( display, vi->screen ), 
-							 vi->visual, AllocNone );
+	cmap = XCreateColormap( display,
+						RootWindow( display, vi->screen ),
+						vi->visual, AllocNone );
+	swa.colormap = cmap;
 	swa.background_pixmap = None ;
 	swa.border_pixel	= 0;
 	swa.event_mask	  = StructureNotifyMask;
-	ms_message( "Creating window" );
-	*win = XCreateWindow( display, RootWindow( display, vi->screen ), 
-					200, 200, size.width, size.height, 0, vi->depth, InputOutput, 
-					vi->visual, 
-					CWBorderPixel|CWColormap|CWEventMask, &swa );
-	if ( !(*win) ) {
-		ms_error( "Failed to create window." );
-		return FALSE;
+	if (*win==0){
+		
+		ms_message( "Creating window" );
+		*win = XCreateWindow( display, RootWindow( display, vi->screen ),
+						200, 200, size.width, size.height, 0, vi->depth, InputOutput,
+						vi->visual,
+						CWBorderPixel|CWColormap|CWEventMask, &swa );
+		if ( !(*win) ) {
+			ms_error( "Failed to create window." );
+			return FALSE;
+		}
+		XStoreName( display, *win, "Video" );
+
+		ms_message( "Mapping window" );
+		XMapWindow( display, *win );
+	}else{
+		ms_message( "Creating sub window in window %p", (void *)*win );
+		*win = XCreateWindow( display, *win,
+						0, 0, size.width, size.height, 0, vi->depth, InputOutput,
+						vi->visual,
+						CWBorderPixel|CWColormap|CWEventMask, &swa );
+		if ( !(*win) ) {
+			ms_error( "Failed to create sub window." );
+			return FALSE;
+		}
+		ms_message( "Mapping window subwindow" );
+		XClearWindow(display, *win);
+		XMapWindow( display, *win );
 	}
 	// Done with the visual info data
 	XFree( vi );
- 
-	XStoreName( display, *win, "Video" );
- 
-	ms_message( "Mapping window" );
-	XMapWindow( display, *win );
- 
 	// Get the default screen's GLX extension list
 	*ctx = glXCreateNewContext( display, bestFbc, GLX_RGBA_TYPE, 0, True );
 
@@ -384,6 +454,12 @@ static int glxvideo_enable_autofit(MSFilter *f,void *arg){
 	return 0;
 }
 
+static int glxvideo_set_local_view_mode(MSFilter *f, void *arg){
+	GLXVideo *s=(GLXVideo*)f->data;
+	s->corner=*(int*)arg;
+	return 0;
+}
+
 static MSFilterMethod methods[]={
 	{	MS_FILTER_SET_VIDEO_SIZE		, glxvideo_set_vsize },
 	{	MS_VIDEO_DISPLAY_GET_NATIVE_WINDOW_ID	, glxvideo_get_native_window_id },
@@ -392,6 +468,7 @@ static MSFilterMethod methods[]={
 	{	MS_VIDEO_DISPLAY_ZOOM			, glxvideo_zoom },
 	{	MS_VIDEO_DISPLAY_ENABLE_MIRRORING	, glxvideo_enable_mirroring},
 	{	MS_VIDEO_DISPLAY_ENABLE_AUTOFIT		, glxvideo_enable_autofit	},
+	{	MS_VIDEO_DISPLAY_SET_LOCAL_VIEW_MODE	, glxvideo_set_local_view_mode},
 	{	0	,NULL}
 };
 

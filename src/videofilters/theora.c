@@ -36,7 +36,7 @@ typedef struct EncState{
 } EncState;
 
 static void enc_init(MSFilter *f){
-	EncState *s=(EncState *)ms_new(EncState,1);
+	EncState *s=ms_new0(EncState,1);
 	theora_info_init(&s->tinfo);
 	s->tinfo.width=MS_VIDEO_SIZE_CIF_W;
 	s->tinfo.height=MS_VIDEO_SIZE_CIF_H;
@@ -181,11 +181,6 @@ static inline void payload_header_set(uint8_t *buf, uint32_t ident, uint8_t ft, 
 	*((uint32_t*)buf)=htonl(tmp);
 }
 
-static inline uint32_t payload_header_get_ident(uint8_t *buf){
-	uint32_t *tmp=(uint32_t*)buf;
-	return (ntohl(*tmp)>>8) & 0xFFFFFF;
-}
-
 static inline uint32_t payload_header_get_tdt(uint8_t *buf){
 	uint32_t *tmp=(uint32_t*)buf;
 	return ((ntohl(*tmp))>>4) & 0x3;
@@ -194,11 +189,6 @@ static inline uint32_t payload_header_get_tdt(uint8_t *buf){
 static inline uint32_t payload_header_get_ft(uint8_t *buf){
 	uint32_t *tmp=(uint32_t*)buf;
 	return ((ntohl(*tmp))>>6) & 0x3;
-}
-
-static inline uint32_t payload_header_get_pkts(uint8_t *buf){
-	uint32_t *tmp=(uint32_t*)buf;
-	return ntohl(*tmp) & 0xf;
 }
 
 static int create_packed_conf(EncState *s){
@@ -417,7 +407,7 @@ typedef struct DecState{
 }DecState;
 
 static void dec_init(MSFilter *f){
-	DecState *s=(DecState *)ms_new(DecState,1);
+	DecState *s=ms_new0(DecState,1);
 	s->ready=FALSE;
 	theora_info_init(&s->tinfo);
 	s->yuv=NULL;

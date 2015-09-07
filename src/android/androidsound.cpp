@@ -29,6 +29,7 @@
 #include <jni.h>
 
 #include "audiofilters/devices.h"
+#include "hardware_echo_canceller.h"
 
 #define NATIVE_USE_HARDWARE_RATE 1
 //#define TRACE_SND_WRITE_TIMINGS
@@ -38,7 +39,7 @@ using namespace::fake_android;
 /*notification duration for audio callbacks, in ms*/
 static const float audio_buf_ms=0.01;
 
-static MSSndCard * android_snd_card_new(void);
+static MSSndCard * android_snd_card_new(SoundDeviceDescription *d);
 static MSFilter * ms_android_snd_read_new(void);
 static MSFilter * ms_android_snd_write_new(void);
 static Library *libmedia=0;
@@ -52,9 +53,10 @@ static int std_sample_rates[]={
 };
 
 struct AndroidNativeSndCardData{
-	AndroidNativeSndCardData(int forced_rate, audio_source_t capture_source): mVoipMode(0) ,mIoHandle(0),mCaptureSource(capture_source){
+	AndroidNativeSndCardData(int forced_rate, int flags): mVoipMode(0) ,mIoHandle(0),mFlags(flags){
 		/* try to use the same sampling rate as the playback.*/
 		int hwrate;
+		mCaptureSource = flags & DEVICE_USE_ANDROID_MIC ? AUDIO_SOURCE_MIC:AUDIO_SOURCE_VOICE_COMMUNICATION;
 		enableVoipMode();
 		if (AudioSystem::getOutputSamplingRate(&hwrate,AUDIO_STREAM_VOICE_CALL)==0){
 			ms_message("Hardware output sampling rate is %i",hwrate);
@@ -122,6 +124,7 @@ struct AndroidNativeSndCardData{
 	int mRecFrames;
 	audio_io_handle_t mIoHandle;
 	audio_source_t mCaptureSource;
+	int mFlags;
 };
 
 struct AndroidSndReadData{
@@ -139,7 +142,6 @@ struct AndroidSndReadData{
 	~AndroidSndReadData(){
 		ms_mutex_destroy(&mutex);
 		flushq(&q,0);
-		if (rec) delete rec;
 		rec=0;
 	}
 	void setCard(MSSndCard *card){
@@ -157,13 +159,14 @@ struct AndroidSndReadData{
 	int nchannels;
 	ms_mutex_t mutex;
 	queue_t q;
-	AudioRecord *rec;
+	sp<AudioRecord> rec;
 	int nbufs;
 	int rec_buf_size;
 	MSTickerSynchronizer *mTickerSynchronizer;
 	int64_t read_samples;
 	audio_io_handle_t iohandle;
 	jobject aec;
+	double av_skew;
 	bool started;
 	bool builtin_aec;
 };
@@ -193,7 +196,7 @@ struct AndroidSndWriteData{
 	int nchannels;
 	ms_mutex_t mutex;
 	MSBufferizer bf;
-	AudioTrack *tr;
+	sp<AudioTrack> tr;
 	int nbufs;
 	int nFramesRequested;
 	bool mStarted;
@@ -213,12 +216,38 @@ static MSFilter *android_snd_card_create_writer(MSSndCard *card){
 	return f;
 }
 
+static int get_sdk_version(){
+	static int sdk_version = 0;
+	if (sdk_version==0){
+		/* Get Android SDK version. */
+		JNIEnv *jni_env = ms_get_jni_env();
+		jclass version_class = jni_env->FindClass("android/os/Build$VERSION");
+		jfieldID fid = jni_env->GetStaticFieldID(version_class, "SDK_INT", "I");
+		sdk_version = jni_env->GetStaticIntField(version_class, fid);
+		ms_message("SDK version [%i] detected", sdk_version);
+		jni_env->DeleteLocalRef(version_class);
+	}
+	return sdk_version;
+}
+
 static void android_snd_card_detect(MSSndCardManager *m){
 	bool audio_record_loaded=false;
 	bool audio_track_loaded=false;
 	bool audio_system_loaded=false;
 	bool string8_loaded=false;
+	bool refbase_loaded=false;
+	SoundDeviceDescription *d;
 
+	if (get_sdk_version()>19){
+		/*it is actually working well on android 5 on Nexus 4 but crashes on Samsung S5, due to, maybe
+		 * calling convention of C++ method being different. Arguments received by AudioTrack constructor do not match the arguments
+		 * sent by the caller (TransferType maps to uid argument!).
+		 * Until we find a rational explanation to this, the native module is disabled on Android 5.
+		**/
+		ms_message("Native android sound support not tested on SDK [%i], disabled.",get_sdk_version());
+		return;
+	}
+	
 	/* libmedia and libutils static variable may survive to Linphone restarts
 	 It is then necessary to perform the *::init() calls even if the libmedia and libutils are there.*/
 	if (!libmedia)
@@ -228,30 +257,24 @@ static void android_snd_card_detect(MSSndCardManager *m){
 	
 	if (libmedia && libutils){
 		/*perform initializations in order rather than in a if statement so that all missing symbols are shown in logs*/
+		string8_loaded=String8Impl::init(libutils);
+		refbase_loaded=RefBaseImpl::init(libutils);
 		audio_record_loaded=AudioRecordImpl::init(libmedia);
 		audio_track_loaded=AudioTrackImpl::init(libmedia);
 		audio_system_loaded=AudioSystemImpl::init(libmedia);
-		string8_loaded=String8Impl::init(libutils);
 	}
-	if (audio_record_loaded && audio_track_loaded && audio_system_loaded && string8_loaded){
+	d=sound_device_description_get();
+	if (audio_record_loaded && audio_track_loaded && audio_system_loaded && string8_loaded && refbase_loaded && !(d->flags & DEVICE_HAS_UNSTANDARD_LIBMEDIA)){
 		ms_message("Native android sound support available.");
-		MSSndCard *card=android_snd_card_new();
+		MSSndCard *card=android_snd_card_new(d);
 		ms_snd_card_manager_add_card(m,card);
 		return;
 	}
 	ms_message("Native android sound support is NOT available.");
 }
 
-static int sdk_version = 0;
-
 static void android_native_snd_card_init(MSSndCard *card) {
-	/* Get Android SDK version. */
-	JNIEnv *jni_env = ms_get_jni_env();
-	jclass version_class = jni_env->FindClass("android/os/Build$VERSION");
-	jfieldID fid = jni_env->GetStaticFieldID(version_class, "SDK_INT", "I");
-	sdk_version = jni_env->GetStaticIntField(version_class, fid);
-	ms_message("SDK version [%i] detected", sdk_version);
-	jni_env->DeleteLocalRef(version_class);
+	
 }
 
 static void android_native_snd_card_uninit(MSSndCard *card){
@@ -276,19 +299,18 @@ MSSndCardDesc android_native_snd_card_desc={
 
 
 
-static MSSndCard * android_snd_card_new(void)
+static MSSndCard * android_snd_card_new(SoundDeviceDescription *d)
 {
 	MSSndCard * obj;
-	SoundDeviceDescription *d;
+	
 	
 	obj=ms_snd_card_new(&android_native_snd_card_desc);
 	obj->name=ms_strdup("android sound card");
 	
-	d=sound_device_description_get();
 	if (d->flags & DEVICE_HAS_BUILTIN_AEC) obj->capabilities|=MS_SND_CARD_CAP_BUILTIN_ECHO_CANCELLER;
 	obj->latency=d->delay;
 	obj->data = new AndroidNativeSndCardData(	d->recommended_rate
-												,(d->flags & DEVICE_USE_ANDROID_MIC) ?AUDIO_SOURCE_MIC:AUDIO_SOURCE_VOICE_COMMUNICATION);
+												, d->flags);
 	return obj;
 }
 
@@ -299,24 +321,37 @@ static void android_snd_read_init(MSFilter *obj){
 }
 
 static void compute_timespec(AndroidSndReadData *d) {
-	static int count = 0;
 	uint64_t ns = ((1000 * d->read_samples) / (uint64_t) d->rate) * 1000000;
 	MSTimeSpec ts;
 	ts.tv_nsec = ns % 1000000000;
 	ts.tv_sec = ns / 1000000000;
-	double av_skew = ms_ticker_synchronizer_set_external_time(d->mTickerSynchronizer, &ts);
-	if ((++count) % 100 == 0)
-		ms_message("sound/wall clock skew is average=%f ms", av_skew);
+	d->av_skew = ms_ticker_synchronizer_set_external_time(d->mTickerSynchronizer, &ts);
 }
 
+/*
+ * This is a callback function called by AudioRecord's thread. This thread is not created by ortp/ms2 and is not able to attach to a JVM without crashing
+ * at the end, despite it is detached (since android 4.4).
+ * We must not output a single log within this callback in the event that the application is using LinphoneCoreFactory.setLogHandler(), in which case
+ * the log would be upcalled to java, which will attach the thread to the jvm.
+**/
 static void android_snd_read_cb(int event, void* user, void *p_info){
 	AndroidSndReadData *ad=(AndroidSndReadData*)user;
 	
 	if (!ad->started) return;
 	if (ad->mTickerSynchronizer==NULL){
 		MSFilter *obj=ad->mFilter;
+		/*
+		 * ABSOLUTE HORRIBLE HACK. We temporarily disable logs to prevent ms_ticker_set_time_func() to output a debug log.
+		 * This is horrible because this also suspends logs for all concurrent threads during these two lines of code.
+		 * Possible way to do better:
+		 *  1) understand why AudioRecord thread doesn't detach.
+		 *  2) disable logs just for this thread (using a TLS)
+		 */
+		int loglevel=ortp_get_log_level_mask();
+		ortp_set_log_level_mask(ORTP_ERROR|ORTP_FATAL);
 		ad->mTickerSynchronizer = ms_ticker_synchronizer_new();
 		ms_ticker_set_time_func(obj->ticker,(uint64_t (*)(void*))ms_ticker_synchronizer_get_corrected_time, ad->mTickerSynchronizer);
+		ortp_set_log_level_mask(loglevel);
 	}
 	if (event==AudioRecord::EVENT_MORE_DATA){
 		AudioRecord::Buffer info;
@@ -331,10 +366,11 @@ static void android_snd_read_cb(int event, void* user, void *p_info){
 			compute_timespec(ad);
 			putq(&ad->q,m);
 			ms_mutex_unlock(&ad->mutex);
-			//ms_message("android_snd_read_cb: got %i bytes",info->size);
 		}
 	}else if (event==AudioRecord::EVENT_OVERRUN){
+#ifdef TRACE_SND_READ_TIMINGS
 		ms_warning("AudioRecord overrun");
+#endif
 	}
 }
 
@@ -342,55 +378,13 @@ static void android_snd_read_activate_hardware_aec(MSFilter *obj){
 	AndroidSndReadData *ad=(AndroidSndReadData*)obj->data;
 	JNIEnv *env=ms_get_jni_env();
 	int sessionId=ad->rec->getSessionId();
+	ms_message("AudioRecord.getAudioSessionId() returned %i", sessionId);
 	
-	if (sessionId==-1) return;
-	
-	jclass aecClass = env->FindClass("android/media/audiofx/AcousticEchoCanceler");
-	if (aecClass==NULL){
-		env->ExceptionClear(); //very important.
+	if (sessionId==-1) {
 		return;
 	}
-	//aecClass= (jclass)env->NewGlobalRef(aecClass);
-	jmethodID isAvailableID = env->GetStaticMethodID(aecClass,"isAvailable","()Z");
-	if (isAvailableID!=NULL){
-		jboolean ret=env->CallStaticBooleanMethod(aecClass,isAvailableID);
-		if (ret){
-			jmethodID createID = env->GetStaticMethodID(aecClass,"create","(I)Landroid/media/audiofx/AcousticEchoCanceler;");
-			if (createID!=NULL){
-				ad->aec=env->CallStaticObjectMethod(aecClass,createID,sessionId);
-				if (ad->aec){
-					ad->aec=env->NewGlobalRef(ad->aec);
-					ms_message("AcousticEchoCanceler successfully created.");
-					jclass effectClass=env->FindClass("android/media/audiofx/AudioEffect");
-					if (effectClass){
-						//effectClass=(jclass)env->NewGlobalRef(effectClass);
-						jmethodID isEnabledID = env->GetMethodID(effectClass,"getEnabled","()Z");
-						jmethodID setEnabledID = env->GetMethodID(effectClass,"setEnabled","(Z)I");
-						if (isEnabledID && setEnabledID){
-							jboolean enabled=env->CallBooleanMethod(ad->aec,isEnabledID);
-							ms_message("AcousticEchoCanceler enabled: %i",(int)enabled);
-							if (!enabled){
-								int ret=env->CallIntMethod(ad->aec,setEnabledID,TRUE);
-								if (ret!=0){
-									ms_error("Could not enable AcousticEchoCanceler: %i",ret);
-								}
-							}
-						}
-						env->DeleteLocalRef(effectClass);
-					}
-				}else{
-					ms_error("Failed to create AcousticEchoCanceler.");
-				}
-			}else{
-				ms_error("create() not found in class AcousticEchoCanceler !");
-				env->ExceptionClear(); //very important.
-			}
-		}
-	}else{
-		ms_error("isAvailable() not found in class AcousticEchoCanceler !");
-		env->ExceptionClear(); //very important.
-	}
-	env->DeleteLocalRef(aecClass);
+	
+	ad->aec = enable_hardware_echo_canceller(env, sessionId);
 }
 
 static void android_snd_read_preprocess(MSFilter *obj){
@@ -410,13 +404,13 @@ static void android_snd_read_preprocess(MSFilter *obj){
 						AUDIO_FORMAT_PCM_16_BIT,
 						audio_channel_in_mask_from_count(ad->nchannels),
 						ad->rec_buf_size,
-						android_snd_read_cb,ad,notify_frames,0);
+						android_snd_read_cb,ad,notify_frames,0,AudioRecord::TRANSFER_DEFAULT, 
+						(ad->mCard->mFlags & DEVICE_HAS_CRAPPY_ANDROID_FASTRECORD) ? AUDIO_INPUT_FLAG_NONE : AUDIO_INPUT_FLAG_FAST);
 		ss=ad->rec->initCheck();
 		ms_message("Setting up AudioRecord  source=%i,rate=%i,framecount=%i",ad->audio_source,ad->rate,ad->rec_buf_size);
 
 		if (ss!=0){
 			ms_error("Problem when setting up AudioRecord:%s ",strerror(-ss));
-			delete ad->rec;
 			ad->rec=0;
 			if (i == 0) {
 				ms_error("Retrying with AUDIO_SOURCE_MIC");
@@ -439,10 +433,9 @@ static void android_snd_read_postprocess(MSFilter *obj){
 		ad->rec->stop();
 		if (ad->aec){
 			JNIEnv *env=ms_get_jni_env();
-			env->DeleteGlobalRef(ad->aec);
-			ad->aec=NULL;
+			delete_hardware_echo_canceller(env, ad->aec);
+			ad->aec = NULL;
 		}
-		delete ad->rec;
 		ad->rec=0;
 	}
 	ms_ticker_set_time_func(obj->ticker,NULL,NULL);
@@ -462,6 +455,7 @@ static void android_snd_read_uninit(MSFilter *obj){
 static void android_snd_read_process(MSFilter *obj){
 	AndroidSndReadData *ad=(AndroidSndReadData*)obj->data;
 	mblk_t *om;
+	
 	ms_mutex_lock(&ad->mutex);
 	if (ad->rec == 0 ) {
 		ms_mutex_unlock(&ad->mutex);
@@ -474,6 +468,8 @@ static void android_snd_read_process(MSFilter *obj){
 		//ms_message("android_snd_read_process: Outputing %i bytes",msgdsize(om));
 		ms_queue_put(obj->outputs[0],om);
 		ad->nbufs++;
+		if (ad->nbufs % 100 == 0)
+			ms_message("sound/wall clock skew is average=%g ms", ad->av_skew);
 	}
 	ms_mutex_unlock(&ad->mutex);
 }
@@ -612,7 +608,12 @@ static int android_snd_write_get_nchannels(MSFilter *obj, void *data){
 	return 0;
 }
 
-
+/*
+ * This is a callback function called by AudioTrack's thread. This thread is not created by ortp/ms2 and is not able to attach to a JVM without crashing
+ * at the end, despite it is detached (since android 4.4).
+ * We must not output a single log within this callback in the event that the application is using LinphoneCoreFactory.setLogHandler(), in which case
+ * the log would be upcalled to java, which will attach the thread to the jvm.
+**/
 static void android_snd_write_cb(int event, void *user, void * p_info){
 	AndroidSndWriteData *ad=(AndroidSndWriteData*)user;
 	
@@ -673,17 +674,19 @@ static void android_snd_write_cb(int event, void *user, void * p_info){
 			ms_get_cur_time(&ts);
 			ms_warning("%03u.%03u: PCM playback underrun: available %d", (uint32_t) ts.tv_sec, (uint32_t) (ts.tv_nsec / 1000), ms_bufferizer_get_avail(&ad->bf));
 		}
-#else
-		ms_warning("PCM playback underrun: available %d", ms_bufferizer_get_avail(&ad->bf));
 #endif
 		ms_mutex_unlock(&ad->mutex);
-	}else ms_error("Untracked event %i",event);
+	}else{
+#ifdef TRACE_SND_WRITE_TIMINGS
+		ms_error("Untracked event %i",event);
+#endif
+	}
 }
 
 static int channel_mask_for_audio_track(int nchannels) {
 	int channel_mask;
 	channel_mask = audio_channel_out_mask_from_count(nchannels);
-	if (sdk_version < 14) {
+	if (get_sdk_version() < 14) {
 		ms_message("Android version older than ICS, apply audio channel hack for AudioTrack");
 		if ((channel_mask & AUDIO_CHANNEL_OUT_MONO) == AUDIO_CHANNEL_OUT_MONO) {
 			channel_mask = 0x4;
@@ -715,12 +718,11 @@ static void android_snd_write_preprocess(MSFilter *obj){
                      AUDIO_FORMAT_PCM_16_BIT,
                      channel_mask_for_audio_track(ad->nchannels),
                      play_buf_size,
-                     AUDIO_OUTPUT_FLAG_NONE, // AUDIO_OUTPUT_FLAG_NONE,
+                     (ad->mCard->mFlags & DEVICE_HAS_CRAPPY_ANDROID_FASTTRACK) ? AUDIO_OUTPUT_FLAG_NONE : AUDIO_OUTPUT_FLAG_FAST,
                      android_snd_write_cb, ad,notify_frames,0, AudioTrack::TRANSFER_CALLBACK);
 	s=ad->tr->initCheck();
 	if (s!=0) {
 		ms_error("Problem setting up AudioTrack: %s",strerror(-s));
-		delete ad->tr;
 		ad->tr=NULL;
 		return;
 	}
@@ -786,7 +788,6 @@ static void android_snd_write_postprocess(MSFilter *obj){
 	ms_message("Sound playback stopped");
 	ad->tr->flush();
 	ms_message("Sound playback flushed, deleting");
-	if (ad->tr) delete ad->tr;
 	ad->tr=NULL;
 	ad->mCard->disableVoipMode();
 	ad->mStarted=false;

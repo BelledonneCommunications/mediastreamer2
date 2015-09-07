@@ -23,14 +23,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <AudioToolbox/AudioToolbox.h>
 
 /* frame are encoded/decoded for a constant sample number of 512(but an RTP packet may contain several frames */
-#define SIGNAL_FRAME_SIZE (512*sizeof(AudioSampleType))
+#define SIGNAL_FRAME_SIZE (512*sizeof(SInt16))
 /* RFC3640 3.3.6: aac-hbr mode have a 4 bytes header(we use only one frame per packet) */
 #define AU_HDR_SZ 4
-
-/*  defines needed to compute network bit rate, copied from misc.c */
-#define UDP_HDR_SZ 8
-#define RTP_HDR_SZ 12
-#define IP4_HDR_SZ 20
 
 struct EncState {
 	uint32_t timeStamp; /* timeStamp is actually expressed in number of sample processed, needed for encoder only, inserted in the encoded message block */
@@ -48,12 +43,73 @@ struct EncState {
 	AudioConverterRef            audioConverter;
 	UInt32 maxOutputPacketSize; /* maximum size of the output packet */
 	UInt32 bytesToEncode;
+    UInt32 encoderType; /* AAC_ELD or AAC_ELD_SBR */
 };
 
 /* Encoder */
+
+typedef struct {
+    UInt32 encoderType;
+    UInt32 sampling;
+    UInt32 min_bitrate;
+    UInt32 max_bitrate;
+ } aac_rates_t;
+
+/* The iOS AAC encoder supports different sampling rates and bitrates. 
+   These also depend on the type of encoder (with/without SBR).
+ */
+static aac_rates_t aac_rates[] = {
+    { kAudioFormatMPEG4AAC_ELD, 16000, 12000, 48000 },
+    { kAudioFormatMPEG4AAC_ELD, 22050, 16000, 72000 },
+    { kAudioFormatMPEG4AAC_ELD, 32000, 24000, 96000 },
+    { kAudioFormatMPEG4AAC_ELD, 44100, 32000, 128000 },
+    { kAudioFormatMPEG4AAC_ELD, 48000, 32000, 128000 },
+
+    { kAudioFormatMPEG4AAC_ELD_SBR, 16000, 16000, 32000 },
+    { kAudioFormatMPEG4AAC_ELD_SBR, 22050, 16000, 48000 },
+    { kAudioFormatMPEG4AAC_ELD_SBR, 32000, 28000, 64000 },
+    { kAudioFormatMPEG4AAC_ELD_SBR, 44100, 28000, 64000 },
+    { kAudioFormatMPEG4AAC_ELD_SBR, 48000, 28000, 64000 },
+};
+static int aac_rates_size = sizeof(aac_rates)/sizeof(*aac_rates);
+
+/* initial values, known to be working for ELD and ELD-SBR */
+#define AAC_DEFAULT_SR 22050
+#define AAC_DEFAULT_BR 24000
+
+
+/* UTILS */
+
+/*  defines needed to compute network bit rate, copied from misc.c */
+#define UDP_HDR_SZ 8
+#define RTP_HDR_SZ 12
+#define IP4_HDR_SZ 20
+#define OVERHEAD_BYTES (IP4_HDR_SZ + RTP_HDR_SZ + UDP_HDR_SZ)
+
+
+static int  codec_to_network_bitrate(struct EncState* s, int codecBitrate ){
+    float packetsPerSecond = 1000.0/s->ptime;
+    float bytesPerPacket = codecBitrate / (packetsPerSecond * 8);
+    int networkBitrate = ( bytesPerPacket + OVERHEAD_BYTES ) * packetsPerSecond * 8;
+    return networkBitrate;
+}
+
+static int  network_to_codec_bitrate(struct EncState* s, int networkBitrate ){
+    float packetsPerSec = 1000/s->ptime;
+    float bytesPerPacket = ((float)networkBitrate / (packetsPerSec * 8 /* bits per byte */));
+    int codecBitrate=(int) ( (bytesPerPacket - OVERHEAD_BYTES) * packetsPerSec * 8 );
+
+    return codecBitrate;
+}
+
+
+
+/* ENCODER */
+
+static void enc_update_bitrate( struct EncState* s, int new_bitrate);
 /* called at init and any modification of ptime: compute the input data length */
 static void enc_update ( struct EncState *s ) {
-	s->nbytes= ( sizeof ( AudioSampleType ) *s->nchannels*s->samplingRate*s->ptime ) /1000; /* input is 16 bits LPCM: 2 bytes per sample, ptime is in ms so /1000 */
+	s->nbytes= ( sizeof ( SInt16 ) *s->nchannels*s->samplingRate*s->ptime ) /1000; /* input is 16 bits LPCM: 2 bytes per sample, ptime is in ms so /1000 */
 	/* the nbytes must be a multiple of SIGNAL_FRAME_SIZE(512 sample frame) */
 	/* nbytes % SIGNAL_FRAME_SIZE must be 0, min SIGNAL_FRAME_SIZE */
 	/* this gives for sampling rate at 22050Hz available values of ptime: 23.2ms and multiples up to 92.8ms */
@@ -70,14 +126,15 @@ static void enc_update ( struct EncState *s ) {
 static void enc_init ( MSFilter *f ) {
 	/* instanciate the encoder status */
 	struct EncState *s= ( struct EncState* ) ms_new ( struct EncState,1 );
-	s->timeStamp=0;
-	s->bufferizer=ms_bufferizer_new();
-	s->ptime = 10;
-	s->maxptime = -1;
-	s->samplingRate=22050; /* default is narrow band : 22050Hz and 32000b/s */
-	s->bitRate=32000;
-	s->nchannels=1;
-	s->inputBuffer= NULL;
+    s->timeStamp    = 0;
+    s->bufferizer   = ms_bufferizer_new();
+    s->ptime        = 10;
+    s->maxptime     = -1;
+    s->samplingRate = AAC_DEFAULT_SR;
+    s->bitRate      = AAC_DEFAULT_BR;
+    s->nchannels    = 1;
+    s->inputBuffer  = NULL;
+    s->encoderType  = kAudioFormatMPEG4AAC_ELD_SBR;
 	memset ( & ( s->sourceFormat ), 0, sizeof ( AudioStreamBasicDescription ) );
 	memset ( & ( s->destinationFormat ), 0, sizeof ( AudioStreamBasicDescription ) );
 
@@ -91,55 +148,52 @@ static void enc_init ( MSFilter *f ) {
 static void enc_preprocess ( MSFilter *f ) {
 	struct EncState *s= ( struct EncState* ) f->data;
 
-	/* check sampling and bit rate, must be either 44100Hz and 64000b/s or 22050Hz and 32000b/s */
-	if ( ! ( ( s->samplingRate==22050 && s->bitRate == 32000 ) || ( s->samplingRate==44100 && s->bitRate == 64000 ) ) ) {
-		ms_message ( "AAC-ELD encoder received incorrect sampling/bitrate settings (sr%d br%d). Switch back sampling rate setting %dHz",s->samplingRate, s->bitRate, s->samplingRate );
-		if (s->samplingRate == 22050) {
-			s->bitRate = 32000;
-		} else {
-			s->bitRate = 64000;
-		}
-	}
-
 	/* update the nbytes value */
 	enc_update ( s );
 
 	/*** initialize the encoder ***/
 	/* initialise the input audio stream basic description : LPCM */
-	s->sourceFormat.mSampleRate = s->samplingRate;
-	s->sourceFormat.mFormatID = kAudioFormatLinearPCM;
-	s->sourceFormat.mFormatFlags = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
-	s->sourceFormat.mBytesPerPacket = s->nchannels * sizeof ( AudioSampleType );
-	s->sourceFormat.mFramesPerPacket = 1;
-	s->sourceFormat.mBytesPerFrame = s->nchannels * sizeof ( AudioSampleType );
-	s->sourceFormat.mChannelsPerFrame = s->nchannels;
-	s->sourceFormat.mBitsPerChannel = 8*sizeof ( AudioSampleType );
+    s->sourceFormat.mSampleRate            = s->samplingRate;
+    s->sourceFormat.mFormatID              = kAudioFormatLinearPCM;
+    s->sourceFormat.mFormatFlags           = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
+    s->sourceFormat.mBytesPerPacket        = s->nchannels * sizeof ( SInt16 );
+    s->sourceFormat.mFramesPerPacket       = 1;
+    s->sourceFormat.mBytesPerFrame         = s->nchannels * sizeof ( SInt16 );
+    s->sourceFormat.mChannelsPerFrame      = s->nchannels;
+    s->sourceFormat.mBitsPerChannel        = 8*sizeof ( SInt16 );
 
-	/* initialise the ouput audio stream description AAC-ELD */
-	s->destinationFormat.mFormatID         = kAudioFormatMPEG4AAC_ELD;
-	s->destinationFormat.mChannelsPerFrame = s->nchannels;
-	s->destinationFormat.mSampleRate       = s->samplingRate;
+    /* Encoder setup */
+    s->destinationFormat.mFormatID         = s->encoderType;
+    s->destinationFormat.mChannelsPerFrame = s->nchannels;
+    s->destinationFormat.mSampleRate       = s->samplingRate;
 
 	/* have coreAudio fill the rest of the audio stream description */
 	UInt32 dataSize = sizeof ( s->destinationFormat );
-	AudioFormatGetProperty ( kAudioFormatProperty_FormatInfo, 0, NULL, &dataSize , & ( s->destinationFormat ) ) ;
+	OSStatus status = AudioFormatGetProperty ( kAudioFormatProperty_FormatInfo, 0, NULL, &dataSize , & ( s->destinationFormat ) ) ;
 
 	/* Create a new audio converter */
-	AudioConverterNew ( & ( s->sourceFormat ), & ( s->destinationFormat ), & ( s->audioConverter ) ) ;
+	status = AudioConverterNew ( & ( s->sourceFormat ), & ( s->destinationFormat ), & ( s->audioConverter ) ) ;
+	ms_debug("AudioConverter: %p, status: %x", s->audioConverter, (unsigned int)status );
 
-	/* Set the output bitrate */
-	UInt32 outputBitrate = s->bitRate;
-	dataSize = sizeof ( outputBitrate );
-	AudioConverterSetProperty ( s->audioConverter, kAudioConverterEncodeBitRate, dataSize, &outputBitrate );
+    // set bitrate
+    enc_update_bitrate(s, s->bitRate);
 
 	/* Get the maximum output size of output buffer */
 	UInt32 maxOutputSizePerPacket = 0;
 	dataSize = sizeof ( maxOutputSizePerPacket );
-	AudioConverterGetProperty ( s->audioConverter,
+	status = AudioConverterGetProperty ( s->audioConverter,
 								kAudioConverterPropertyMaximumOutputPacketSize,
 								&dataSize,
 								&maxOutputSizePerPacket );
 	s->maxOutputPacketSize = maxOutputSizePerPacket;
+	ms_debug("get kAudioConverterPropertyMaximumOutputPacketSize to %d -> %x", (unsigned int)maxOutputSizePerPacket, (unsigned int)status);
+
+	ms_debug("AAC encoder set to: SR: %d mBitsPerChannel: %d mChannelsPerFrame: %d maxOutputPacketSize: %d bitrate: %d",
+		s->samplingRate, 
+		(unsigned int)s->sourceFormat.mBitsPerChannel, 
+		s->nchannels, 
+		(unsigned int)s->maxOutputPacketSize,
+		s->bitRate);
 }
 
 
@@ -147,6 +201,7 @@ static OSStatus encoderCallback ( AudioConverterRef inAudioConverter, UInt32 *io
 								  AudioStreamPacketDescription **outDataPacketDescription,void *inUserData ) {
 	/* Get the current encoder state from the inUserData parameter */
 	struct EncState *s= ( struct EncState* ) inUserData;
+
 
 	/* Compute the maximum number of output packets -- useless as we shall always have nbytes at 512 bytes */
 	UInt32 maxPackets = s->nbytes / s->sourceFormat.mBytesPerPacket;
@@ -172,6 +227,7 @@ static OSStatus encoderCallback ( AudioConverterRef inAudioConverter, UInt32 *io
 	return noErr;
 }
 
+
 /* process: get data from MSFilter queue and put it into the EncState buffer, then process it until there is less than nbytes in the input buffer */
 static void enc_process ( MSFilter *f ) {
 	struct EncState *s= ( struct EncState* ) f->data;
@@ -183,27 +239,29 @@ static void enc_process ( MSFilter *f ) {
 	ms_bufferizer_put_from_queue ( s->bufferizer,f->inputs[0] );
 
 	UInt16 frameNumber = s->nbytes/SIGNAL_FRAME_SIZE; /* number of frame in the packet */
-	
+	ms_debug("enc_process -- frameNumber: %d nbytes: %d", frameNumber, s->nbytes);
+
 	/* until we find at least the requested amount of input data in the input buffer, process it */
 	while ( ms_bufferizer_get_avail ( s->bufferizer ) >=s->nbytes ) {
 		mblk_t *outputMessage=allocb ( (s->maxOutputPacketSize+2)*frameNumber+2,0 ); /* create an output message of requested size(max ouput size * number of frame in the packet + 2 bytes per frame for au header and 2 bytes for au header length) */
 		UInt16 messageLength = 2 + 2*frameNumber; /* store in bytes the complete message length to increment the write pointer of output message at the end of the encoding, initialise with au header length */
-		
+
 		/* insert the header accoring to RC3640 3.3.6: 2 bytes of AU-Header section and one AU-HEader of 2 bytes */
 		/* au header length is frame number*16(2 bytes per frame) */
 		outputMessage->b_wptr[0] = (UInt8)(frameNumber>>4);
 		outputMessage->b_wptr[1] = (UInt8)(frameNumber<<4);
-		
+
 		/*** encoding ***/
 		/* create an audio stream packet description to feed the encoder in order to get the description of encoded data */
 		AudioStreamPacketDescription outPacketDesc[1];
 
-		/* encode a 512 sample frame (nbytes is 512*sizeof(AudioSampleType) or a greater multiple */
+		/* encode a 512 sample frame (nbytes is 512*sizeof(SInt16) or a greater multiple */
 		UInt32 bufferIndex =0;
 		unsigned char *outputBuffer = outputMessage->b_wptr+2+2*frameNumber; /* set the pointer to the output buffer just after the header */
+
 		for ( bufferIndex=0; bufferIndex<s->nbytes; bufferIndex+=SIGNAL_FRAME_SIZE ) {
 
-			/* Create the output buffer list */
+            /* Create the output buffer list */
 			AudioBufferList outBufferList;
 			outBufferList.mNumberBuffers = 1;
 			outBufferList.mBuffers[0].mNumberChannels = s->nchannels;
@@ -215,15 +273,19 @@ static void enc_process ( MSFilter *f ) {
 
 			/* start the encoding process, iOS will call back when ready the callback function provided as second arg to get the input data */
 			UInt32 numOutputDataPackets = 1;
-			OSStatus status = AudioConverterFillComplexBuffer ( s->audioConverter,
-							  encoderCallback,
-							  s, /* to have the MSFilterDesc of encoder available in the callback function */
-							  &numOutputDataPackets,
-							  &outBufferList,
-							  outPacketDesc );
+			OSStatus status = AudioConverterFillComplexBuffer ( 
+				s->audioConverter, // the instance of the converter
+				encoderCallback, // callback to call when conversion is done
+				s, // user data to pass to the callback
+				&numOutputDataPackets, // sizeof the outBufferList in number of packets
+				&outBufferList, // buffer where the AAC packet is to be written
+				outPacketDesc ); // buffer where the description of the output packet will be placed
+
+
 
 			if ( status != noErr ) {
 				ms_message ( "AAC-ELD unable to encode, exit status : %ld",status );
+            	ms_filter_unlock(f);
 				return;
 			}
 
@@ -238,10 +300,10 @@ static void enc_process ( MSFilter *f ) {
 			outputBuffer += encodedFrameLength;
 		}
 		outputMessage->b_wptr += messageLength;
-		
+
 		/* set timeStamp in the output Message */
 		mblk_set_timestamp_info ( outputMessage,s->timeStamp );
-		s->timeStamp += s->nbytes/ ( sizeof ( AudioSampleType ) *s->nchannels ); /* increment timeStamp by the number of sample processed (divided by the number of channels) */
+		s->timeStamp += s->nbytes/ ( sizeof ( SInt16 ) *s->nchannels ); /* increment timeStamp by the number of sample processed (divided by the number of channels) */
 
 		/* insert the output message into the output queue of MSFilter */
 		ms_queue_put ( f->outputs[0],outputMessage );
@@ -269,7 +331,7 @@ static int set_ptime ( struct EncState *s, int value ) {
 	if (s->maxptime<0) {
 		s->maxptime = MIN(100,MAX(value, 50));
 	}
-	
+
 	if ( value>0 && value<=s->maxptime ) {
 		s->ptime=value;
 		ms_message ( "AAC-ELD encoder using ptime=%i",value );
@@ -298,50 +360,124 @@ static int enc_add_fmtp ( MSFilter *f, void *arg ) {
 	struct EncState *s= ( struct EncState* ) f->data;
 	char tmp[16]= {0};
 	int retval=0;
-	
+
 	if ( fmtp_get_value ( fmtp,"ptime",tmp,sizeof ( tmp ) ) ) {
 		ms_filter_lock ( f );
 		retval = set_ptime ( s,atoi ( tmp ) );
 		ms_filter_unlock ( f );
+	}
+	if( fmtp_get_value(fmtp, "SBR-enabled", tmp, sizeof(tmp)) ){
+		int enabled = atoi(tmp);
+		if( enabled != 0){
+            ms_warning("AAC encoder will send SBR");
+			s->encoderType = kAudioFormatMPEG4AAC_ELD_SBR;
+		}
 	}
 	return retval;
 }
 
 static int enc_set_sr ( MSFilter *f, void *arg ) {
 	struct EncState *s= ( struct EncState* ) f->data;
-	s->samplingRate = ( ( int* ) arg ) [0];
-	/* sampling rate modify also the bitrate, only 2 configs possibles */
-	if (s->samplingRate == 44100) {
-		s->bitRate = 64000;
-	} else if (s->samplingRate == 22050) {
-		s->bitRate = 32000;
-	} else {
-		ms_message("AAC-ELD codec, try to set unsupported sampling rate %d Hz, fallback to 22050Hz", s->samplingRate);
-		s->samplingRate = 22050;
-		s->bitRate = 32000;
+    int wantedSampleRate = ( ( int* ) arg ) [0];
+	bool_t found = FALSE;
+	int i;
+
+	for( i=0; i<aac_rates_size;i++){
+		if( s->samplingRate == aac_rates[i].sampling ){
+            s->samplingRate = wantedSampleRate;
+			found = TRUE;
+            break;
+		}
 	}
+
+	if(!found) {
+		ms_debug("AAC-ELD codec, try to set unsupported sampling rate %d Hz, fallback to 22050Hz", wantedSampleRate);
+        s->samplingRate = AAC_DEFAULT_SR;
+	}
+	ms_message("AAC-ELD encoder sample rate set to %d (asked %d)", s->samplingRate, *(int*)arg);
+
 	return 0;
 }
 
 static int enc_get_sr ( MSFilter *f, void *arg ) {
 	struct EncState *s= ( struct EncState* ) f->data;
 	( ( int* ) arg ) [0]=s->samplingRate;
-	return 0;
-}
-
-static int enc_set_br ( MSFilter *f, void *arg ) {
-	/* ignore bit rate setting */
-	/* bit rate is fixed according to sampling rate : 44100Hz-> 64kbps */
-	/* 22050Hz->32kbps */
+	ms_debug("AAC encoder sample rate is %d", s->samplingRate);
 	return 0;
 }
 
 static int enc_get_br ( MSFilter *f, void *arg ) {
+    struct EncState *s= ( struct EncState* ) f->data;
+     ( ( int* ) arg ) [0]= codec_to_network_bitrate(s, s->bitRate);
+    return 0;
+}
+
+static int enc_set_br ( MSFilter *f, void *arg ) {
 	struct EncState *s= ( struct EncState* ) f->data;
-	/* in s->bitRate, we have the codec bitrate but this function must return the network bitrate */
-	/* network_bitrate = ((codec_bitrate*ptime/8) + AU Header + RTP Header + UDP Header + IP Header)*8/ptime */
-	( ( int* ) arg ) [0]= (s->bitRate*s->ptime/8 + AU_HDR_SZ + RTP_HDR_SZ + UDP_HDR_SZ + IP4_HDR_SZ) *8 / s->ptime;
-	return 0;
+
+	int networkBitrate = ((int*)arg)[0];
+    int codecBitrate = network_to_codec_bitrate(s, networkBitrate);
+    ms_message("AAC wanted network bitrate: %d -> codec bitrate: %d", networkBitrate, codecBitrate);
+
+    if( f->ticker != NULL ) {
+        // we are running: set the bitrate to the encoder
+        enc_update_bitrate(s, codecBitrate);
+    } else {
+        s->bitRate = codecBitrate;
+    }
+
+
+    return 0;
+}
+
+static void enc_update_bitrate( struct EncState* s, int new_bitrate){
+    int i;
+    bool_t found = FALSE;
+
+    if( s->audioConverter == NULL ){
+        ms_error("No AAC audio encoder: cannot update bitrate");
+        return;
+    }
+
+    // get the current encoder output bitrate
+    UInt32 currentBitRate = 0;
+    UInt32 dataSize = sizeof ( currentBitRate );
+    OSStatus status = AudioConverterGetProperty ( s->audioConverter,
+                                                 kAudioConverterEncodeBitRate,
+                                                 &dataSize,
+                                                 &currentBitRate );
+    ms_debug("AAC current encoder bitrate: %d", (unsigned int)currentBitRate);
+
+
+    for( i=0; i<aac_rates_size;i++){
+        if( s->samplingRate == aac_rates[i].sampling && s->encoderType == aac_rates[i].encoderType ){
+            aac_rates_t* rate = &aac_rates[i];
+            // clamp bitrate to supported bitrate
+            s->bitRate = MIN( MAX(new_bitrate, rate->min_bitrate), rate->max_bitrate);
+            found = TRUE;
+            break;
+        }
+    }
+
+    if( !found ){
+        ms_warning("AAC could not set bitrate to %d, keeping %d", new_bitrate, s->bitRate);
+    } else {
+        /* Set the output bitrate */
+        UInt32 outputBitrate = s->bitRate;
+        dataSize = sizeof ( outputBitrate );
+        status = AudioConverterSetProperty ( s->audioConverter, kAudioConverterEncodeBitRate, dataSize, &outputBitrate );
+        ms_debug("set kAudioConverterEncodeBitRate to %d -> %x", (unsigned int)outputBitrate, (unsigned int)status);
+
+        if( status != noErr ){
+            ms_warning("Could not set bitrate for AAC encoder (%x), reverting to default encoder bitRate: %d", ( unsigned int)status, (int)currentBitRate);
+            dataSize = sizeof ( outputBitrate );
+            status = AudioConverterSetProperty ( s->audioConverter, kAudioConverterEncodeBitRate, dataSize, &currentBitRate );
+            ms_debug("set kAudioConverterEncodeBitRate to %d -> %x", (unsigned int)currentBitRate, (unsigned int)status);
+        } else {
+            ms_message("AAC target bitrate changed from %d to %d", (unsigned int)currentBitRate, s->bitRate);
+        }
+    }
+
 }
 
 static int enc_set_nchannels(MSFilter *f, void *arg) {
@@ -353,7 +489,7 @@ static int enc_set_nchannels(MSFilter *f, void *arg) {
 static int enc_set_ptime(MSFilter *f, void *arg) {
 	struct EncState *s = (struct EncState *)f->data;
 	int retval=0;
-	
+
 	ms_filter_lock ( f );
 	retval = set_ptime ( s, *(int *)arg );
 	ms_filter_unlock ( f );
@@ -431,14 +567,14 @@ static void dec_preprocess ( MSFilter *f ) {
 	s->destinationFormat.mSampleRate = s->samplingRate;
 	s->destinationFormat.mFormatID = kAudioFormatLinearPCM;
 	s->destinationFormat.mFormatFlags = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
-	s->destinationFormat.mBytesPerPacket = s->nchannels * sizeof ( AudioSampleType );
+	s->destinationFormat.mBytesPerPacket = s->nchannels * sizeof ( SInt16 );
 	s->destinationFormat.mFramesPerPacket = 1;
-	s->destinationFormat.mBytesPerFrame = s->nchannels * sizeof ( AudioSampleType );
+	s->destinationFormat.mBytesPerFrame = s->nchannels * sizeof ( SInt16 );
 	s->destinationFormat.mChannelsPerFrame = s->nchannels;
-	s->destinationFormat.mBitsPerChannel = 8*sizeof ( AudioSampleType );
+	s->destinationFormat.mBitsPerChannel = 8*sizeof ( SInt16 );
 
 	/* from AAC-ELD, having the same sampling rate, but possibly a different channel configuration */
-	s->sourceFormat.mFormatID         = kAudioFormatMPEG4AAC_ELD;
+	s->sourceFormat.mFormatID         = kAudioFormatMPEG4AAC_ELD; // ELD can handle SBR as well
 	s->sourceFormat.mChannelsPerFrame = s->nchannels;
 	s->sourceFormat.mSampleRate       = s->samplingRate;
 
@@ -512,7 +648,7 @@ static void dec_process ( MSFilter *f ) {
 	/* get the input message from queue */
 	mblk_t *inputMessage;
 
-	UInt32 numOutputDataPackets; 
+	UInt32 numOutputDataPackets;
 
 	while ( ( inputMessage=ms_queue_get ( f->inputs[0] ) ) ) {
 		numOutputDataPackets = SIGNAL_FRAME_SIZE / s->maxOutputPacketSize;
@@ -521,15 +657,15 @@ static void dec_process ( MSFilter *f ) {
 		UInt16 frameNumber = ((((UInt16)(inputMessage->b_rptr[0]))<<8) + ((UInt16)(inputMessage->b_rptr[1])))/16;
 		UInt16 headerOffset = 2*frameNumber + 2; /* actual frame start at this offset in input message */
 		mblk_t *outputMessage = allocb ( SIGNAL_FRAME_SIZE*frameNumber, 0 ); /* fixed size output frame, allocate the requested amount in the output message */
-		
+
 		int frameIndex;
 		s->decodeBuffer=inputMessage->b_rptr + headerOffset; /* initialise the read pointer to the beginning of the first frame */
 		for (frameIndex=0; frameIndex<frameNumber; frameIndex++) {
-			
+
 			/* get the frame length from the header */
 			UInt16 frameLength = ((((UInt16)(inputMessage->b_rptr[2+2*frameIndex]))<<8) + ((UInt16)(inputMessage->b_rptr[2+2*frameIndex+1])))>>3;
 			s->bytesToDecode = frameLength;
-			
+
 			/* Create the output buffer list */
 			AudioBufferList outBufferList;
 			outBufferList.mNumberBuffers = 1;
@@ -549,35 +685,35 @@ static void dec_process ( MSFilter *f ) {
 													  outputPacketDesc );
 
 			outputMessage->b_wptr += SIGNAL_FRAME_SIZE; // increment write pointer of output message by the amount of data written by the decoder
-			s->decodeBuffer += frameLength; /* increase the read pointer to the begining of next frame (if any, otherwise, it won't be used) */
+			s->decodeBuffer = (UInt8*)s->decodeBuffer + frameLength; /* increase the read pointer to the begining of next frame (if any, otherwise, it won't be used) */
 		}
 		/* insert the output message with all decoded frame in the queue and free the input message */
 		ms_queue_put ( f->outputs[0],outputMessage ); /* insert the decoded message in the output queue for MSFilter */
 		/* signal to concealment context the reception of data */
-		ms_concealer_ts_context_inc_sample_ts(s->concealer,  f->ticker->time*s->samplingRate/1000, frameNumber*SIGNAL_FRAME_SIZE/sizeof(AudioSampleType), 1);
+		ms_concealer_ts_context_inc_sample_ts(s->concealer,  f->ticker->time*s->samplingRate/1000, frameNumber*SIGNAL_FRAME_SIZE/sizeof(SInt16), 1);
 		freemsg ( inputMessage );
 	}
-	
+
 	/* is concealment needed? */
 	if(ms_concealer_ts_context_is_concealement_required(s->concealer, f->ticker->time*s->samplingRate/1000)) {
 		mblk_t *outputMessage = allocb (SIGNAL_FRAME_SIZE, 0);
-		
+
 		/* send a zero frame to the decoder (2 bytes at 0) */
 		s->bytesToDecode = 2;
 		UInt16 zerobytes = 0;
 		s->decodeBuffer = &zerobytes;
 		numOutputDataPackets = SIGNAL_FRAME_SIZE / s->maxOutputPacketSize;
-		
+
 		/* Create the output buffer list */
 		AudioBufferList outBufferList;
 		outBufferList.mNumberBuffers = 1;
 		outBufferList.mBuffers[0].mNumberChannels = s->nchannels;
 		outBufferList.mBuffers[0].mDataByteSize   = SIGNAL_FRAME_SIZE;
 		outBufferList.mBuffers[0].mData           = outputMessage->b_wptr;
-		
+
 		OSStatus status = noErr;
 		AudioStreamPacketDescription outputPacketDesc[512]; //ouput is 512 samples
-		
+
 		/* Start the decoding process */
 		status = AudioConverterFillComplexBuffer ( s->audioConverter,
 												  decoderCallback,
@@ -585,16 +721,16 @@ static void dec_process ( MSFilter *f ) {
 												  &numOutputDataPackets,
 												  &outBufferList,
 												  outputPacketDesc );
-		
+
 		outputMessage->b_wptr += SIGNAL_FRAME_SIZE;
 		mblk_set_plc_flag(outputMessage, 1);
 		ms_queue_put (f->outputs[0], outputMessage);
-		ms_concealer_ts_context_inc_sample_ts(s->concealer, f->ticker->time*s->samplingRate/1000, SIGNAL_FRAME_SIZE/sizeof(AudioSampleType), 0);
+		ms_concealer_ts_context_inc_sample_ts(s->concealer, f->ticker->time*s->samplingRate/1000, SIGNAL_FRAME_SIZE/sizeof(SInt16), 0);
 	}
 }
 
 static void dec_postprocess ( MSFilter *f ) {
-	
+
 }
 
 static void dec_uninit ( MSFilter *f ) {
@@ -626,10 +762,25 @@ static int dec_add_fmtp ( MSFilter *f, void *data ) {
 	return 0;
 }
 
-/* set the sampling rate (22050 or 44100 Hz) */
 static int dec_set_sr ( MSFilter *f, void *arg ) {
 	struct DecState *s= ( struct DecState* ) f->data;
+	bool_t found = FALSE;
+	int i;
+
 	s->samplingRate = ( ( int* ) arg ) [0];
+	for( i=0; i<aac_rates_size;i++){
+		if( s->samplingRate == aac_rates[i].sampling ){
+			found = TRUE;
+            break;
+		}
+	}
+
+	if(!found) {
+		// unlike the encoder, we fall back to 44100 here so that we can still do lower in any case
+		ms_message("AAC-ELD decoder, try to set unsupported sampling rate %d Hz, fallback to 44100Hz", s->samplingRate);
+		s->samplingRate = 44100;
+	}
+	ms_debug("AAC-ELD decoder sample rate set to %d (asked %d)", s->samplingRate, *(int*)arg);
 	return 0;
 }
 

@@ -23,23 +23,44 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "ffmpeg-priv.h"
 #endif
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <malloc.h>
 #endif
 
-#ifdef __arm__
+#if MS_HAS_ARM
 #include "msvideo_neon.h"
 #endif
+
+#ifndef INT32_MAX
+#define INT32_MAX 017777777777
+#endif
+
+const char *ms_pix_fmt_to_string(MSPixFmt fmt){
+	switch(fmt){
+		case MS_YUV420P: return "MS_YUV420P";
+		case MS_YUYV : return "MS_YUYV";
+		case MS_RGB24: return "MS_RGB24";
+		case MS_RGB24_REV: return "MS_RGB24_REV";
+		case MS_MJPEG: return "MS_MJPEG";
+		case MS_UYVY: return "MS_UYVY";
+		case MS_YUY2: return "MS_YUY2";
+		case MS_RGBA32: return "MS_RGBA32";
+		case MS_RGB565: return "MS_RGB565";
+		case MS_H264: return "MS_H264";
+		case MS_PIX_FMT_UNKNOWN: return "MS_PIX_FMT_UNKNOWN";
+	}
+	return "bad format";
+}
 
 struct _mblk_video_header {
 	uint16_t w, h;
 	int pad[3];
 };
-typedef struct _mblk_video_header mblk_video_header; 
+typedef struct _mblk_video_header mblk_video_header;
 
 static void yuv_buf_init(YuvBuf *buf, int w, int h, uint8_t *ptr){
 	int ysize,usize;
-	ysize=w*h;
+	ysize=w*(h & 0x1 ? h +1 : h);
 	usize=ysize/4;
 	buf->w=w;
 	buf->h=h;
@@ -57,7 +78,7 @@ int ms_yuv_buf_init_from_mblk(YuvBuf *buf, mblk_t *m){
 	int w,h;
 
 	// read header
-	mblk_video_header* hdr = (mblk_video_header*)m->b_datap->db_base; 
+	mblk_video_header* hdr = (mblk_video_header*)m->b_datap->db_base;
 	w = hdr->w;
 	h = hdr->h;
 
@@ -106,12 +127,12 @@ int ms_picture_init_from_mblk_with_size(MSPicture *buf, mblk_t *m, MSPixFmt fmt,
 }
 
 mblk_t * ms_yuv_buf_alloc(YuvBuf *buf, int w, int h){
-	int size=(w*h*3)/2;
-	const int header_size =sizeof(mblk_video_header);
+	int size=(w * (h & 0x1 ? h+1 : h) *3)/2; /*swscale doesn't like odd numbers of line*/
+	const int header_size = sizeof(mblk_video_header);
 	const int padding=16;
 	mblk_t *msg=allocb(header_size + size+padding,0);
 	// write width/height in header
-	mblk_video_header* hdr = (mblk_video_header*)msg->b_wptr; 
+	mblk_video_header* hdr = (mblk_video_header*)msg->b_wptr;
 	hdr->w = w;
 	hdr->h = h;
 	msg->b_rptr += header_size;
@@ -125,7 +146,7 @@ mblk_t* ms_yuv_buf_alloc_from_buffer(int w, int h, mblk_t* buffer) {
 	const int header_size =sizeof(mblk_video_header);
 	mblk_t *msg=allocb(header_size,0);
 	// write width/height in header
-	mblk_video_header* hdr = (mblk_video_header*)msg->b_wptr; 
+	mblk_video_header* hdr = (mblk_video_header*)msg->b_wptr;
 	hdr->w = w;
 	hdr->h = h;
 	msg->b_rptr += header_size;
@@ -150,12 +171,46 @@ static void plane_copy(const uint8_t *src_plane, int src_stride,
 }
 
 void ms_yuv_buf_copy(uint8_t *src_planes[], const int src_strides[],
-		uint8_t *dst_planes[], const int dst_strides[3], MSVideoSize roi){
+		uint8_t *dst_planes[], const int dst_strides[], MSVideoSize roi){
 	plane_copy(src_planes[0],src_strides[0],dst_planes[0],dst_strides[0],roi);
 	roi.width=roi.width/2;
 	roi.height=roi.height/2;
 	plane_copy(src_planes[1],src_strides[1],dst_planes[1],dst_strides[1],roi);
 	plane_copy(src_planes[2],src_strides[2],dst_planes[2],dst_strides[2],roi);
+}
+
+MSYuvBufAllocator *ms_yuv_buf_allocator_new(void) {
+	msgb_allocator_t *allocator = (msgb_allocator_t *)ms_new0(msgb_allocator_t, 1);
+	msgb_allocator_init(allocator);
+	return allocator;
+}
+
+mblk_t *ms_yuv_buf_allocator_get(MSYuvBufAllocator *obj, MSPicture *buf, int w, int h) {
+	int size=(w * (h & 0x1 ? h+1 : h) *3)/2; /*swscale doesn't like odd numbers of line*/
+	const int header_size = sizeof(mblk_video_header);
+	const int padding=16;
+	mblk_t *msg = msgb_allocator_alloc(obj, header_size + size+padding);
+	mblk_video_header* hdr = (mblk_video_header*)msg->b_wptr;
+	hdr->w = w;
+	hdr->h = h;
+	msg->b_rptr += header_size;
+	msg->b_wptr += header_size;
+	yuv_buf_init(buf,w,h,msg->b_wptr);
+	msg->b_wptr+=size;
+	return msg;
+}
+
+void ms_yuv_buf_allocator_free(MSYuvBufAllocator *obj) {
+	mblk_t *m;
+	int possibly_leaked = 0;
+	for(m = qbegin(&obj->q); !qend(&obj->q,m); m = qnext(&obj->q, m)){
+		if (m->b_datap->db_ref > 1) possibly_leaked++;
+	}
+	msgb_allocator_uninit(obj);
+	ms_free(obj);
+	if (possibly_leaked > 0){
+		ms_warning("ms_yuv_buf_allocator_free(): leaving %i mblk_t still ref'd, possible leak.", possibly_leaked);
+	}
 }
 
 static void plane_horizontal_mirror(uint8_t *p, int linesize, int w, int h){
@@ -404,9 +459,9 @@ typedef struct _MSFFScalerContext MSFFScalerContext;
 static MSScalerContext *ff_create_swscale_context(int src_w, int src_h, MSPixFmt src_fmt,
                                           int dst_w, int dst_h, MSPixFmt dst_fmt, int flags){
 	int ff_flags=0;
-	MSFFScalerContext *ctx=ms_new(MSFFScalerContext,1);
+	MSFFScalerContext *ctx=ms_new0(MSFFScalerContext,1);
 	ctx->src_h=src_h;
-#if __arm__
+#if MS_HAS_ARM
 	ff_flags|=SWS_FAST_BILINEAR;
 #else
 	if (flags & MS_SCALER_METHOD_BILINEAR)
@@ -425,7 +480,7 @@ static MSScalerContext *ff_create_swscale_context(int src_w, int src_h, MSPixFmt
 
 static int ff_sws_scale(MSScalerContext *ctx, uint8_t *src[], int src_strides[], uint8_t *dst[], int dst_strides[]){
 	MSFFScalerContext *fctx=(MSFFScalerContext*)ctx;
-#if LIBSWSCALE_VERSION_INT >= AV_VERSION_INT(0,9,0)	
+#if LIBSWSCALE_VERSION_INT >= AV_VERSION_INT(0,9,0)
 	int err=sws_scale(fctx->ctx,(const uint8_t * const*)src,src_strides,0,fctx->src_h,dst,dst_strides);
 #else
 	int err=sws_scale(fctx->ctx,(uint8_t **)src,src_strides,0,fctx->src_h,dst,dst_strides);
@@ -569,7 +624,7 @@ void ms_video_set_scaler_impl(MSScalerDesc *desc){
 }
 
 /* Can rotate Y, U or V plane; use step=2 for interleaved UV planes otherwise step=1*/
-static void rotate_plane(int wDest, int hDest, int full_width, uint8_t* src, uint8_t* dst, int step, bool_t clockWise) {
+static void rotate_plane(int wDest, int hDest, int full_width, const uint8_t* src, uint8_t* dst, int step, bool_t clockWise) {
 	int hSrc = wDest;
 	int wSrc = hDest;
 	int src_stride = full_width * step;
@@ -612,30 +667,36 @@ static void rotate_plane(int wDest, int hDest, int full_width, uint8_t* src, uin
 static int hasNeon = -1;
 #elif defined (__ARM_NEON__)
 static int hasNeon = 1;
-#elif defined(__arm__)
+#elif MS_HAS_ARM
 static int hasNeon = 0;
 #endif
 
 /* Destination and source images may have their dimensions inverted.*/
-mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(uint8_t* y, uint8_t * cbcr, int rotation, int w, int h, int y_byte_per_row,int cbcr_byte_per_row, bool_t uFirstvSecond, bool_t down_scale) {
+mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(MSYuvBufAllocator *allocator, const uint8_t* y, const uint8_t * cbcr, int rotation, int w, int h, int y_byte_per_row,int cbcr_byte_per_row, bool_t uFirstvSecond, bool_t down_scale) {
 	MSPicture pict;
 	int uv_w;
 	int uv_h;
-	uint8_t* ysrc;
+	const uint8_t* ysrc;
 	uint8_t* ydst;
-	uint8_t* uvsrc;
-	uint8_t* srcu;
+	const uint8_t* uvsrc;
+	const uint8_t* srcu;
 	uint8_t* dstu;
-	uint8_t* srcv;
+	const uint8_t* srcv;
 	uint8_t* dstv;
 
-	mblk_t *yuv_block = ms_yuv_buf_alloc(&pict, w, h);
+	mblk_t *yuv_block = ms_yuv_buf_allocator_get(allocator, &pict, w, h);
+
 #ifdef ANDROID
 	if (hasNeon == -1) {
 		hasNeon = (android_getCpuFamily() == ANDROID_CPU_FAMILY_ARM && (android_getCpuFeatures() & ANDROID_CPU_ARM_FEATURE_NEON) != 0);
+	#ifdef __arm64__
+		ms_warning("Warning: ARM64 NEON routines for video rotation are not yes implemented for Android: using SOFT version!");
+	#endif
 	}
 #endif
-#ifdef __arm__
+
+
+#if MS_HAS_ARM
 	if (down_scale && !hasNeon) {
 		ms_error("down scaling by two requires NEON, returning empty block");
 		return yuv_block;
@@ -656,12 +717,12 @@ mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(uint8_t
 		uint8_t* u_dest=pict.planes[1], *v_dest=pict.planes[2];
 
 		if (rotation == 0) {
-#ifdef __arm__
+#if MS_HAS_ARM
 			if (hasNeon) {
 				deinterlace_down_scale_neon(y, cbcr, pict.planes[0], u_dest, v_dest, w, h, y_byte_per_row, cbcr_byte_per_row,down_scale);
-			} else 
+			} else
 #endif
-			{	
+			{
 				// plain copy
 				for(i=0; i<h; i++) {
 					memcpy(&pict.planes[0][i*w], &y[i*y_byte_per_row], w);
@@ -675,10 +736,10 @@ mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(uint8_t
 				}
 			}
 		} else {
-#ifdef __arm__
+#if defined(__arm__)
 			if (hasNeon) {
 				deinterlace_down_scale_and_rotate_180_neon(y, cbcr, pict.planes[0], u_dest, v_dest, w, h, y_byte_per_row, cbcr_byte_per_row,down_scale);
-			} else 
+			} else
 #endif
 {
 				// 180° y rotation
@@ -689,7 +750,7 @@ mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(uint8_t
 				}
 				// 180° rotation + de-interlace u/v
 				uvsrc=&cbcr[uv_h*uv_w*2-2];
-				for (i=0; i<uv_h*uv_w*2; i++) {
+				for (i=0; i<uv_h*uv_w; i++) {
 					*u_dest++ = *uvsrc--;
 					*v_dest++ = *uvsrc--;
 				}
@@ -698,14 +759,14 @@ mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(uint8_t
 	} else {
 		bool_t clockwise = rotation == 90 ? TRUE : FALSE;
 		// Rotate Y
-#ifdef __arm__
+#if defined(__arm__)
 		if (hasNeon) {
 			if (clockwise) {
 				rotate_down_scale_plane_neon_clockwise(w,h,y_byte_per_row,(uint8_t*)y,pict.planes[0],down_scale);
 			} else {
 				rotate_down_scale_plane_neon_anticlockwise(w,h,y_byte_per_row,(uint8_t*)y,pict.planes[0], down_scale);
 			}
-		} else 
+		} else
 #endif
 {
 			uint8_t* dsty = pict.planes[0];
@@ -713,10 +774,10 @@ mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(uint8_t
 			rotate_plane(w,h,y_byte_per_row,srcy,dsty,1, clockwise);
 		}
 
-#ifdef __arm__
+#if defined(__arm__)
 		if (hasNeon) {
 			rotate_down_scale_cbcr_to_cr_cb(uv_w,uv_h, cbcr_byte_per_row/2, (uint8_t*)cbcr, pict.planes[2], pict.planes[1],clockwise,down_scale);
-		} else 
+		} else
 #endif
 {
 			// Copying U
@@ -733,8 +794,8 @@ mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(uint8_t
 	return yuv_block;
 }
 
-mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation(uint8_t* y, uint8_t * cbcr, int rotation, int w, int h, int y_byte_per_row,int cbcr_byte_per_row, bool_t uFirstvSecond) {
-	return copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(y, cbcr, rotation, w, h, y_byte_per_row, cbcr_byte_per_row, uFirstvSecond, FALSE);
+mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation(MSYuvBufAllocator *allocator, const uint8_t* y, const uint8_t * cbcr, int rotation, int w, int h, int y_byte_per_row,int cbcr_byte_per_row, bool_t uFirstvSecond) {
+	return copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(allocator, y, cbcr, rotation, w, h, y_byte_per_row, cbcr_byte_per_row, uFirstvSecond, FALSE);
 }
 
 void ms_video_init_framerate_controller(MSFrameRateController* ctrl, float fps) {
@@ -764,17 +825,22 @@ bool_t ms_video_capture_new_frame(MSFrameRateController* ctrl, uint32_t current_
 	}
 }
 
-void ms_video_init_average_fps(MSAverageFPS* afps, const char* ctx) {
+void ms_average_fps_init(MSAverageFPS* afps, const char* ctx) {
 	afps->last_frame_time = -1;
 	afps->last_print_time = -1;
 	afps->mean_inter_frame = 0;
 	afps->context = ctx;
 	if (!ctx || strstr(ctx, "%f") == 0) {
 		ms_error("Invalid MSAverageFPS context given '%s' (must be not null and must contain one occurence of '%%f'", ctx);
-	} 
+	}
 }
 
-bool_t ms_video_update_average_fps(MSAverageFPS* afps, uint32_t current_time) {
+/*compatibility, deprecated*/
+void ms_video_init_average_fps(MSAverageFPS* afps, const char* ctx){
+	ms_average_fps_init(afps,ctx);
+}
+
+bool_t ms_average_fps_update(MSAverageFPS* afps, uint32_t current_time) {
 	if (afps->last_frame_time!=-1){
 		float frame_interval=(float)(current_time - afps->last_frame_time)/1000.0;
 		if (afps->mean_inter_frame==0){
@@ -795,37 +861,69 @@ bool_t ms_video_update_average_fps(MSAverageFPS* afps, uint32_t current_time) {
 	return FALSE;
 }
 
-MSVideoConfiguration ms_video_find_best_configuration_for_bitrate(const MSVideoConfiguration *vconf_list, int bitrate) {
-	const MSVideoConfiguration *current_vconf = vconf_list;
-	const MSVideoConfiguration *closer_to_best_vconf = NULL;
-	MSVideoConfiguration best_vconf;
+/*compatibility, deprecated*/
+bool_t ms_video_update_average_fps(MSAverageFPS* afps, uint32_t current_time){
+	return ms_average_fps_update(afps,current_time);
+}
 
-	while (closer_to_best_vconf == NULL) {
-		if ((bitrate >= current_vconf->required_bitrate) || (current_vconf->required_bitrate == 0)) {
-			closer_to_best_vconf = current_vconf;
-		} else {
-			current_vconf++;
+float ms_average_fps_get(const MSAverageFPS* afps){
+	return afps->mean_inter_frame!=0 ? 1.0/afps->mean_inter_frame : 0.0;
+}
+
+MSVideoConfiguration ms_video_find_best_configuration_for_bitrate(const MSVideoConfiguration *vconf_list, int bitrate , int cpu_count) {
+	const MSVideoConfiguration *vconf_it = vconf_list;
+	MSVideoConfiguration best_vconf={0};
+	int max_pixels=0;
+
+	/* search for configuration that has compatible cpu count, compatible bitrate, biggest video size, and greater fps*/
+	while(TRUE) {
+		int pixels=vconf_it->vsize.width*vconf_it->vsize.height;
+		if ((cpu_count>=vconf_it->mincpu && bitrate>=vconf_it->required_bitrate) || vconf_it->required_bitrate==0){
+			if (pixels>max_pixels){
+				best_vconf=*vconf_it;
+				max_pixels=pixels;
+			}else if (pixels==max_pixels){
+				if (best_vconf.fps<vconf_it->fps){
+					best_vconf=*vconf_it;
+				}
+			}
 		}
+		if (vconf_it->required_bitrate==0) {
+			break;
+		}
+		vconf_it++;
 	}
-
-	memcpy(&best_vconf, closer_to_best_vconf, sizeof(best_vconf));
-	best_vconf.required_bitrate = bitrate;
+	best_vconf.required_bitrate=bitrate>best_vconf.bitrate_limit ? best_vconf.bitrate_limit : bitrate;
 	return best_vconf;
 }
 
-MSVideoConfiguration ms_video_find_best_configuration_for_size(const MSVideoConfiguration *vconf_list, MSVideoSize vsize) {
-	const MSVideoConfiguration *current_vconf = vconf_list;
-	const MSVideoConfiguration *closer_to_best_vconf = NULL;
-	MSVideoConfiguration best_vconf;
+MSVideoConfiguration ms_video_find_best_configuration_for_size(const MSVideoConfiguration *vconf_list, MSVideoSize vsize, int cpu_count) {
+	const MSVideoConfiguration *vconf_it = vconf_list;
+	MSVideoConfiguration best_vconf={0};
+	int min_score=INT32_MAX;
+	int ref_pixels=vsize.height*vsize.width;
 
-	while (closer_to_best_vconf == NULL) {
-		if ((current_vconf->vsize.width * current_vconf->vsize.height) <= (vsize.width * vsize.height)) {
-			closer_to_best_vconf = current_vconf;
-		} else {
-			current_vconf++;
+	/* search for configuration that is first nearest to target video size, then second has the greater fps,
+	 * but any case making sure the the cpu count is sufficient*/
+	while(TRUE) {
+		int pixels=vconf_it->vsize.width*vconf_it->vsize.height;
+		int score=abs(pixels-ref_pixels);
+		if (cpu_count>=vconf_it->mincpu){
+			if (score<min_score){
+				best_vconf=*vconf_it;
+				min_score=score;
+			}else if (score==min_score){
+				if (best_vconf.fps<vconf_it->fps){
+					best_vconf=*vconf_it;
+				}
+			}
 		}
-	}
+		if (vconf_it->required_bitrate==0) {
+			break;
+		}
+		vconf_it++;
 
-	memcpy(&best_vconf, closer_to_best_vconf, sizeof(best_vconf));
+	}
+	best_vconf.vsize=vsize;
 	return best_vconf;
 }

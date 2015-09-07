@@ -128,7 +128,7 @@ public class AndroidVideoApi5JniWrapper {
 			exc.printStackTrace(); 
 		}
 	}
-	
+	//select nearest resolution equal or above requested, if none, return highest resolution from the supported list
 	protected static int[] selectNearestResolutionAvailableForCamera(int id, int requestedW, int requestedH) {
 		// inversing resolution since webcams only support landscape ones
 		if (requestedH > requestedW) {
@@ -158,26 +158,22 @@ public class AndroidVideoApi5JniWrapper {
 		
 		try { 
 			// look for nearest size
-			Size result = null;
+			Size result = supportedSizes.get(0); /*by default return first value*/
 			int req = rW * rH;
 			int minDist = Integer.MAX_VALUE;
 			int useDownscale = 0;
-			int ratioToKeep = (int)(((float)rW / (float)rH) * 100);
-			for(Size s: supportedSizes) {
-				int ratio = (int)(((float)s.width / (float)s.height) * 100);
-				if (ratio != ratioToKeep) continue;
-
-				int dist = Math.abs(req - s.width * s.height);
-				if (dist < minDist) {
+			for(Size s: supportedSizes) {				
+				int dist = /*Math.abs*/-1*(req - s.width * s.height);
+				if ( ((s.width >= rW && s.height >= rH) || (s.width >= rH && s.height >= rW)) && dist < minDist) {
 					minDist = dist;
 					result = s;
 					useDownscale = 0;
 				}
 				
 				/* MS2 has a NEON downscaler, so we test this too */
-				int downScaleDist = Math.abs(req - s.width * s.height / 4);
-				if (downScaleDist < minDist) {
-					if (Version.isArmv7() && Version.hasNeon()) {
+				int downScaleDist = /*Math.abs*/-1*(req - s.width * s.height / 4);
+				if (((s.width/2 >= rW && s.height/2 >= rH) || (s.width/2 >= rH && s.height/2 >= rW)) && downScaleDist < minDist) {
+					if (Version.hasFastCpuWithAsmOptim()) {
 						minDist = downScaleDist;
 						result = s;
 						useDownscale = 1;
@@ -196,8 +192,7 @@ public class AndroidVideoApi5JniWrapper {
 			Log.d("mediastreamer", "resolution selection done (" + r[0] + ", " + r[1] + ", " + r[2] + ")");
 			return r;
 		} catch (Exception exc) {
-			Log.e("mediastreamer", "resolution selection failed");
-			exc.printStackTrace();
+			Log.e(exc,"mediastreamer", " resolution selection failed");
 			return null;
 		}	
 	}
@@ -220,6 +215,6 @@ public class AndroidVideoApi5JniWrapper {
 			Log.d("mediastreamer", "Preview framerate set:" + params.getPreviewFrameRate());
 		}
 		
-		camera.setParameters(params);		
+		camera.setParameters(params);
 	}
 }

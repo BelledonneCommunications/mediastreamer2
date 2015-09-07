@@ -32,8 +32,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
 
 /**
- * @defgroup mediastreamer2_soundcard Sound Card API - manage audio capture/play filters.
- * @ingroup mediastreamer2_api
+ * @addtogroup mediastreamer2_soundcard
  * @{
  */
 
@@ -96,7 +95,9 @@ typedef int (*MSSndCardGetControlFunc)(struct _MSSndCard *obj, MSSndCardControlE
 typedef struct _MSFilter * (*MSSndCardCreateReaderFunc)(struct _MSSndCard *obj);
 typedef struct _MSFilter * (*MSSndCardCreateWriterFunc)(struct _MSSndCard *obj);
 typedef struct _MSSndCard * (*MSSndCardDuplicateFunc)(struct _MSSndCard *obj);
+typedef void (*MSSndCardSetUsageHintFunc)(struct _MSSndCard *obj, bool_t is_going_to_be_used);
 typedef void (*MSSndCardUnloadFunc)(MSSndCardManager *obj);
+
 
 struct _MSSndCardDesc{
 	const char *driver_type;
@@ -112,7 +113,7 @@ struct _MSSndCardDesc{
 	MSSndCardUninitFunc uninit;
 	MSSndCardDuplicateFunc duplicate;
 	MSSndCardUnloadFunc unload;
-
+	MSSndCardSetUsageHintFunc usage_hint;
 };
 
 /**
@@ -125,6 +126,7 @@ typedef struct _MSSndCardDesc MSSndCardDesc;
 #define MS_SND_CARD_CAP_CAPTURE (1) /**<This sound card can capture sound */
 #define MS_SND_CARD_CAP_PLAYBACK (1<<1) /**<This sound card can playback sound */
 #define MS_SND_CARD_CAP_BUILTIN_ECHO_CANCELLER (1<<2) /**<This sound card has built-in echo cancellation*/
+#define MS_SND_CARD_CAP_IS_SLOW (1<<3) /**<This sound card is very slow to start*/
 
 struct _MSSndCard{
 	MSSndCardDesc *desc;
@@ -221,6 +223,13 @@ MS2_PUBLIC const MSList * ms_snd_card_manager_get_list(MSSndCardManager *m);
 MS2_PUBLIC void ms_snd_card_manager_add_card(MSSndCardManager *m, MSSndCard *c);
 
 /**
+ * Prepend a list of sound card object to the sound card manager's list.
+ * @param[in] m A sound card manager containing sound cards.
+ * @param[in] l A list of sound card objects to be prepended to the sound card manager's list.
+ */
+MS2_PUBLIC void ms_snd_card_manager_prepend_cards(MSSndCardManager *m, MSList *l);
+
+/**
  * Register a sound card description in a sound card manager.
  *
  * @param m      A sound card manager containing sound cards.
@@ -275,7 +284,7 @@ MS2_PUBLIC MSSndCard * ms_snd_card_new(MSSndCardDesc *desc);
  * Create a new sound card object.
  *
  * @param desc   A sound card description object.
- * @param card mame
+ * @param name The card name
  *
  * Returns: MSSndCard if successfull, NULL otherwise.
  */
@@ -416,7 +425,7 @@ MS2_PUBLIC void ms_snd_card_set_capture(MSSndCard *obj, MSSndCardCapture c);
  *
  * @param obj      A sound card object.
  * @param e        A sound card control object.
- * @param percent  A value for control.
+ * @param val  A value for control.
  *
  * Returns: 0 if successfull, <0 otherwise.
  */
@@ -457,7 +466,12 @@ MS2_PUBLIC int ms_snd_card_get_preferred_sample_rate(const MSSndCard *obj);
  * Returns:  0 if successfull, <0 otherwise.
  */
 MS2_PUBLIC int ms_snd_card_set_preferred_sample_rate(MSSndCard *obj,int rate);
-	
+
+/**
+ * Enable application to tell that the soundcard is going to be used or will cease to be used.
+ * This is recommended for cards which are known to be slow (see flag MS_SND_CARD_CAP_IS_SLOW ).
+**/
+MS2_PUBLIC void ms_snd_card_set_usage_hint(MSSndCard *obj, bool_t is_going_to_be_used);
 
 /**
  * Create a alsa card with user supplied pcm name and mixer name.

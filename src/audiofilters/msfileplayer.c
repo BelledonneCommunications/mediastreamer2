@@ -127,7 +127,7 @@ int ms_read_wav_header_from_fd(wave_header_t *header,int fd){
 			goto not_a_wav;
 		}
 		if (strncmp(data_chunk->data, "data", 4)!=0){
-			ms_warning("skipping chunk=%s len=%i", data_chunk->data, data_chunk->len);
+			ms_warning("skipping chunk=%c%c%c%c len=%i", data_chunk->data[0],data_chunk->data[1],data_chunk->data[2],data_chunk->data[3], data_chunk->len);
 			lseek(fd,le_uint32(data_chunk->len),SEEK_CUR);
 			count++;
 			hsize+=len+le_uint32(data_chunk->len);
@@ -181,9 +181,10 @@ static int player_open(MSFilter *f, void *arg){
 		player_close(f,NULL);
 	}
 	if ((fd=open(file,O_RDONLY|O_BINARY))==-1){
-		ms_warning("Failed to open %s",file);
+		ms_warning("MSFilePlayer[%p]: failed to open %s: %s",f,file,strerror(errno));
 		return -1;
 	}
+
 	d->state=MSPlayerPaused;
 	d->fd=fd;
 	d->ts=0;
@@ -194,7 +195,7 @@ static int player_open(MSFilter *f, void *arg){
 		char err[PCAP_ERRBUF_SIZE];
 		d->pcap = pcap_open_offline(file, err);
 		if (d->pcap == NULL) {
-			ms_error("Failed to open pcap file: %s", err);
+			ms_error("MSFilePlayer[%p]: failed to open pcap file: %s",f,err);
 			d->fd=-1;
 			close(fd);
 			return -1;
@@ -204,7 +205,8 @@ static int player_open(MSFilter *f, void *arg){
 	if (read_wav_header(d)!=0 && strstr(file,".wav")){
 		ms_warning("File %s has .wav extension but wav header could be found.",file);
 	}
-	ms_message("%s opened: rate=%i,channel=%i",file,d->rate,d->nchannels);
+	ms_filter_notify_no_arg(f,MS_FILTER_OUTPUT_FMT_CHANGED);
+	ms_message("MSFilePlayer[%p]: %s opened: rate=%i,channel=%i",f,file,d->rate,d->nchannels);
 	return 0;
 }
 
@@ -299,6 +301,7 @@ static void player_process(MSFilter *f){
 					res = pcap_next_ex(d->pcap, &d->pcap_hdr, &d->pcap_data);
 				}
 				if (res == -2) {
+					ms_filter_notify_no_arg(f,MS_PLAYER_EOF);
 					ms_filter_notify_no_arg(f, MS_FILE_PLAYER_EOF);
 				} else if (res > 0) {
 					const u_char *ethernet_header = &d->pcap_data[0];
@@ -325,16 +328,17 @@ static void player_process(MSFilter *f){
 							ms_message("initial ts=%u, seq=%u",ts,pcap_seq);
 						}
 						diff_ms = ((ts - d->pcap_initial_ts) * 1000) / d->rate;
-						ms_message("diff_ms=%u",diff_ms);
+						//ms_message("diff_ms=%u",diff_ms);
 						if ((f->ticker->time - d->pcap_initial_time) >= diff_ms) {
 							if (pcap_seq >= d->pcap_seq) {
 								om = allocb(bytes, 0);
 								memcpy(om->b_wptr, payload, bytes);
 								om->b_wptr += bytes;
+								mblk_set_cseq(om, pcap_seq);
 								mblk_set_timestamp_info(om, f->ticker->time);
 								mblk_set_marker_info(om,markbit);
 								ms_queue_put(f->outputs[0], om);
-								ms_message("Outputting RTP packet of size %i, markbit=%i", bytes,(int)markbit);
+								ms_message("Outputting RTP packet of size %i, seq=%u markbit=%i", bytes, pcap_seq, (int)markbit);
 							}
 							d->pcap_seq = pcap_seq;
 							d->pcap_hdr = NULL;
@@ -372,6 +376,8 @@ static void player_process(MSFilter *f){
 					ms_queue_put(f->outputs[0],om);
 				}else freemsg(om);
 				if (err<bytes){
+					ms_filter_notify_no_arg(f,MS_PLAYER_EOF);
+					/*for compatibility:*/
 					ms_filter_notify_no_arg(f,MS_FILE_PLAYER_EOF);
 					lseek(d->fd,d->hsize,SEEK_SET);
 
@@ -446,10 +452,11 @@ static MSFilterMethod player_methods[]={
 	{ MS_PLAYER_PAUSE, player_pause },
 	{ MS_PLAYER_CLOSE, player_close },
 	{ MS_PLAYER_GET_STATE, player_get_state },
+	{ MS_PLAYER_SET_LOOP, player_loop },
 	{	0,			NULL		}
 };
 
-#ifdef WIN32
+#ifdef _WIN32
 
 MSFilterDesc ms_file_player_desc={
 	MS_FILE_PLAYER_ID,
@@ -457,13 +464,13 @@ MSFilterDesc ms_file_player_desc={
 	N_("Raw files and wav reader"),
 	MS_FILTER_OTHER,
 	NULL,
-    0,
+	0,
 	1,
 	player_init,
 	NULL,
-    player_process,
+	player_process,
 	NULL,
-    player_uninit,
+	player_uninit,
 	player_methods
 };
 

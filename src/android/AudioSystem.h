@@ -17,6 +17,8 @@
 #ifndef ANDROID_AUDIOSYSTEM_H_
 #define ANDROID_AUDIOSYSTEM_H_
 
+#include <cstddef>
+
 
 #include "audio.h"
 #include "loader.h"
@@ -255,11 +257,99 @@ public:
 	Function2<status_t,audio_io_handle_t,const String8 &> mSetParameters;
 	Function1<status_t, audio_mode_t> mSetPhoneState;
 	Function2<status_t, audio_policy_force_use_t, audio_policy_forced_cfg_t> mSetForceUse;
+	Function0<int> mNewAudioSessionId;
 	//Function6<audio_io_handle_t,audio_source_t,uint32_t,audio_format_t,uint32_t,audio_in_acoustics_t,int> mGetInput;
 private:
 	AudioSystemImpl(Library *lib);
 	static AudioSystemImpl *sImpl;
 };
+
+class RefBaseImpl{
+public:
+	static bool init(Library *lib);
+	static RefBaseImpl * get(){
+		return sImpl;
+	}
+	Function1<void,void*> mCtor;
+	Function2<void,void*,const void*> mIncStrong;
+	Function2<void,void*,const void*> mDecStrong;
+	Function1<int32_t,void*> mGetStrongCount;
+private:
+	RefBaseImpl(Library *lib);
+	static RefBaseImpl *sImpl;
+};
+
+class RefBase{
+public:
+	RefBase();
+	virtual ~RefBase();
+	void incStrong(const void* id) const;
+	void decStrong(const void* id) const;
+	int32_t getStrongCount() const;
+protected:
+	virtual void *getRealThis()const =0;
+	virtual bool isRefCounted()const =0;
+	virtual void destroy()const=0; //used when the object is not refcounted*/
+private:
+	RefBaseImpl *mImpl;
+	mutable int mCnt;
+};
+
+template <typename _T>
+class sp{
+public:
+	sp() : mPtr(0){
+	}
+	sp(_T *p) : mPtr(0){
+		assign(p);
+	}
+	sp(const sp<_T> &other) : mPtr(0){
+		assign(other.mPtr);
+	}
+	void reset(){
+		assign(0);
+	}
+	~sp(){
+		reset();
+	}
+	_T * operator->(){
+		return mPtr;
+	}
+	bool operator==(const sp<_T> & other)const{
+		return mPtr==other.mPtr;
+	}
+	sp<_T> & operator=(const sp<_T> & other){
+		assign(other.mPtr);
+		return *this;
+	}
+	sp<_T> & operator=(_T *ptr){
+		assign(ptr);
+		return *this;
+	}
+	bool operator!(){
+		return !mPtr;
+	}
+	bool operator!=(const sp<_T> & other){
+		return mPtr!=other.mPtr;
+	}
+	_T * get()const{
+		return mPtr;
+	}
+private:
+	void assign(_T *ptr){
+		if (ptr) ptr->incStrong(this);
+		if (mPtr) {
+			mPtr->decStrong(this);
+			mPtr=0;
+		}
+		mPtr=ptr;
+	}
+	_T *mPtr;
+};
+
+ptrdiff_t findRefbaseOffset(void *obj, size_t size);
+
+void dumpMemory(void *obj, size_t size);
 
 };  // namespace android
 

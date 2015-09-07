@@ -23,10 +23,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <math.h>
 
-#include "mediastreamer2/mediastream.h"
+#include "common.h"
 #include "mediastreamer2/msequalizer.h"
 #include "mediastreamer2/msfileplayer.h"
 #include "mediastreamer2/msvolume.h"
+#include "mediastreamer2/msfilerec.h"
 #ifdef VIDEO_ENABLED
 #include "mediastreamer2/msv4l.h"
 #endif
@@ -52,7 +53,9 @@ static int cond = 1;
 typedef struct _MediastreamDatas {
 	int payload;
 	bool_t is_verbose;
+	bool_t avpf;
 	char *playback_card;
+	char *outfile;
 	char *infile;
 	PayloadType *pt;
 	RtpProfile *profile;
@@ -79,7 +82,9 @@ static void stop_handler(int signum);
 
 const char *usage = "pcap_playback --infile <pcapfile>\n"
                     "--payload <payload type number or payload name like 'audio/pmcu/8000'>\n"
+		    		"--avpf [assume RTP/AVPF profile]\n"
                     "[ --playback-card <name> ]\n"
+					"[ --outfile <name> ] limited to wav file for now\n"
                     "[ --verbose (most verbose messages) ]\n"
                     ;
 
@@ -91,8 +96,10 @@ int main(int argc, char *argv[])
 
 	args = init_default_args();
 
-	if (!parse_args(argc, argv, args))
+	if (!parse_args(argc, argv, args)) {
+		printf("%s", usage);
 		return 0;
+	}
 
 	setup_media_streams(args);
 	run_non_interactive_loop(args);
@@ -137,6 +144,9 @@ static bool_t parse_args(int argc, char **argv, MediastreamDatas *out)
 			i++;
 			if (isdigit(argv[i][0])) {
 				out->payload = atoi(argv[i]);
+			}else {
+				out->payload=114;
+				out->pt=ms_tools_parse_custom_payload(argv[i]);
 			}
 		} else if (strcmp(argv[i], "--playback-card") == 0) {
 			i++;
@@ -144,12 +154,21 @@ static bool_t parse_args(int argc, char **argv, MediastreamDatas *out)
 		} else if (strcmp(argv[i], "--infile") == 0) {
 			i++;
 			out->infile = argv[i];
+		} else if (strcmp(argv[i], "--outfile") == 0) {
+			i++;
+			out->outfile = argv[i];
 		} else if (strcmp(argv[i], "--verbose") == 0) {
 			out->is_verbose = TRUE;
 		} else if (strcmp(argv[i], "--help") == 0) {
 			printf("%s", usage);
 			return FALSE;
+		}else if (strcmp(argv[i],"--avpf")==0){
+			out->avpf=TRUE;
 		}
+	}
+	if (out->playback_card && out->outfile ) {
+		ms_error("Cannot define both playback card and output file, select only one");
+		return FALSE;
 	}
 	return TRUE;
 }
@@ -159,6 +178,25 @@ static void reader_notify_cb(void *user_data, MSFilter *f, unsigned int event, v
 {
 	if (event == MS_FILE_PLAYER_EOF) {
 		cond = 0;
+	}
+}
+
+static void video_decoder_callback(void *user_data, MSFilter *f, unsigned int event, void *eventdata){
+	MSVideoCodecRPSI *rpsi;
+	uint16_t picture_id=0;
+	switch(event){
+		case MS_VIDEO_DECODER_SEND_RPSI:
+			rpsi=(MSVideoCodecRPSI*)eventdata;
+			if (rpsi->bit_string_len == 8) {
+				picture_id = *((uint8_t *)rpsi->bit_string);
+			} else if (rpsi->bit_string_len == 16) {
+				picture_id = ntohs(*((uint16_t *)rpsi->bit_string));
+			}
+			ms_message("Decoder would like to send RPSI for pic-id=%u",picture_id);
+		break;
+		case MS_VIDEO_DECODER_SEND_SLI:
+			ms_message("Decoder would like to send SLI");
+		break;
 	}
 }
 
@@ -196,7 +234,8 @@ static void setup_media_streams(MediastreamDatas *args)
 	ms_filter_reset_statistics();
 
 	signal(SIGINT, stop_handler);
-	args->pt = rtp_profile_get_payload(args->profile, args->payload);
+	if (args->pt==NULL)
+		args->pt = rtp_profile_get_payload(args->profile, args->payload);
 	if (args->pt == NULL) {
 		printf("Error: no payload defined with number %i.", args->payload);
 		exit(-1);
@@ -221,11 +260,18 @@ static void setup_media_streams(MediastreamDatas *args)
 		args->read = ms_filter_new(MS_FILE_PLAYER_ID);
 		args->write = ms_filter_new_from_name(display_name);
 		args->decoder = ms_filter_create_decoder(args->pt->mime_type);
+		if (args->decoder==NULL){
+			fprintf(stderr,"No decoder available for %s.\n",args->pt->mime_type);
+			exit(-1);
+		}
+		if (ms_filter_call_method(args->decoder,MS_VIDEO_DECODER_ENABLE_AVPF,&args->avpf)==0){
+			ms_filter_add_notify_callback(args->decoder, video_decoder_callback, NULL, TRUE);
+		}
 		ms_filter_call_method_noarg(args->read, MS_FILE_PLAYER_CLOSE);
 		ms_filter_call_method(args->read, MS_FILE_PLAYER_OPEN, args->infile);
 		ms_filter_call_method(args->read, MS_FILTER_SET_SAMPLE_RATE, &args->pt->clock_rate);
 		ms_filter_call_method_noarg(args->read, MS_FILE_PLAYER_START);
-		ms_filter_set_notify_callback(args->read, reader_notify_cb, NULL);
+		ms_filter_add_notify_callback(args->read, reader_notify_cb, NULL,FALSE);
 
 		/*force the decoder to output YUV420P */
 		format = MS_YUV420P;
@@ -252,11 +298,21 @@ static void setup_media_streams(MediastreamDatas *args)
 #endif
 	} else {
 		MSSndCardManager *manager = ms_snd_card_manager_get();
-		MSSndCard *play = args->playback_card == NULL ? ms_snd_card_manager_get_default_playback_card(manager) :
-		                  ms_snd_card_manager_get_card(manager, args->playback_card);
+		MSSndCard *play =NULL;
+		if (args->outfile) {
+			args->write=ms_filter_new(MS_FILE_REC_ID);
+			if (ms_filter_call_method(args->write, MS_FILE_REC_OPEN, args->outfile)) {
+				ms_error("Cannot open file [%s] in write mode",args->outfile);
+				exit(-1);
+			}
 
+		} else {
+			play = args->playback_card ==NULL ? ms_snd_card_manager_get_default_playback_card(manager) :
+		                  ms_snd_card_manager_get_card(manager, args->playback_card);
+			args->write = ms_snd_card_create_writer(play);
+
+		}
 		args->read = ms_filter_new(MS_FILE_PLAYER_ID);
-		args->write = ms_snd_card_create_writer(play);
 		args->decoder = ms_filter_create_decoder(args->pt->mime_type);
 		ms_filter_call_method_noarg(args->read, MS_FILE_PLAYER_CLOSE);
 		ms_filter_call_method(args->read, MS_FILE_PLAYER_OPEN, args->infile);
@@ -267,6 +323,9 @@ static void setup_media_streams(MediastreamDatas *args)
 		ms_filter_call_method(args->write, MS_FILTER_SET_SAMPLE_RATE, &args->pt->clock_rate);
 		ms_filter_call_method(args->write, MS_FILTER_SET_NCHANNELS, &args->pt->channels);
 
+		if (ms_filter_get_id(args->write) == MS_FILE_REC_ID) {
+			ms_filter_call_method_noarg(args->write, MS_FILE_REC_START);
+		}
 		params.name = "Audio MSTicker";
 		params.prio  = MS_TICKER_PRIO_REALTIME;
 		args->ticker = ms_ticker_new_with_params(&params);
@@ -314,6 +373,9 @@ static void clear_mediastreams(MediastreamDatas *args)
 		ms_connection_helper_unlink(&h, args->read, -1, 0);
 		ms_connection_helper_unlink(&h, args->decoder, 0, 0);
 		ms_connection_helper_unlink(&h, args->write, 0, -1);
+		if (ms_filter_get_id(args->write) == MS_FILE_REC_ID) {
+			ms_filter_call_method_noarg(args->write, MS_FILE_REC_CLOSE);
+		}
 	}
 	rtp_profile_destroy(args->profile);
 

@@ -1,6 +1,12 @@
 GITVERSION_FILE=gitversion.h
 GITVERSION_FILE_TMP=gitversion.h.tmp
 
+## This command is used to check if the sources are cloned in a git repo.
+## We can't only depend on the presence of the .git/ directory anymore,
+## because of gits submodule handling.
+## We now simply issue a git log on configure.ac and if the output is empty (error or file not tracked), then we are not in git.
+GITLOG=`cd "$(top_srcdir)" && git log -1 --pretty=format:%H configure.ac`
+
 ECHO=/bin/echo
 
 ANDROID_SRC_FILES= \
@@ -8,6 +14,7 @@ ANDROID_SRC_FILES= \
 	android/AudioSystem.cpp android/AudioSystem.h \
 	android/AudioTrack.cpp android/AudioTrack.h \
 	android/String8.cpp android/String8.h \
+	android/hardware_echo_canceller.cpp android/hardware_echo_canceller.h \
 	android/androidsound.cpp \
 	android/androidsound_depr.cpp \
 	android/androidvideo.cpp \
@@ -16,18 +23,42 @@ ANDROID_SRC_FILES= \
 	android/android-opengl-display.c \
 	android/audio.h \
 	android/loader.cpp android/loader.h \
-	audiofilters/webrtc_aec.c
+	audiofilters/aac-eld-android.cpp
 
 EXTRA_DIST= audiofilters/winsnd2.c audiofilters/winsnd.c videofilters/winvideo.c  \
 	videofilters/winvideods.c videofilters/wincevideods.c dxfilter.h dxfilter.cpp \
 	audiofilters/winsndds.cpp \
 	voip/nowebcamCIF.jpg audiofilters/winsnd3.c utils/vfw-missing.h \
 	videofilters/winvideo2.c utils/msjava.c $(ANDROID_SRC_FILES) \
-	$(GITVERSION_FILE) yuv2rgb.fs yuv2rgb.vs
+	$(GITVERSION_FILE) yuv2rgb.fs yuv2rgb.vs libsrtp.map
 
 BUILT_SOURCES=basedescs.h $(GITVERSION_FILE) yuv2rgb.fs.h yuv2rgb.vs.h
 
 CLEANFILES=basedescs.h voipdescs.h basedescs.txt voipdescs.txt $(GITVERSION_FILE) yuv2rgb.fs.h yuv2rgb.vs.h
+
+libmediastreamer_voip_la_LIBADD=	libmediastreamer_base.la \
+					$(ORTP_LIBS) \
+					$(VP8_LIBS) \
+					$(PORTAUDIO_LIBS) \
+					$(ALSA_LIBS) \
+					$(QSA_LIBS) \
+					$(ARTS_LIBS) \
+					$(LIBPULSE_LIBS) \
+					$(SPEEX_LIBS) \
+					$(GSM_LIBS) \
+					$(LIBV4L1_LIBS) \
+					$(LIBV4L2_LIBS) \
+					$(LIBV4LCONVERT_LIBS) \
+					$(SPANDSP_LIBS) \
+					$(PCAP_LIBS) \
+					$(OPUS_LIBS) \
+					$(SRTP_LIBS) \
+					$(POLARSSL_LIBS)
+
+
+if LIBBZRTP
+libmediastreamer_voip_la_LIBADD+=$(LIBBZRTP_LIB)
+endif
 
 lib_LTLIBRARIES=libmediastreamer_base.la
 if BUILD_VOIP_LIBRARY
@@ -41,8 +72,10 @@ libmediastreamer_base_la_SOURCES=	base/mscommon.c \
 					base/msticker.c \
 					base/eventqueue.c \
 					base/mssndcard.c \
+					base/msfactory.c \
 					otherfilters/tee.c \
 					otherfilters/join.c \
+					base/msvideopresets.c \
 					base/mswebcam.c \
 					base/mtu.c \
 					otherfilters/void.c \
@@ -60,13 +93,19 @@ libmediastreamer_voip_la_SOURCES+=	voip/private.h \
 					voip/mediastream.c \
 					voip/audiostream.c \
 					voip/ringstream.c \
+					voip/msmediaplayer.c \
 					voip/ice.c \
 					otherfilters/msrtp.c \
 					voip/qualityindicator.c \
 					voip/audioconference.c \
 					voip/bitratedriver.c \
-					voip/qosanalyzer.c \
-					voip/bitratecontrol.c
+					voip/qosanalyzer.c voip/qosanalyzer.h \
+					voip/bitratecontrol.c \
+					crypto/zrtp.c \
+					voip/stun.c \
+					voip/stun_udp.c \
+					crypto/ms_srtp.c \
+					crypto/dtls_srtp.c
 else
 libmediastreamer_base_la_SOURCES+=	ortp-deps/logging.c \
 					ortp-deps/port.c \
@@ -81,8 +120,7 @@ if MS2_FILTERS
 libmediastreamer_voip_la_SOURCES+=	audiofilters/alaw.c \
 					audiofilters/ulaw.c \
 					audiofilters/dtmfgen.c \
-					audiofilters/msconf.c \
-					utils/g711common.h \
+					audiofilters/g711.c audiofilters/g711.h \
 					audiofilters/msvolume.c \
 					utils/dsptools.c \
 					utils/kiss_fft.c \
@@ -90,6 +128,7 @@ libmediastreamer_voip_la_SOURCES+=	audiofilters/alaw.c \
 					utils/kiss_fft.h \
 					utils/kiss_fftr.c \
 					utils/kiss_fftr.h \
+					utils/audiodiff.c \
 					audiofilters/equalizer.c \
 					audiofilters/chanadapt.c \
 					audiofilters/audiomixer.c \
@@ -104,7 +143,8 @@ libmediastreamer_voip_la_SOURCES+=	audiofilters/alaw.c \
 					audiofilters/msfileplayer.c \
 					audiofilters/msfilerec.c \
 					audiofilters/waveheader.h \
-					audiofilters/flowcontrol.c audiofilters/flowcontrol.h
+					audiofilters/flowcontrol.c \
+					audiofilters/msvaddtx.c
 
 if BUILD_SPEEX
 libmediastreamer_voip_la_SOURCES+=	audiofilters/msspeex.c audiofilters/speexec.c
@@ -170,10 +210,15 @@ endif
 if BUILD_VIDEO
 
 if BUILD_MACOSX
-libmediastreamer_voip_la_SOURCES+=	videofilters/qtcapture.m \
+
+noinst_LTLIBRARIES=libqtcapture_cocoa.la
+libqtcapture_cocoa_la_LIBTOOLFLAGS= --tag=CC
+libqtcapture_cocoa_la_SOURCES = videofilters/qtcapture.m \
 					videofilters/msosxdisplay.m \
 					utils/shaders.c utils/shaders.h \
 					utils/opengles_display.c utils/opengles_display.h
+
+libmediastreamer_voip_la_LIBADD+=libqtcapture_cocoa.la
 nodist_libmediastreamer_voip_la_SOURCES = yuv2rgb.fs.h yuv2rgb.fs.h
 endif
 
@@ -209,6 +254,11 @@ if BUILD_VP8
 libmediastreamer_voip_la_SOURCES+=	videofilters/vp8.c
 endif
 
+if BUILD_MATROSKA
+libmediastreamer_voip_la_SOURCES+=	videofilters/mkv.c \
+					utils/mkv_reader.c utils/mkv_reader.h
+endif
+
 if BUILD_AVCODEC
 libmediastreamer_voip_la_SOURCES+=	videofilters/videoenc.c \
 					videofilters/videodec.c \
@@ -216,19 +266,11 @@ libmediastreamer_voip_la_SOURCES+=	videofilters/videoenc.c \
 					utils/ffmpeg-priv.h \
 					utils/ffmpeg-priv.c \
 					videofilters/h264dec.c \
-					videofilters/jpegwriter.c 
+					videofilters/jpegwriter.c
 endif
-
-if BUILD_AVCODEC 
-libmediastreamer_voip_la_SOURCES+= 	videofilters/nowebcam.c voip/nowebcam.h 
-else
-if BUILD_IOS
-libmediastreamer_voip_la_SOURCES+= 	videofilters/nowebcam.c voip/nowebcam.h 
-endif
-endif #might be better
 
 if BUILD_SDL
-libmediastreamer_voip_la_SOURCES+=	videofilters/videoout.c 
+libmediastreamer_voip_la_SOURCES+=	videofilters/videoout.c
 endif
 
 if BUILD_X11_XV
@@ -246,9 +288,17 @@ libmediastreamer_voip_la_SOURCES+=	voip/rfc2429.h \
 					voip/msvideo_neon.c \
 					voip/msvideo_neon.h \
 					voip/rfc3984.c \
+					voip/videostarter.c \
+					voip/vp8rtpfmt.c \
+					voip/vp8rtpfmt.h \
 					videofilters/mire.c \
+					videofilters/nowebcam.c voip/nowebcam.h \
 					videofilters/extdisplay.c \
-					voip/layouts.c voip/layouts.h 
+					utils/bits_rw.c \
+					utils/x11_helper.c \
+					utils/stream_regulator.c utils/stream_regulator.h \
+					voip/layouts.c voip/layouts.h \
+					voip/video_preset_high_fps.c
 
 if ORTP_ENABLED
 libmediastreamer_voip_la_SOURCES+=	voip/videostream.c
@@ -258,7 +308,7 @@ endif BUILD_VIDEO
 
 endif MS2_FILTERS
 
-if BUILD_UPNP 
+if BUILD_UPNP
 libmediastreamer_voip_la_SOURCES+=	upnp/upnp_igd.c \
 					upnp/upnp_igd_private.h \
 					upnp/upnp_igd_cmd.c \
@@ -272,9 +322,9 @@ basedescs.h:	Makefile $(libmediastreamer_base_la_SOURCES)
 	awk 'BEGIN { print("#include \"mediastreamer2/msfilter.h\"\n") } { printf("extern MSFilterDesc %s;\n",$$1) } ' $(abs_builddir)/basedescs.txt > $(abs_builddir)/$@ && \
 	awk 'BEGIN { print("MSFilterDesc * ms_base_filter_descs[]={") } { printf("&%s,\n",$$1) } END{ print("NULL\n};\n") } ' $(abs_builddir)/basedescs.txt >> $(abs_builddir)/$@
 
-voipdescs.h:	Makefile $(libmediastreamer_voip_la_SOURCES)
+voipdescs.h:	Makefile $(libmediastreamer_voip_la_SOURCES) $(libqtcapture_cocoa_la_SOURCES)
 	cd $(srcdir) && \
-	awk 'BEGIN { FS="[()]" ; }; /^\t*MS_FILTER_DESC_EXPORT/{ printf("%s\n", $$2) } '  > $(abs_builddir)/voipdescs.txt $(libmediastreamer_voip_la_SOURCES) && \
+	awk 'BEGIN { FS="[()]" ; }; /^\t*MS_FILTER_DESC_EXPORT/{ printf("%s\n", $$2) } '  > $(abs_builddir)/voipdescs.txt $(libmediastreamer_voip_la_SOURCES) $(libqtcapture_cocoa_la_SOURCES) && \
 	awk 'BEGIN { print("#include \"mediastreamer2/msfilter.h\"\n") } { printf("extern MSFilterDesc %s;\n",$$1) } ' $(abs_builddir)/voipdescs.txt > $(abs_builddir)/$@ && \
 	awk 'BEGIN { print("MSFilterDesc * ms_voip_filter_descs[]={") } { printf("&%s,\n",$$1) } END{ print("NULL\n};\n") } ' $(abs_builddir)/voipdescs.txt >> $(abs_builddir)/$@
 
@@ -308,15 +358,16 @@ endif
 
 if BUILD_WIN32
 libmediastreamer_base_la_LIBADD+=	-lole32 \
-					-loleaut32\
-					-lwinmm \
-					-luuid
+									-loleaut32\
+									-lwinmm \
+									-luuid
 endif
 
 if BUILD_WIN32_WCE
 libmediastreamer_base_la_LIBADD+=	-lmmtimer
 endif
 
+#put ORTP_CFLAGS in AM_CPPFLAGS so that inner oRTP submodules is taken in priority rather than installed one, but after MS2 include path to avoid same issue for MS2
 AM_CPPFLAGS=\
 	-I$(top_srcdir)/include/ \
 	-I$(top_srcdir)/src/base \
@@ -324,22 +375,25 @@ AM_CPPFLAGS=\
 	-I$(top_srcdir)/src/voip \
 	-I$(top_srcdir)/src/audiofilters \
 	-I$(top_srcdir)/src/otherfilters \
-	-I$(top_srcdir)/src/videofilters 	
+	-I$(top_srcdir)/src/videofilters \
+	$(ORTP_CFLAGS)   
 
 AM_CFLAGS=\
 	$(STRICT_OPTIONS) \
-	$(ORTP_CFLAGS)   \
+	$(STRICT_OPTIONS_CC) \
 	$(SPEEX_CFLAGS)  \
 	$(GSM_CFLAGS)    \
-	$(STRICT_OPTIONS) \
 	$(LIBPULSE_CFLAGS) \
 	$(SPANDSP_CFLAGS)  \
 	$(MSSILK_CFLAGS) \
 	$(PCAP_CFLAGS) \
-	$(OPUS_CFLAGS) 
+	$(OPUS_CFLAGS) \
+	$(SRTP_CFLAGS) \
+	$(POLARSSL_CFLAGS)
 
 AM_CXXFLAGS=\
 	$(STRICT_OPTIONS) \
+	$(STRICT_OPTIONS_CXX) \
 	$(ORTP_CFLAGS)
 
 DEFS=@DEFS@  -DPACKAGE_PLUGINS_DIR=\"$(PACKAGE_PLUGINS_DIR)\" -DLOCALEDIR=\"$(localedir)\" -DMS2_INTERNAL
@@ -352,33 +406,29 @@ if BUILD_VIDEO
 AM_CFLAGS+=$(VIDEO_CFLAGS) $(GLEW_CFLAGS)
 endif
 
-
-libmediastreamer_voip_la_LIBADD=	libmediastreamer_base.la \
-					$(ORTP_LIBS) \
-					$(VP8_LIBS) \
-					$(PORTAUDIO_LIBS) \
-					$(ALSA_LIBS) \
-					$(QSA_LIBS) \
-					$(ARTS_LIBS) \
-					$(LIBPULSE_LIBS) \
-					$(SPEEX_LIBS) \
-					$(GSM_LIBS) \
-					$(LIBV4L1_LIBS) \
-					$(LIBV4L2_LIBS) \
-					$(SPANDSP_LIBS) \
-					$(PCAP_LIBS) \
-					$(OPUS_LIBS)
+if LIBBZRTP
+AM_CFLAGS+=$(LIBBZRTP_CFLAGS)
+endif
 
 if BUILD_WIN32
 libmediastreamer_voip_la_LIBADD+=       -lole32 \
-                                        -loleaut32\
-                                        -lwinmm \
-                                        -luuid
+										-loleaut32\
+										-lwinmm \
+										-luuid
 endif
 
 if BUILD_VP8
 AM_CFLAGS+=$(VP8_CFLAGS)
 libmediastreamer_voip_la_LIBADD+=$(VP8_LIBS)
+endif
+
+if BUILD_MATROSKA
+AM_CFLAGS+=				$(EBML_CFLAGS) \
+					$(MATROSKA_CFLAGS) \
+					-DHAVE_MATROSKA
+
+libmediastreamer_voip_la_LIBADD+=	$(MATROSKA_LIBS) \
+					$(EBML_LIBS)
 endif
 
 if BUILD_VIDEO
@@ -392,15 +442,13 @@ AM_CFLAGS+=$(LIBUPNP_CFLAGS) -D_GNU_SOURCE
 libmediastreamer_voip_la_LIBADD+=	$(LIBUPNP_LIBS)
 endif
 
-if BUILD_IOS 
+if BUILD_IOS
 libmediastreamer_voip_la_LDFLAGS+=	-framework CoreGraphics
 endif
 
 if BUILD_MACOSX
 libmediastreamer_voip_la_LDFLAGS+=	-framework Cocoa -framework OpenGL -framework QuartzCore
 endif
-
-
 
 AM_OBJCFLAGS=$(AM_CFLAGS)
 
@@ -409,7 +457,7 @@ imgdir=$(datadir)/images/
 img_DATA=voip/nowebcamCIF.jpg
 
 make_gitversion_h:
-	if test -d $(top_srcdir)/.git ; then \
+	if test -n "$(GITLOG)" ; then \
 		$(ECHO) -n "#define GIT_VERSION " > $(GITVERSION_FILE_TMP) &&\
 		$(ECHO) \"`cd $(top_srcdir) && git describe --always`\" >> $(GITVERSION_FILE_TMP) &&\
 		if test "`cat $(GITVERSION_FILE_TMP)`" != "`cat $(srcdir)/$(GITVERSION_FILE)`" ; then \
@@ -430,3 +478,7 @@ yuv2rgb.fs.h: yuv2rgb.fs
 yuv2rgb.vs.h: yuv2rgb.vs
 	cd $(abs_srcdir) && \
 	xxd -i yuv2rgb.vs | sed s/}\;/,0x00}\;/ > $(abs_builddir)/yuv2rgb.vs.h
+
+#because make bundle serahc in this dir
+install-data-local:
+	$(MKDIR_P) $(DESTDIR)$(libdir)/mediastreamer/plugins

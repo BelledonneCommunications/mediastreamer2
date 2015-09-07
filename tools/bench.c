@@ -18,9 +18,6 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
-#ifdef HAVE_CONFIG_H
-#include "mediastreamer-config.h"
-#endif
 
 #include "mediastreamer2/msticker.h"
 
@@ -40,11 +37,11 @@ static void stop(int signum){
 
 struct test_session {
 	RtpSession *rtps;
-	
+
 	MSFilter *fplayer;
 	MSFilter *encoder;
 	MSFilter *rtpsend;
-	
+
 	MSFilter *rtprecv;
 	MSFilter *decoder;
 	MSFilter *frecorder;
@@ -53,16 +50,16 @@ struct test_session {
 struct bench_config {
 	int num_session;
 	int num_session_record;
-	
+
 	int port_origin;
 	char *ip_destination;
 	int port_destination;
-	
+
 	int payload;
 	int rate;
 	int ptime;
 	char *wavfile;
-	
+
 	MSTicker *ticker;
 	MSList *tsessions; /* list of struct test_session */
 };
@@ -75,16 +72,16 @@ struct bench_config cfg[] = {
 		8000,"127.0.0.1",9000,8,8000,20,"test1.wav",NULL,NULL	},
 	{	NUM_SESSION,NUM_SESSION_RECORD,
 		9000,"127.0.0.1",8000,8,8000,20,"test1.wav",NULL,NULL	},
-	
+
 	{	NUM_SESSION,NUM_SESSION_RECORD,
 		10000,"127.0.0.1",11000,8,8000,20,"test1.wav",NULL,NULL	},
 	{	NUM_SESSION,NUM_SESSION_RECORD,
 		11000,"127.0.0.1",10000,8,8000,20,"test1.wav",NULL,NULL	},
-	
-	{	0,0,0,'\0',0,0,0,0,NULL,NULL,NULL	},
+
+	{	0,0,0,"",0,0,0,0,NULL,NULL,NULL	},
 };
 
-RtpSession *create_duplex_rtpsession(int locport){
+static RtpSession *create_duplex_rtpsession(int locport){
 	RtpSession *rtpr;
 	rtpr=rtp_session_new(RTP_SESSION_SENDRECV);
 	rtp_session_set_recv_buf_size(rtpr,MAX_RTP_SIZE);
@@ -93,12 +90,12 @@ RtpSession *create_duplex_rtpsession(int locport){
 	rtp_session_enable_adaptive_jitter_compensation(rtpr,FALSE);
 	rtp_session_set_symmetric_rtp(rtpr,TRUE);
 	rtp_session_set_local_addr(rtpr,"0.0.0.0",locport,locport+1);
-	rtp_session_signal_connect(rtpr,"timestamp_jump",(RtpCallback)rtp_session_resync,(long)NULL);
-	rtp_session_signal_connect(rtpr,"ssrc_changed",(RtpCallback)rtp_session_resync,(long)NULL);
+	rtp_session_signal_connect(rtpr,"timestamp_jump",(RtpCallback)rtp_session_resync,NULL);
+	rtp_session_signal_connect(rtpr,"ssrc_changed",(RtpCallback)rtp_session_resync,NULL);
 	return rtpr;
 }
 
-int init_bench(struct bench_config *bench)
+static int init_bench(struct bench_config *bench)
 {
 	PayloadType *pt;
 	int pos;
@@ -121,7 +118,7 @@ int init_bench(struct bench_config *bench)
 		{
 			struct test_session *ts = (struct test_session *)ortp_malloc(sizeof(struct test_session));
 			memset(ts, 0, sizeof(struct test_session));
-			
+
 			ts->rtps = create_duplex_rtpsession(bench->port_origin+pos*2);
 			if (ts->rtps==NULL)
 				{
@@ -129,29 +126,29 @@ int init_bench(struct bench_config *bench)
 					ortp_free(ts);
 					return count;
 				}
-			
+
 			rtp_session_set_payload_type(ts->rtps,bench->payload);
 			rtp_session_set_remote_addr_full(ts->rtps,
 											 bench->ip_destination,
 											 bench->port_destination+pos*2,
 											 bench->ip_destination,
 											 bench->port_destination+1+pos*2);
-			
+
 			ts->fplayer = ms_filter_new(MS_FILE_PLAYER_ID);
 			if (strstr(bench->wavfile, ".au")==NULL)
 				ts->encoder = ms_filter_create_encoder(pt->mime_type);
 			ts->rtpsend = ms_filter_new(MS_RTP_SEND_ID);
-			
+
 			ts->rtprecv = ms_filter_new(MS_RTP_RECV_ID);
 			ts->decoder = ms_filter_create_decoder(pt->mime_type);
 			ts->frecorder = ms_filter_new(MS_FILE_REC_ID);
-			
+
 			if ((ts->encoder==NULL && strstr(bench->wavfile, ".au")==NULL)
 				|| (ts->decoder==NULL )){
 				ms_error("bench.c: No decoder available for payload %i.",bench->payload);
 				if (ts->fplayer) ms_filter_destroy(ts->fplayer);
 				if (ts->encoder) ms_filter_destroy(ts->encoder);
-				if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);				
+				if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);
 				if (ts->rtprecv) ms_filter_destroy(ts->rtprecv);
 				if (ts->decoder) ms_filter_destroy(ts->decoder);
 				if (ts->frecorder) ms_filter_destroy(ts->frecorder);
@@ -162,7 +159,7 @@ int init_bench(struct bench_config *bench)
 				ms_error("bench.c: missing player filter.");
 				if (ts->fplayer) ms_filter_destroy(ts->fplayer);
 				if (ts->encoder) ms_filter_destroy(ts->encoder);
-				if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);				
+				if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);
 				if (ts->rtprecv) ms_filter_destroy(ts->rtprecv);
 				if (ts->decoder) ms_filter_destroy(ts->decoder);
 				if (ts->frecorder) ms_filter_destroy(ts->frecorder);
@@ -173,7 +170,7 @@ int init_bench(struct bench_config *bench)
 				ms_error("bench.c: missing recorder filter.");
 				if (ts->fplayer) ms_filter_destroy(ts->fplayer);
 				if (ts->encoder) ms_filter_destroy(ts->encoder);
-				if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);				
+				if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);
 				if (ts->rtprecv) ms_filter_destroy(ts->rtprecv);
 				if (ts->decoder) ms_filter_destroy(ts->decoder);
 				if (ts->frecorder) ms_filter_destroy(ts->frecorder);
@@ -184,7 +181,7 @@ int init_bench(struct bench_config *bench)
 				ms_error("bench.c: missing rtpsend filter.");
 				if (ts->fplayer) ms_filter_destroy(ts->fplayer);
 				if (ts->encoder) ms_filter_destroy(ts->encoder);
-				if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);				
+				if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);
 				if (ts->rtprecv) ms_filter_destroy(ts->rtprecv);
 				if (ts->decoder) ms_filter_destroy(ts->decoder);
 				if (ts->frecorder) ms_filter_destroy(ts->frecorder);
@@ -195,37 +192,37 @@ int init_bench(struct bench_config *bench)
 				ms_error("bench.c: missing rtprecv filter.");
 				if (ts->fplayer) ms_filter_destroy(ts->fplayer);
 				if (ts->encoder) ms_filter_destroy(ts->encoder);
-				if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);				
+				if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);
 				if (ts->rtprecv) ms_filter_destroy(ts->rtprecv);
 				if (ts->decoder) ms_filter_destroy(ts->decoder);
 				if (ts->frecorder) ms_filter_destroy(ts->frecorder);
 				ortp_free(ts);
 				return count;
 			}
-			
+
 			ms_filter_call_method(ts->rtpsend,MS_RTP_SEND_SET_SESSION,ts->rtps);
 			ms_filter_call_method(ts->rtprecv,MS_RTP_RECV_SET_SESSION,ts->rtps);
-			
+
 			ms_filter_call_method (ts->rtprecv, MS_FILTER_SET_SAMPLE_RATE,
 								   &pt->clock_rate);
-			
+
 			ms_filter_call_method (ts->frecorder, MS_FILTER_SET_SAMPLE_RATE,
 								   &pt->clock_rate);
-			
+
 			val = ms_filter_call_method(ts->fplayer,MS_FILE_PLAYER_OPEN,(void*)bench->wavfile);
 			if (val!=0)
 				{
 					ms_error("bench.c: Cannot open wav file (%s)", bench->wavfile);
 					if (ts->fplayer) ms_filter_destroy(ts->fplayer);
 					if (ts->encoder) ms_filter_destroy(ts->encoder);
-					if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);				
+					if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);
 					if (ts->rtprecv) ms_filter_destroy(ts->rtprecv);
 					if (ts->decoder) ms_filter_destroy(ts->decoder);
 					if (ts->frecorder) ms_filter_destroy(ts->frecorder);
 					ortp_free(ts);
 					return count;
 				}
-			
+
 			val=0;
 			ms_filter_call_method (ts->fplayer, MS_FILTER_GET_SAMPLE_RATE,
 								   &val);
@@ -235,7 +232,7 @@ int init_bench(struct bench_config *bench)
 							 pt->clock_rate, val);
 					if (ts->fplayer) ms_filter_destroy(ts->fplayer);
 					if (ts->encoder) ms_filter_destroy(ts->encoder);
-					if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);				
+					if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);
 					if (ts->rtprecv) ms_filter_destroy(ts->rtprecv);
 					if (ts->decoder) ms_filter_destroy(ts->decoder);
 					if (ts->frecorder) ms_filter_destroy(ts->frecorder);
@@ -244,14 +241,14 @@ int init_bench(struct bench_config *bench)
 				}
 			ms_filter_call_method (ts->fplayer, MS_FILTER_GET_NCHANNELS,
 								   &val);
-			
+
 			if (val!=1)
 				{
 					ms_error("bench.c: unsupported number of channel for wav file: codec=1 / file=%i",
 							 val);
 					if (ts->fplayer) ms_filter_destroy(ts->fplayer);
 					if (ts->encoder) ms_filter_destroy(ts->encoder);
-					if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);				
+					if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);
 					if (ts->rtprecv) ms_filter_destroy(ts->rtprecv);
 					if (ts->decoder) ms_filter_destroy(ts->decoder);
 					if (ts->frecorder) ms_filter_destroy(ts->frecorder);
@@ -259,7 +256,7 @@ int init_bench(struct bench_config *bench)
 					return count;
 				}
 			ms_filter_call_method_noarg(ts->fplayer,MS_FILE_PLAYER_START);
-			
+
 			if (strstr(bench->wavfile, ".au")==NULL)
 				{
 					ms_filter_link(ts->fplayer,0,ts->encoder,0);
@@ -269,13 +266,13 @@ int init_bench(struct bench_config *bench)
 				{
 					ms_filter_link(ts->fplayer,0,ts->rtpsend,0);
 				}
-			
+
 			ms_filter_link(ts->rtprecv,0,ts->decoder,0);
 			ms_filter_link(ts->decoder,0,ts->frecorder,0);
-			
+
 			ms_ticker_attach(bench->ticker,ts->fplayer);
 			ms_ticker_attach(bench->ticker,ts->rtprecv);
-			
+
 			if (pos < bench->num_session_record)
 			{
 				char rec_file[128];
@@ -285,7 +282,7 @@ int init_bench(struct bench_config *bench)
 				ms_filter_call_method(ts->frecorder,MS_FILE_REC_OPEN,(void*)rec_file);
 				ms_filter_call_method_noarg(ts->frecorder,MS_FILE_REC_START);
 			}
-			
+
 			bench->tsessions = ms_list_append(bench->tsessions, (void*)ts);
 			count++;
 		}
@@ -302,9 +299,9 @@ static int uninit_bench(struct bench_config *bench)
 
 		ms_ticker_detach(bench->ticker,ts->fplayer);
 		ms_ticker_detach(bench->ticker,ts->rtprecv);
-		
+
 		ms_filter_call_method_noarg(ts->frecorder,MS_FILE_REC_CLOSE);
-		
+
 		if (strstr(bench->wavfile, ".au")==NULL)
 			{
 				ms_filter_unlink(ts->fplayer,0,ts->encoder,0);
@@ -314,21 +311,21 @@ static int uninit_bench(struct bench_config *bench)
 			{
 				ms_filter_unlink(ts->fplayer,0,ts->rtpsend,0);
 			}
-		
+
 		ms_filter_unlink(ts->rtprecv,0,ts->decoder,0);
 		ms_filter_unlink(ts->decoder,0,ts->frecorder,0);
-			
+
 		if (ts->fplayer) ms_filter_destroy(ts->fplayer);
 		if (ts->encoder) ms_filter_destroy(ts->encoder);
 		if (ts->rtpsend) ms_filter_destroy(ts->rtpsend);
-		
+
 		if (ts->rtprecv) ms_filter_destroy(ts->rtprecv);
 		if (ts->decoder) ms_filter_destroy(ts->decoder);
 		if (ts->frecorder) ms_filter_destroy(ts->frecorder);
 
 		ortp_free(ts);
 	}
-	
+
 	ms_ticker_destroy(bench->ticker);
 	return 0;
 }
@@ -344,7 +341,7 @@ int main(int argc, char *argv[]){
 	rtp_profile_set_payload(&av_profile,110,&payload_type_speex_nb);
 	rtp_profile_set_payload(&av_profile,111,&payload_type_speex_wb);
 	rtp_profile_set_payload(&av_profile,112,&payload_type_ilbc);
-	
+
 	signal(SIGINT,stop);
 
 	count=0;
@@ -355,7 +352,7 @@ int main(int argc, char *argv[]){
 		}
 
 	ms_message("Number of session started: %i.", count);
-	
+
 	while(run)
 		ms_sleep(1);
 

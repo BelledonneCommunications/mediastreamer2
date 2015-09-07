@@ -24,6 +24,12 @@ import android.media.AudioManager;
 import android.os.Build;
 
 public class MediastreamerAndroidContext {
+	private static final int DEVICE_CHOICE = 0; // The device has the API to tell us it as or not a builtin AEC and we can trust it
+	private static final int DEVICE_HAS_BUILTIN_AEC  = 1; // Says the device has a builtin AEC because the API that would tell us that isn't available
+	private static final int DEVICE_HAS_BUILTIN_AEC_CRAPPY = 2; // The device has the API to tell us it has a builtin AEC but we shouldn't trust it (so we'll use software AEC)
+	private static final int DEVICE_USE_ANDROID_MIC = 4;
+	private static final int DEVICE_HAS_BUILTIN_OPENSLES_AEC = 8; // The device has a builtin AEC and it is working with OpenSLES (which is uncommon)
+	
 	private native void setDeviceFavoriteSampleRate(int samplerate);
 	private native void setDeviceFavoriteBufferSize(int bufferSize);
 	private native void addSoundDeviceDescription(String manufacturer, String model, String platform, int flags, int delay, int recommended_rate);
@@ -77,5 +83,25 @@ public class MediastreamerAndroidContext {
 			Log.e("Can't parse " + value + " to integer ; using default value " + defaultValue);
 		}
 		return returnedValue;
+	}
+	native private int enableFilterFromNameImpl(String name,boolean enable);
+	native private boolean filterFromNameEnabledImpl(String name);
+	/**
+	 * Specifies if a filter is enabled or not.
+	 * @param name   A name for the filter. refer to ms2 internals to get list of filters
+	 * @param enable, true/false
+	 * @throw MediastreamException if filter name is unknown
+	 * */
+	public static void enableFilterFromName(String name,boolean enable) throws MediastreamException {
+		if (getInstance().enableFilterFromNameImpl(name,enable) != 0)
+			throw new MediastreamException("Cannot "+(enable?"enable":"disable") + " filter  name ["+name+"]");
+	}
+	/**
+	 * Specifies if a filter is enabled or not.
+	 * @param name   A name for the filter. refer to ms2 internals to get list of filters
+	 * @return enable, true/false
+	 ** */
+	public static boolean filterFromNameEnabled(String name) {
+		return getInstance().filterFromNameEnabledImpl(name);
 	}
 }
