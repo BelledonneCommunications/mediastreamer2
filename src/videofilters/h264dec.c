@@ -46,7 +46,7 @@ typedef struct _DecData{
 	bool_t avpf_enabled;
 }DecData;
 
-static void ffmpeg_init(){
+static void ffmpeg_init(void){
 	static bool_t done=FALSE;
 	if (!done){
 		avcodec_register_all();
@@ -132,7 +132,7 @@ static mblk_t *get_as_yuvmsg(MSFilter *f, DecData *s, AVFrame *orig){
 		s->vsize.width=ctx->width;
 		s->vsize.height=ctx->height;
 		s->sws_ctx=sws_getContext(ctx->width,ctx->height,ctx->pix_fmt,
-			ctx->width,ctx->height,PIX_FMT_YUV420P,SWS_FAST_BILINEAR,
+			ctx->width,ctx->height,AV_PIX_FMT_YUV420P,SWS_FAST_BILINEAR,
                 	NULL, NULL, NULL);
 		ms_filter_notify_no_arg(f,MS_FILTER_OUTPUT_FMT_CHANGED);
 	}
@@ -448,5 +448,9 @@ MSFilterDesc ms_h264_dec_desc={
 
 #endif
 
-MS_FILTER_DESC_EXPORT(ms_h264_dec_desc)
-
+void __register_ffmpeg_h264_decoder_if_possible(MSFactory *obj) {
+	ms_ffmpeg_check_init();
+	if (avcodec_find_decoder(CODEC_ID_H264) && HAVE_NON_FREE_CODECS) {
+		ms_factory_register_filter(obj, &ms_h264_dec_desc);
+	}
+}

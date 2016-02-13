@@ -1,5 +1,5 @@
 dnl Process this file with autoconf to produce a configure script.
-AC_INIT([mediastreamer],[2.11.2])
+AC_INIT([mediastreamer],[2.13.0])
 
 AC_MSG_NOTICE([$PACKAGE_NAME-$PACKAGE_VERSION		A mediastreaming library for telephony application.])
 AC_MSG_NOTICE([licensed under the terms of the General Public License (GPL)])
@@ -16,7 +16,7 @@ MEDIASTREAMER_MINOR_VERSION=$(echo $PACKAGE_VERSION | cut -d. -f2)
 MEDIASTREAMER_MICRO_VERSION=$(echo $PACKAGE_VERSION | cut -d. -f3)
 MEDIASTREAMER_EXTRA_VERSION=$(echo $PACKAGE_VERSION | cut -d. -f4)
 
-LIBMEDIASTREAMER_SO_CURRENT=5 dnl increment this number when you add/change/remove an interface
+LIBMEDIASTREAMER_SO_CURRENT=6 dnl increment this number when you add/change/remove an interface
 LIBMEDIASTREAMER_SO_REVISION=0 dnl increment this number when you change source code, without changing interfaces; set to 0 when incrementing CURRENT
 LIBMEDIASTREAMER_SO_AGE=0 dnl increment this number when you add an interface, set to 0 if you remove an interface
 
@@ -57,7 +57,7 @@ AC_ARG_ENABLE(strict,
 )
 
 STRICT_OPTIONS="-Wall -Wuninitialized"
-STRICT_OPTIONS_CC="-Wdeclaration-after-statement "
+STRICT_OPTIONS_CC="-Wdeclaration-after-statement -Wstrict-prototypes"
 STRICT_OPTIONS_CXX=""
 
 #for clang
@@ -82,7 +82,7 @@ case "$target_os" in
 esac
 
 if test "$strictness" = "yes" ; then
-	STRICT_OPTIONS="$STRICT_OPTIONS -Werror"
+	STRICT_OPTIONS="$STRICT_OPTIONS -Werror -Wno-error=strict-prototypes"
 	CFLAGS="$CFLAGS -fno-strict-aliasing"
 fi
 AC_SUBST(STRICT_OPTIONS)
@@ -763,6 +763,10 @@ AM_CONDITIONAL(BUILD_SDL,test "$sdl_found" = "true" )
 AM_CONDITIONAL(BUILD_X11_XV, test "$enable_xv" = "true" )
 AM_CONDITIONAL(BUILD_X11_GL, test "$enable_glx" = "true" )
 AM_CONDITIONAL(BUILD_UPNP, test "$build_upnp" = "true" )
+
+if test "$build_vp8" != "false" ; then
+	AC_DEFINE(HAVE_VPX, 1, [Tells whether vpx can be used])
+fi
 
 dnl	*********************************************
 dnl	Enable/disable oRTP dependency

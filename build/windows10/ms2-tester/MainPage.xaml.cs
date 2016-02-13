@@ -37,9 +37,15 @@ namespace ms2_tester
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            MS2Tester.Instance.setWritableDirectory(ApplicationData.Current.LocalFolder);
-            _suites = UnitTestDataSource.GetSuites(MS2Tester.Instance);
-            TryAutoLaunch();
+            if ((e.Parameter is Uri) && (e.Parameter.ToString().Equals("ms2-tester:autolaunch")))
+            {
+                AutoLaunch();
+            }
+            else
+            {
+                MS2Tester.Instance.initialize(ApplicationData.Current.LocalFolder, true);
+                _suites = UnitTestDataSource.GetSuites(MS2Tester.Instance);
+            }
         }
 
         public IEnumerable<UnitTestSuite> Suites
@@ -173,24 +179,20 @@ namespace ms2_tester
             });
         }
 
-        private async void TryAutoLaunch()
+        private void AutoLaunch()
         {
-            try
+            CommandBar.IsEnabled = false;
+            ProgressIndicator.IsIndeterminate = true;
+            ProgressIndicator.IsEnabled = true;
+            MS2Tester.Instance.initialize(ApplicationData.Current.LocalFolder, false);
+            MS2Tester.Instance.runAllToXml();
+            if (MS2Tester.Instance.AsyncAction != null)
             {
-                await ApplicationData.Current.LocalFolder.GetFileAsync("autolaunch");
-                CommandBar.IsEnabled = false;
-                ProgressIndicator.IsIndeterminate = true;
-                ProgressIndicator.IsEnabled = true;
-                MS2Tester.Instance.runAllToXml();
-                if (MS2Tester.Instance.AsyncAction != null)
+                MS2Tester.Instance.AsyncAction.Completed += (asyncInfo, asyncStatus) =>
                 {
-                    MS2Tester.Instance.AsyncAction.Completed += (asyncInfo, asyncStatus) =>
-                    {
-                        App.Current.Exit();
-                    };
-                }
+                    App.Current.Exit();
+                };
             }
-            catch (Exception) { }
         }
 
         private UnitTestCase RunningTestCase;

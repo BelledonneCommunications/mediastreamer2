@@ -28,14 +28,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "mediastreamer2_tester_private.h"
 #include "private.h"
 
-static int basic_audio_tester_init(void) {
+static int basic_audio_tester_before_all(void) {
 	ms_init();
 	ms_filter_enable_statistics(TRUE);
 	ortp_init();
 	return 0;
 }
 
-static int basic_audio_tester_cleanup(void) {
+static int basic_audio_tester_after_all(void) {
 	ms_exit();
 	return 0;
 }
@@ -135,7 +135,7 @@ static void dtmfgen_enc_dec_tonedet_pcmu(void) {
 	dtmfgen_enc_dec_tonedet("pcmu", 8000, 1);
 }
 
-static void dtmfgen_enc_dec_tonedet_isac() {
+static void dtmfgen_enc_dec_tonedet_isac(void) {
 	bool_t supported = ms_filter_codec_supported("iSAC");
 	if( supported ) {
 		dtmfgen_enc_dec_tonedet("iSAC", 16000, 1);
@@ -268,8 +268,10 @@ test_t basic_audio_tests[] = {
 
 test_suite_t basic_audio_test_suite = {
 	"Basic Audio",
-	basic_audio_tester_init,
-	basic_audio_tester_cleanup,
+	basic_audio_tester_before_all,
+	basic_audio_tester_after_all,
+	NULL,
+	NULL,
 	sizeof(basic_audio_tests) / sizeof(basic_audio_tests[0]),
 	basic_audio_tests
 };

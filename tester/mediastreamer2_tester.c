@@ -60,10 +60,25 @@ void mediastreamer2_tester_init(void(*ftester_printf)(int level, const char *fmt
 #ifdef __ARM_NEON__
 	bc_tester_add_suite(&neon_test_suite);
 #endif
+	bc_tester_add_suite(&text_stream_test_suite);
 }
 
 void mediastreamer2_tester_uninit(void) {
 	bc_tester_uninit();
+}
+
+int mediastreamer2_tester_set_log_file(const char *filename) {
+	if (log_file) {
+		fclose(log_file);
+	}
+	log_file = fopen(filename, "w");
+	if (!log_file) {
+		ms_error("Cannot open file [%s] for writing logs because [%s]", filename, strerror(errno));
+		return -1;
+	}
+	ms_message("Redirecting traces to file [%s]", filename);
+	ortp_set_log_file(log_file);
+	return 0;
 }
 
 static const char* mediastreamer2_helper =
@@ -89,14 +104,15 @@ int main (int argc, char *argv[]) {
 
 	mediastreamer2_tester_init(NULL);
 
+	// this allows to launch tester from outside of tester directory
 	if (strstr(argv[0], ".libs")) {
-		char res_dir[128] = {0};
-		// this allows to launch liblinphone_tester from outside of tester directory
-		strncpy(res_dir, argv[0], strstr(argv[0], ".libs")-argv[0]);
-		bc_tester_set_resource_dir_prefix(res_dir);
-		bc_tester_set_writable_dir_prefix(res_dir);
+		int prefix_length = strstr(argv[0], ".libs") - argv[0] + 1;
+		char *prefix = ms_strdup_printf("%s%.*s", argv[0][0] == '/' ? "" : "./", prefix_length, argv[0]);
+		ms_warning("Resource prefix set to %s", prefix);
+		bc_tester_set_resource_dir_prefix(prefix);
+		bc_tester_set_writable_dir_prefix(prefix);
+		ms_free(prefix);
 	}
-
 	for(i = 1; i < argc; ++i) {
 		if (strcmp(argv[i], "--verbose") == 0) {
 			ortp_set_log_level_mask(ORTP_MESSAGE|ORTP_WARNING|ORTP_ERROR|ORTP_FATAL);
@@ -104,14 +120,7 @@ int main (int argc, char *argv[]) {
 			ortp_set_log_level_mask(ORTP_FATAL);
 		} else if (strcmp(argv[i],"--log-file")==0){
 			CHECK_ARG("--log-file", ++i, argc);
-			log_file=fopen(argv[i],"w");
-			if (!log_file) {
-				ms_error("Cannot open file [%s] for writing logs because [%s]",argv[i],strerror(errno));
-				return -2;
-			} else {
-				ms_message("Redirecting traces to file [%s]",argv[i]);
-				ortp_set_log_file(log_file);
-			}
+			if (mediastreamer2_tester_set_log_file(argv[i]) < 0) return -2;
 		} else {
 			int ret = bc_tester_parse_args(argc, argv, i);
 			if (ret>0) {
@@ -124,7 +133,7 @@ int main (int argc, char *argv[]) {
 		}
 	}
 
-	ret = bc_tester_start();
+	ret = bc_tester_start(argv[0]);
 	mediastreamer2_tester_uninit();
 	return ret;
 

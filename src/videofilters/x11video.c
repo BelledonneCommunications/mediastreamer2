@@ -74,7 +74,7 @@ typedef struct X11Video
 
 
 
-static Display *init_display(){
+static Display *init_display(void){
 	const char *display;
 	Display *ret;
 	display=getenv("DISPLAY");
@@ -173,7 +173,7 @@ static void x11video_prepare(MSFilter *f){
 	XvPortID port=-1;
 	int imgfmt_id=0;
 	XShmSegmentInfo *shminfo=&s->shminfo;
-	XWindowAttributes wa;
+	XWindowAttributes wa = {0};
 
 	if (s->display==NULL) return;
 	if (s->window_id==0){

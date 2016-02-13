@@ -102,7 +102,7 @@ struct opengles_display {
 	float zoom_cy;
 };
 
-struct opengles_display* ogl_display_new() {
+struct opengles_display* ogl_display_new(void) {
 	struct opengles_display* result =
 		(struct opengles_display*) malloc(sizeof(struct opengles_display));
 	if (result == 0) {
@@ -129,7 +129,7 @@ void ogl_display_free(struct opengles_display* gldisp) {
 
 	for(i=0; i<MAX_IMAGE; i++) {
 		if (gldisp->yuv[i]) {
-			ms_free(gldisp->yuv[i]);
+			freemsg(gldisp->yuv[i]);
 			gldisp->yuv[i] = NULL;
 		}
 	}
@@ -202,7 +202,7 @@ void ogl_display_uninit(struct opengles_display* gldisp, bool_t freeGLresources)
 	ms_message("uninit opengles_display (gl initialized:%d)\n", gldisp->glResourcesInitialized);
 	for(i=0; i<MAX_IMAGE; i++) {
 		if (gldisp->yuv[i]) {
-			ms_free(gldisp->yuv[i]);
+			freemsg(gldisp->yuv[i]);
 			gldisp->yuv[i] = NULL;
 		}
 	}

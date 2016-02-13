@@ -21,12 +21,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "mediastreamer2/msmediaplayer.h"
 #include "mediastreamer2/mediastream.h"
 
-static int tester_init() {
+static int tester_before_all(void) {
 	ms_init();
 	return 0;
 }
 
-static int tester_cleanup() {
+static int tester_after_all(void) {
 	ms_exit();
 	return 0;
 }
@@ -164,6 +164,10 @@ static void play_sintel_trailer_opus_h264_mkv(void) {
 	play_root_file("sounds/sintel_trailer_opus_h264.mkv", !ms_media_player_matroska_supported(), FALSE, FALSE);
 }
 
+static void play_sintel_trailer_opus_vp8_mkv(void) {
+	play_root_file("sounds/sintel_trailer_opus_vp8.mkv", !ms_media_player_matroska_supported(), FALSE, FALSE);
+}
+
 static void seeking_test(void) {
 	play_root_file("sounds/sintel_trailer_opus_h264.mkv", !ms_media_player_matroska_supported(), TRUE, FALSE);
 }
@@ -179,14 +183,17 @@ static test_t tests[] = {
 	{	"Play hello_opus.mka"                ,	play_hello_opus_mka                },
 	{	"Play sintel_trailer_pcmu_h264.mkv"  ,	play_sintel_trailer_pcmu_h264_mkv  },
 	{	"Play sintel_trailer_opus_h264.mkv"  ,	play_sintel_trailer_opus_h264_mkv  },
+	{	"Play sintel_trailer_opus_vp8.mkv"   ,	play_sintel_trailer_opus_vp8_mkv   },
 	{	"Seeking"                            ,	seeking_test                       },
 	{	"Playing twice"                      ,	playing_twice_test                 }
 };
 
 test_suite_t player_test_suite = {
 	"Player",
-	tester_init,
-	tester_cleanup,
+	tester_before_all,
+	tester_after_all,
+	NULL,
+	NULL,
 	sizeof(tests)/sizeof(test_t),
 	tests
 };

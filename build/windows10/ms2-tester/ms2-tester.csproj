@@ -115,6 +115,8 @@
     <None Include="ms2-tester_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Assets\StoreLogo.png" />
+    <Content Include="Assets\WideLogo.png" />
     <Content Include="Properties\Default.rd.xml" />
     <Content Include="Assets\Images\nowebcamCIF.jpg" />
     <Content Include="Assets\Logo.png" />
@@ -136,7 +138,6 @@
     <Content Include="Assets\Sounds\sintel_trailer_opus_h264.mkv" />
     <Content Include="Assets\Sounds\sintel_trailer_pcmu_h264.mkv" />
     <Content Include="Assets\SplashScreen.png" />
-    <Content Include="Assets\WideLogo.scale-100.png" />
   </ItemGroup>
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml">
@@ -158,12 +159,14 @@
       <Name>ms2-tester-runtime-component</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>
   </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
   <PropertyGroup>
-    <PreBuildEvent>XCopy /I /Y $(ProjectDir)..\..\..\tester\sounds $(ProjectDir)Assets\Sounds
+    <PreBuildEvent>XCopy /I /Y $(ProjectDir)..\..\..\tester\common\bc_completion $(ProjectDir)Assets\common
+XCopy /I /Y $(ProjectDir)..\..\..\tester\sounds $(ProjectDir)Assets\Sounds
 XCopy /I /Y $(ProjectDir)..\..\..\src\voip\*.jpg $(ProjectDir)Assets\Images</PreBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

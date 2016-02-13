@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "mediastreamer2/msitc.h"
 #include "mediastreamer2/zrtp.h"
 #include "mediastreamer2/msvideopresets.h"
+#include "mediastreamer2/mseventqueue.h"
 #include "private.h"
 
 
@@ -134,18 +135,26 @@ static void video_stream_process_rtcp(MediaStream *media_stream, mblk_t *m){
 					for (i = 0; ; i++) {
 						rtcp_fb_fir_fci_t *fci = rtcp_PSFB_fir_get_fci(m, i);
 						if (fci == NULL) break;
-						if (rtcp_fb_fir_fci_get_ssrc(fci) == rtp_session_get_send_ssrc(stream->ms.sessions.rtp_session)) {
+						if (rtcp_fb_fir_fci_get_ssrc(fci) == rtp_session_get_recv_ssrc(stream->ms.sessions.rtp_session)) {
 							uint8_t seq_nr = rtcp_fb_fir_fci_get_seq_nr(fci);
 							ms_filter_call_method(stream->ms.encoder, MS_VIDEO_ENCODER_NOTIFY_FIR, &seq_nr);
+                            stream->ms_video_stat.counter_rcvd_fir++;
+                            ms_message("video_stream_process_rtcp stream [%p] FIR count %d", stream,  stream->ms_video_stat.counter_rcvd_fir);
+
 							break;
 						}
 					}
 					break;
 				case RTCP_PSFB_PLI:
+                    
+                    stream->ms_video_stat.counter_rcvd_pli++;
 					ms_filter_call_method_noarg(stream->ms.encoder, MS_VIDEO_ENCODER_NOTIFY_PLI);
+                    ms_message("video_stream_process_rtcp stream [%p] PLI count %d", stream,  stream->ms_video_stat.counter_rcvd_pli);
+                    
 					break;
 				case RTCP_PSFB_SLI:
 					for (i = 0; ; i++) {
+                       
 						rtcp_fb_sli_fci_t *fci = rtcp_PSFB_sli_get_fci(m, i);
 						MSVideoCodecSLI sli;
 						if (fci == NULL) break;
@@ -153,6 +162,9 @@ static void video_stream_process_rtcp(MediaStream *media_stream, mblk_t *m){
 						sli.number = rtcp_fb_sli_fci_get_number(fci);
 						sli.picture_id = rtcp_fb_sli_fci_get_picture_id(fci);
 						ms_filter_call_method(stream->ms.encoder, MS_VIDEO_ENCODER_NOTIFY_SLI, &sli);
+                        stream->ms_video_stat.counter_rcvd_sli++;
+                        ms_message("video_stream_process_rtcp stream [%p] SLI count %d", stream,  stream->ms_video_stat.counter_rcvd_sli);
+                       
 					}
 					break;
 				case RTCP_PSFB_RPSI:
@@ -162,6 +174,8 @@ static void video_stream_process_rtcp(MediaStream *media_stream, mblk_t *m){
 					rpsi.bit_string = rtcp_fb_rpsi_fci_get_bit_string(fci);
 					rpsi.bit_string_len = rtcp_PSFB_rpsi_get_fci_bit_string_len(m);
 					ms_filter_call_method(stream->ms.encoder, MS_VIDEO_ENCODER_NOTIFY_RPSI, &rpsi);
+                    stream->ms_video_stat.counter_rcvd_rpsi++;
+                    ms_message("video_stream_process_rtcp stream [%p] RPSI count %d", stream,  stream->ms_video_stat.counter_rcvd_rpsi);
 				}
 					break;
 				default:
@@ -216,7 +230,11 @@ void video_stream_iterate(VideoStream *stream){
 }
 
 const char *video_stream_get_default_video_renderer(void){
-#ifdef _WIN32
+#if defined(MS2_WINDOWS_UNIVERSAL)
+	return "MSWinRTDis";
+#elif defined(MS2_WINDOWS_PHONE)
+	return "MSWP8Dis";
+#elif defined(MS2_WINDOWS_DESKTOP)
 	return "MSDrawDibDisplay";
 #elif defined(ANDROID)
 	return "MSAndroidDisplay";
@@ -228,6 +246,8 @@ const char *video_stream_get_default_video_renderer(void){
 	return "MSGLXVideo";
 #elif defined(__ios)
 	return "IOSDisplay";
+#elif defined(__QNX__)
+	return "MSBB10Display";
 #else
 	return "MSVideoOut";
 #endif
@@ -261,6 +281,7 @@ VideoStream *video_stream_new2(const char* ip, int loc_rtp_port, int loc_rtcp_po
 	return obj;
 }
 
+
 VideoStream *video_stream_new_with_sessions(const MSMediaStreamSessions *sessions){
 	VideoStream *stream = (VideoStream *)ms_new0 (VideoStream, 1);
 	const OrtpRtcpXrMediaCallbacks rtcp_xr_media_cbs = {
@@ -274,7 +295,7 @@ VideoStream *video_stream_new_with_sessions(const MSMediaStreamSessions *session
 
 	stream->ms.type = MSVideo;
 	stream->ms.sessions=*sessions;
-	media_stream_init(&stream->ms);
+	media_stream_init(&stream->ms, ms_factory_get_fallback());
 
 	if (sessions->zrtp_context != NULL) {
 		ms_zrtp_set_stream_sessions(sessions->zrtp_context, &(stream->ms.sessions));
@@ -299,7 +320,7 @@ VideoStream *video_stream_new_with_sessions(const MSMediaStreamSessions *session
 	/*
 	 * In practice, these filters are needed only for audio+video recording.
 	 */
-	if (ms_factory_lookup_filter_by_id(ms_factory_get_fallback(), MS_MKV_RECORDER_ID)){
+	if (ms_factory_lookup_filter_by_id(stream->ms.factory, MS_MKV_RECORDER_ID)){
 		stream->tee3=ms_filter_new(MS_TEE_ID);
 		stream->recorder_output=ms_filter_new(MS_ITC_SINK_ID);
 	}
@@ -468,7 +489,7 @@ static void configure_video_source(VideoStream *stream){
 			MSVideoSize vsize={640,480};
 			ms_error("Player does not give its format correctly [%s]",ms_fmt_descriptor_to_string(pf.fmt));
 			/*put a default format as the error handling is complicated here*/
-			pf.fmt=ms_factory_get_video_format(ms_factory_get_fallback(),"VP8",vsize,0,NULL);
+			pf.fmt=ms_factory_get_video_format(stream->ms.factory,"VP8",vsize,0,NULL);
 		}
 		cam_vsize=pf.fmt->vsize;
 	}else{
@@ -580,7 +601,7 @@ static void configure_recorder_output(VideoStream *stream){
 				tmp.encoding=pt->mime_type;
 				tmp.rate=pt->clock_rate;
 				pinfmt.pin=0;
-				pinfmt.fmt=ms_factory_get_format(ms_factory_get_fallback(),&tmp);
+				pinfmt.fmt=ms_factory_get_format(stream->ms.factory,&tmp);
 				ms_filter_call_method(stream->recorder_output,MS_FILTER_SET_INPUT_FMT,&pinfmt);
 				ms_message("configure_itc(): format set to %s",ms_fmt_descriptor_to_string(pinfmt.fmt));
 			}
@@ -659,13 +680,15 @@ int video_stream_start (VideoStream *stream, RtpProfile *profile, const char *re
 	return video_stream_start_from_io(stream, profile, rem_rtp_ip, rem_rtp_port, rem_rtcp_ip, rem_rtcp_port, payload, &io);
 }
 
-static void recorder_handle_event(void *userdata, MSFilter *recorder, unsigned int event, void *event_arg){
+void video_recorder_handle_event(void *userdata, MSFilter *recorder, unsigned int event, void *event_arg){
 	VideoStream *stream = (VideoStream*) userdata;
 	switch (event){
 		case MS_RECORDER_NEEDS_FIR:
 			ms_message("Request sending of FIR on videostream [%p]", stream);
 			video_stream_send_fir(stream);
-		break;
+			break;
+		default:
+			break;
 	}
 }
 
@@ -728,7 +751,7 @@ int video_stream_start_from_io(VideoStream *stream, RtpProfile *profile, const c
 					ms_filter_destroy(stream->recorder_output);
 				}
 				stream->recorder_output = recorder;
-				ms_filter_add_notify_callback(recorder, recorder_handle_event, stream, TRUE);
+				ms_filter_add_notify_callback(recorder, video_recorder_handle_event, stream, TRUE);
 				if (io->output.file) video_stream_open_remote_record(stream, io->output.file);
 			break;
 			default:
@@ -746,7 +769,7 @@ bool_t video_stream_started(VideoStream *stream) {
 }
 
 static void apply_video_preset(VideoStream *stream, PayloadType *pt) {
-	MSVideoPresetsManager *vpm = ms_factory_get_video_presets_manager(ms_factory_get_fallback());
+	MSVideoPresetsManager *vpm = ms_factory_get_video_presets_manager(stream->ms.factory);
 	MSVideoPresetConfiguration *vpc = NULL;
 	MSVideoConfiguration *conf = NULL;
 	MSList *codec_tags = NULL;
@@ -1309,7 +1332,9 @@ void video_stream_send_vfu(VideoStream *stream){
 
 static MSFilter* _video_stream_stop(VideoStream * stream, bool_t keep_source)
 {
+	MSEventQueue *evq;
 	MSFilter* source = NULL;
+
 	stream->eventcb = NULL;
 	stream->event_pointer = NULL;
 	if (stream->ms.sessions.ticker){
@@ -1402,6 +1427,11 @@ static MSFilter* _video_stream_stop(VideoStream * stream, bool_t keep_source)
 		source = stream->source;
 		stream->source = NULL; // will prevent video_stream_free() from destroying the source
 	}
+	/*before destroying the filters, pump the event queue so that pending events have a chance to reach their listeners.
+	 * When the filter are destroyed, all their pending events in the event queue will be cancelled*/
+	evq = ms_factory_get_event_queue(stream->ms.factory);
+	if (evq) ms_event_queue_pump(evq);
+	
 	video_stream_free(stream);
 
 	return source;

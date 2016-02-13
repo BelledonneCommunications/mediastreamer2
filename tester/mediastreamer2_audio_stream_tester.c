@@ -33,7 +33,7 @@ static RtpProfile rtp_profile;
 #define SILK16_PAYLOAD_TYPE  123
 #define PCMA8_PAYLOAD_TYPE 8
 
-static int tester_init(void) {
+static int tester_before_all(void) {
 	ms_init();
 	ms_filter_enable_statistics(TRUE);
 	ortp_init();
@@ -46,7 +46,7 @@ static int tester_init(void) {
 	return 0;
 }
 
-static int tester_cleanup(void) {
+static int tester_after_all(void) {
 	ms_exit();
 	rtp_profile_clear_all(&rtp_profile);
 	return 0;
@@ -190,12 +190,12 @@ static void basic_audio_stream_base(	const char* marielle_local_ip
 	rtp_profile_destroy(profile);
 }
 
-static void basic_audio_stream()  {
+static void basic_audio_stream(void)  {
 	basic_audio_stream_base(MARIELLE_IP,MARIELLE_RTP_PORT,MARIELLE_RTCP_PORT
 							,MARGAUX_IP, MARGAUX_RTP_PORT, MARGAUX_RTCP_PORT);
 }
 
-static void multicast_audio_stream()  {
+static void multicast_audio_stream(void)  {
 	basic_audio_stream_base("0.0.0.0",MARIELLE_RTP_PORT, 0
 							,MULTICAST_IP, MARGAUX_RTP_PORT, 0);
 }
@@ -568,8 +568,10 @@ static test_t tests[] = {
 
 test_suite_t audio_stream_test_suite = {
 	"AudioStream",
-	tester_init,
-	tester_cleanup,
+	tester_before_all,
+	tester_after_all,
+	NULL,
+	NULL,
 	sizeof(tests) / sizeof(tests[0]),
 	tests
 };

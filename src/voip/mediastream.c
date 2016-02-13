@@ -100,9 +100,10 @@ MSTickerPrio __ms_get_default_prio(bool_t is_video) {
 	}
 }
 
-void media_stream_init(MediaStream *stream) {
+void media_stream_init(MediaStream *stream, MSFactory *factory) {
 	stream->evd = ortp_ev_dispatcher_new(stream->sessions.rtp_session);
 	stream->evq = ortp_ev_queue_new();
+	stream->factory = factory; /*the factory is used later to instanciate everything in mediastreamer2.*/
 	rtp_session_register_event_queue(stream->sessions.rtp_session, stream->evq);
 }
 
@@ -434,6 +435,7 @@ bool_t media_stream_secured (const MediaStream *stream) {
 
 	switch (stream->type) {
 	case MSAudio:
+	case MSText:
 		/*fixme need also audio stream direction to be more precise*/
 		return ms_media_stream_sessions_secured(&stream->sessions, MediaStreamSendRecv);
 	case MSVideo:{

@@ -60,6 +60,7 @@ static SoundDeviceDescription devices[]={
 	{	"motorola",	"MB860",		"",			0,	200 },
 	{	"motorola",	"XT907",		"",			0,	500 },
 	{	"motorola",	"DROIX X2",		"",			0,	320 },
+	{	"motorola",	"MotoG3",		"msm8916",	DEVICE_HAS_BUILTIN_AEC_CRAPPY,	100 }, /*The MotoG3 audio capture hangs for several seconds when switching to speaker mode*/
 
 	{	"samsung",	"GT-S5360",		"bcm21553",	0,	250 }, /*<Galaxy Y*/
 	{	"samsung",	"GT-S5360L",	"",			0,	250 }, /*<Galaxy Y*/
@@ -88,9 +89,10 @@ static SoundDeviceDescription devices[]={
 	{	"samsung",	"SAMSUNG-SGH-I337","",		DEVICE_HAS_BUILTIN_AEC | DEVICE_HAS_BUILTIN_OPENSLES_AEC,	0 }, /* Galaxy S4 ? */
 	{	"samsung",	"GT-I9195",		"",			DEVICE_HAS_BUILTIN_AEC | DEVICE_HAS_BUILTIN_OPENSLES_AEC,	0 }, /* Galaxy S4 mini*/
 	{	"samsung",	"GT-N7000",		"",			DEVICE_HAS_BUILTIN_AEC,	0 },  /*Galaxy Note*/
-	{	"samsung",	"GT-N7100",		"exynos4",	DEVICE_HAS_BUILTIN_AEC, 0 }, /*Galaxy Note 2  */
-	{	"samsung",	"GT-N7105",		"",			DEVICE_HAS_BUILTIN_AEC,	0 },  /*Galaxy Note 2*/
-	{	"samsung",	"SGH-T889",		"",			DEVICE_HAS_BUILTIN_AEC,	0 },  /*Galaxy Note 2*/
+	{	"samsung",	"GT-N7100",		"exynos4",		DEVICE_HAS_BUILTIN_AEC, 0 }, /*Galaxy Note 2  */
+	{	"samsung",	"GT-N7105",		"",			DEVICE_HAS_BUILTIN_AEC|DEVICE_HAS_UNSTANDARD_LIBMEDIA,	0 },  /*Galaxy Note 2 t0lte*/
+	{	"samsung",	"SGH-T889",		"",			DEVICE_HAS_BUILTIN_AEC|DEVICE_HAS_UNSTANDARD_LIBMEDIA,	0 },  /*Galaxy Note 2 t0lte*/
+	{	"samsung",	"SGH-I317",		"",			DEVICE_HAS_BUILTIN_AEC|DEVICE_HAS_UNSTANDARD_LIBMEDIA, 0 }, /*Galaxy Note 2 t0lte*/
 	{	"samsung",	"Nexus S",		"s5pc110",	DEVICE_HAS_BUILTIN_AEC_CRAPPY,	180 }, /*Nexus S gives calibration around 240ms, but in practice the internal buffer size shrinks after a couple of seconds.*/
 	{	"samsung",	"Galaxy Nexus", "",			0,	120 },
 	{	"samsung",	"GT-S5570I",	"",			0,	250},
@@ -100,6 +102,7 @@ static SoundDeviceDescription devices[]={
 	{	"samsung",	"GT-I915",		"",			DEVICE_HAS_BUILTIN_AEC, 0 }, /* Verizon Tab*/
 	{	"samsung",	"GT-I8190N",	"montblanc",	DEVICE_HAS_BUILTIN_AEC | DEVICE_HAS_BUILTIN_OPENSLES_AEC, 0, 16000 }, /* Galaxy S3 Mini*/
 	{	"samsung",	"GT-I8190",		"montblanc",	DEVICE_HAS_BUILTIN_AEC | DEVICE_HAS_BUILTIN_OPENSLES_AEC,	0, 16000 },  /*Galaxy S3 mini*/
+	{	"samsung",	"SM-T230",		"mrvl",		DEVICE_HAS_BUILTIN_AEC_CRAPPY, 200, 0},			/*Galaxy Tab 4 wifi*/
 	
 	
 	{	"Sony Ericsson","ST15a",	"",			0, 	150 },

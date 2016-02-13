@@ -93,6 +93,9 @@ libmediastreamer_voip_la_SOURCES+=	voip/private.h \
 					voip/mediastream.c \
 					voip/audiostream.c \
 					voip/ringstream.c \
+					voip/rfc4103_textstream.c \
+					otherfilters/rfc4103_source.c \
+					otherfilters/rfc4103_sink.c \
 					voip/msmediaplayer.c \
 					voip/ice.c \
 					otherfilters/msrtp.c \
@@ -139,7 +142,9 @@ libmediastreamer_voip_la_SOURCES+=	audiofilters/alaw.c \
 					utils/g722_encode.c \
 					audiofilters/msg722.c \
 					audiofilters/l16.c \
+					audiofilters/genericplc.h \
 					audiofilters/genericplc.c \
+					audiofilters/msgenericplc.c \
 					audiofilters/msfileplayer.c \
 					audiofilters/msfilerec.c \
 					audiofilters/waveheader.h \

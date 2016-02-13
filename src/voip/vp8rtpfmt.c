@@ -307,7 +307,7 @@ static bool_t parse_frame_header(Vp8RtpFmtFrame *frame) {
 	nb_partitions = (1 << vp8_read_literal(&bc, 2));
 	if (nb_partitions > 8) return FALSE;
 	frame->partitions_info.nb_partitions = nb_partitions;
-	partition_size = data + first_partition_length_in_bytes - m->b_rptr + (3 * (nb_partitions - 1));
+	partition_size = (uint16_t)(data + first_partition_length_in_bytes - m->b_rptr + (3 * (nb_partitions - 1)));
 	if (msgdsize(m) < partition_size) return FALSE;
 	frame->partitions_info.partition_sizes[0] = partition_size;
 	for (i = 1; i < nb_partitions; i++) {
@@ -404,9 +404,9 @@ static MSVideoSize get_size_from_key_frame(Vp8RtpFmtFrame *frame) {
 
 static void send_pli(Vp8RtpFmtUnpackerCtx *ctx) {
 	if (ctx->avpf_enabled == TRUE) {
-		ms_filter_notify_no_arg(ctx->filter, MS_VIDEO_DECODER_SEND_PLI);
+		if(ctx->filter) ms_filter_notify_no_arg(ctx->filter, MS_VIDEO_DECODER_SEND_PLI);
 	} else {
-		ms_filter_notify_no_arg(ctx->filter, MS_VIDEO_DECODER_DECODING_ERRORS);
+		if(ctx->filter) ms_filter_notify_no_arg(ctx->filter, MS_VIDEO_DECODER_DECODING_ERRORS);
 		ctx->error_notified = TRUE;
 	}
 }
@@ -418,12 +418,12 @@ static void send_sli(Vp8RtpFmtUnpackerCtx *ctx, Vp8RtpFmtFrame *frame) {
 			sli.first = 0;
 			sli.number = (ctx->video_size.width * ctx->video_size.height) / (16 * 16);
 			sli.picture_id = frame->pictureid & 0x3F;
-			ms_filter_notify(ctx->filter, MS_VIDEO_DECODER_SEND_SLI, &sli);
+			if(ctx->filter) ms_filter_notify(ctx->filter, MS_VIDEO_DECODER_SEND_SLI, &sli);
 		} else {
 			send_pli(ctx);
 		}
 	} else {
-		ms_filter_notify_no_arg(ctx->filter, MS_VIDEO_DECODER_DECODING_ERRORS);
+		if(ctx->filter) ms_filter_notify_no_arg(ctx->filter, MS_VIDEO_DECODER_DECODING_ERRORS);
 		ctx->error_notified = TRUE;
 	}
 }
@@ -442,7 +442,7 @@ void vp8rtpfmt_send_rpsi(Vp8RtpFmtUnpackerCtx *ctx, uint16_t pictureid) {
 			rpsi.bit_string = (uint8_t *)&picture_id8;
 			rpsi.bit_string_len = 8;
 		}
-		ms_filter_notify(ctx->filter, MS_VIDEO_DECODER_SEND_RPSI, &rpsi);
+		if(ctx->filter) ms_filter_notify(ctx->filter, MS_VIDEO_DECODER_SEND_RPSI, &rpsi);
 	}
 }
 
@@ -734,7 +734,7 @@ static int output_valid_partitions(Vp8RtpFmtUnpackerCtx *ctx, MSQueue *out) {
 				ctx->video_size = get_size_from_key_frame(frame);
 				ctx->waiting_for_reference_frame = FALSE;
 				if (ctx->error_notified == TRUE) {
-					ms_filter_notify_no_arg(ctx->filter, MS_VIDEO_DECODER_RECOVERED_FROM_ERRORS);
+					if(ctx->filter) ms_filter_notify_no_arg(ctx->filter, MS_VIDEO_DECODER_RECOVERED_FROM_ERRORS);
 					ctx->error_notified = FALSE;
 				}
 			}
@@ -818,10 +818,16 @@ static void clean_frame(Vp8RtpFmtUnpackerCtx *ctx) {
 	}
 }
 
+static void free_frame(void *data) {
+	Vp8RtpFmtFrame *frame = (Vp8RtpFmtFrame *)data;
+	free_partitions_of_frame(frame);
+	ms_free(frame);
+}
+
 static Vp8RtpFmtErrorCode parse_payload_descriptor(Vp8RtpFmtPacket *packet) {
 	uint8_t *h = packet->m->b_rptr;
 	Vp8RtpFmtPayloadDescriptor *pd = packet->pd;
-	unsigned int packet_size = packet->m->b_wptr - packet->m->b_rptr;
+	unsigned int packet_size = (unsigned int)(packet->m->b_wptr - packet->m->b_rptr);
 	uint8_t offset = 0;
 
 	if (packet_size == 0) return Vp8RtpFmtInvalidPayloadDescriptor;
@@ -852,7 +858,7 @@ static Vp8RtpFmtErrorCode parse_payload_descriptor(Vp8RtpFmtPacket *packet) {
 	if (pd->pictureid_present == TRUE) {
 		if (h[offset] & (1 << 7)) {
 			/* The pictureID is 16 bits long. */
-			if ((offset + 1) >= packet_size) return Vp8RtpFmtInvalidPayloadDescriptor;
+			if ((unsigned int)(offset + 1) >= packet_size) return Vp8RtpFmtInvalidPayloadDescriptor;
 			pd->pictureid = (h[offset] << 8) | h[offset + 1];
 			offset += 2;
 		} else {
@@ -901,7 +907,9 @@ void vp8rtpfmt_unpacker_init(Vp8RtpFmtUnpackerCtx *ctx, MSFilter *f, bool_t avpf
 }
 
 void vp8rtpfmt_unpacker_uninit(Vp8RtpFmtUnpackerCtx *ctx) {
+	ms_list_for_each(ctx->frames_list, free_frame);
 	ms_list_free(ctx->frames_list);
+	ms_list_for_each(ctx->non_processed_packets_list, free_packet);
 	ms_list_free(ctx->non_processed_packets_list);
 }
 
@@ -947,6 +955,7 @@ int vp8rtpfmt_unpacker_get_frame(Vp8RtpFmtUnpackerCtx *ctx, MSQueue *out, Vp8Rtp
 		Vp8RtpFmtFrame *frame = (Vp8RtpFmtFrame *)ms_list_nth_data(ctx->frames_list, 0);
 		frame_info->pictureid_present = frame->pictureid_present;
 		frame_info->pictureid = frame->pictureid;
+		frame_info->keyframe = frame->keyframe;
 	} else if (ms_list_size(ctx->non_processed_packets_list) >= 0) {
 		ms_debug("VP8 packets are remaining for next iteration of the filter.");
 	}
@@ -1023,7 +1032,7 @@ static void packer_process_frame_part(void *p, void *c) {
 			pdm->b_wptr++;
 		}
 
-		dlen = MIN((max_size - pdsize), (packet->m->b_wptr - rptr));
+		dlen = MIN((max_size - pdsize), (int)(packet->m->b_wptr - rptr));
 		dm = dupb(packet->m);
 		dm->b_rptr = rptr;
 		dm->b_wptr = rptr + dlen;

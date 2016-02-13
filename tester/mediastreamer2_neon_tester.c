@@ -20,21 +20,20 @@
 #include <stdio.h>
 #include <time.h>
 #include "mediastreamer2_tester.h"
-#include <speex/speex.h>
-//#include "libspeex/resample_neon.h"
 #include <ortp/port.h>
 
-#ifdef __ARM_NEON__
+#if defined(__ARM_NEON__) && defined(HAVE_SPEEXDSP)
 #include <arm_neon.h>
+#include <speex/speex.h>
 
-static int tester_init() {
+static int tester_before_all() {
 	ortp_set_log_level_mask(ORTP_MESSAGE | ORTP_WARNING | ORTP_ERROR | ORTP_FATAL);
 	ms_init();
 	srand(time(0));
 	return 0;
 }
 
-static int tester_cleanup() {
+static int tester_after_all() {
 	ms_exit();
 	return 0;
 }
@@ -268,8 +267,10 @@ static test_t tests[] = {
 
 test_suite_t neon_test_suite = {
 	"NEON",
-	tester_init,
-	tester_cleanup,
+	tester_before_all,
+	tester_after_all,
+	NULL,
+	NULL,
 	sizeof(tests)/sizeof(test_t),
 	tests
 };

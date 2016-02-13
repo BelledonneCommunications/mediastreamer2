@@ -40,7 +40,8 @@ extern "C"{
 #endif
 
 extern void __register_ffmpeg_encoders_if_possible(MSFactory *factory);
-extern void ms_ffmpeg_check_init();
+extern void __register_ffmpeg_h264_decoder_if_possible(MSFactory *factory);
+extern void ms_ffmpeg_check_init(void);
 extern bool_t libmsandroiddisplay_init(MSFactory *factory);
 extern void libmsandroiddisplaybad_init(MSFactory *factory);
 extern void libmsandroidopengldisplay_init(MSFactory *factory);
@@ -216,6 +217,9 @@ extern MSWebCamDesc ms_bb10_camera_desc;
 
 static MSWebCamDesc * ms_web_cam_descs[]={
 #ifdef MS2_FILTERS
+#if defined (ANDROID)
+	&ms_android_video_capture_desc,
+#endif
 #ifdef HAVE_LINUX_VIDEODEV2_H
 	&v4l2_card_desc,
 #endif
@@ -231,17 +235,14 @@ static MSWebCamDesc * ms_web_cam_descs[]={
 #if TARGET_OS_MAC && !TARGET_OS_IPHONE
 	&ms_v4m_cam_desc,
 #endif
-#if defined (ANDROID)
-	&ms_android_video_capture_desc,
+#ifdef __QNX__
+	&ms_bb10_camera_desc,
 #endif
 #if TARGET_OS_IPHONE &&  !TARGET_IPHONE_SIMULATOR
 	&ms_v4ios_cam_desc,
 #endif
 	&ms_mire_webcam_desc,
 	&static_image_desc,
-#ifdef __QNX__
-	&ms_bb10_camera_desc,
-#endif
 #endif /*MS2_FILTERS */
 	NULL
 };
@@ -302,6 +303,7 @@ void ms_factory_init_voip(MSFactory *obj){
 #if defined(VIDEO_ENABLED) && defined(MS2_FILTERS) && !defined(NO_FFMPEG) && defined(HAVE_LIBAVCODEC_AVCODEC_H)
 	ms_ffmpeg_check_init();
 	__register_ffmpeg_encoders_if_possible(obj);
+	__register_ffmpeg_h264_decoder_if_possible(obj);
 #endif
 
 #if defined(ANDROID) && defined (VIDEO_ENABLED)
@@ -339,6 +341,22 @@ void ms_voip_exit(){
 	}
 	ms_srtp_shutdown();
 	ms_factory_uninit_voip(ms_factory_get_fallback());
+}
+
+PayloadType * ms_offer_answer_context_match_payload(MSOfferAnswerContext *context, const MSList *local_payloads, const PayloadType *remote_payload, const MSList *remote_payloads, bool_t is_reading){
+	return context->match_payload(context, local_payloads, remote_payload, remote_payloads, is_reading);
+}
+
+ MSOfferAnswerContext *ms_offer_answer_create_simple_context(MSPayloadMatcherFunc func){
+	 MSOfferAnswerContext *ctx = ms_new0(MSOfferAnswerContext,1);
+	 ctx->match_payload = func;
+	 ctx->destroy = (void (*)(MSOfferAnswerContext *)) ms_free;
+	 return ctx;
+}
+
+void ms_offer_answer_context_destroy(MSOfferAnswerContext *ctx){
+	if (ctx->destroy)
+		ctx->destroy(ctx);
 }
 
 #ifdef __cplusplus

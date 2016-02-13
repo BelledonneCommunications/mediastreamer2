@@ -65,6 +65,7 @@ LOCAL_SRC_FILES = \
 	audiofilters/flowcontrol.c \
 	audiofilters/g711.c \
 	audiofilters/genericplc.c \
+	audiofilters/msgenericplc.c \
 	audiofilters/l16.c \
 	audiofilters/msfileplayer.c \
 	audiofilters/msfilerec.c \
@@ -112,7 +113,10 @@ LOCAL_SRC_FILES = \
 	voip/qualityindicator.c \
 	voip/ringstream.c \
 	voip/stun.c \
-	voip/stun_udp.c
+	voip/stun_udp.c \
+	otherfilters/rfc4103_source.c \
+	otherfilters/rfc4103_sink.c \
+	voip/rfc4103_textstream.c
 
 LOCAL_STATIC_LIBRARIES :=
 
@@ -155,10 +159,14 @@ LOCAL_SRC_FILES += \
 	videofilters/mire.c \
 	videofilters/vp8.c \
 	videofilters/jpegwriter.c \
+	videofilters/msv4l2.c \
 	android/android-display.c \
 	android/android-display-bad.cpp \
 	android/androidvideo.cpp \
 	android/android-opengl-display.c
+
+#uncomment this if you want to try loading v4l2 cameras on android (not really supported by google).
+#LOCAL_CFLAGS += -DHAVE_LINUX_VIDEODEV2_H=1
 
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
 	LOCAL_CFLAGS += -DVIDEO_ENABLED
