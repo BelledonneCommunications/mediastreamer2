@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "ortp/port.h"
 #include "mediastreamer2/mediastream.h"
+#include "mediastreamer2/msrtp.h"
 #include "private.h"
 #include <ctype.h>
 
@@ -107,11 +108,11 @@ void media_stream_init(MediaStream *stream, MSFactory *factory) {
 	rtp_session_register_event_queue(stream->sessions.rtp_session, stream->evq);
 }
 
-RtpSession * ms_create_duplex_rtp_session(const char* local_ip, int loc_rtp_port, int loc_rtcp_port) {
+RtpSession * ms_create_duplex_rtp_session(const char* local_ip, int loc_rtp_port, int loc_rtcp_port, int mtu) {
 	RtpSession *rtpr;
 
 	rtpr = rtp_session_new(RTP_SESSION_SENDRECV);
-	rtp_session_set_recv_buf_size(rtpr, MAX(ms_get_mtu() , MS_MINIMAL_MTU));
+	rtp_session_set_recv_buf_size(rtpr, MAX(mtu , MS_MINIMAL_MTU));
 	rtp_session_set_scheduling_mode(rtpr, 0);
 	rtp_session_set_blocking_mode(rtpr, 0);
 	rtp_session_enable_adaptive_jitter_compensation(rtpr, TRUE);
@@ -224,6 +225,18 @@ void media_stream_enable_dtls(MediaStream *stream, MSDtlsSrtpParams *params){
 	}
 }
 
+void media_stream_set_ice_check_list(MediaStream *stream, IceCheckList *cl) {
+	bool_t stun_enabled = TRUE;
+	stream->ice_check_list = cl;
+	if (stream->ice_check_list != NULL) {
+		ice_check_list_set_rtp_session(stream->ice_check_list, stream->sessions.rtp_session);
+		stun_enabled = FALSE;
+	}
+	if (stream->rtpsend != NULL) {
+		ms_filter_call_method(stream->rtpsend, MS_RTP_SEND_ENABLE_STUN, &stun_enabled);
+	}
+}
+
 bool_t media_stream_dtls_supported(void){
 	return ms_dtls_srtp_available();
 }
@@ -257,16 +270,7 @@ bool_t ms_is_ipv6(const char *remote) {
 }
 
 bool_t ms_is_multicast_addr(const struct sockaddr *addr) {
-
-	switch (addr->sa_family) {
-		case AF_INET:
-			return IN_MULTICAST(ntohl(((struct sockaddr_in *) addr)->sin_addr.s_addr));
-		case AF_INET6:
-			return IN6_IS_ADDR_MULTICAST(&(((struct sockaddr_in6 *) addr)->sin6_addr));
-		default:
-			return FALSE;
-	}
-
+	return ortp_is_multicast_addr(addr);
 }
 
 bool_t ms_is_multicast(const char *address) {
@@ -331,18 +335,8 @@ void media_stream_iterate(MediaStream *stream){
 				ms_message("%s_stream_iterate[%p], local statistics available:"
 							"\n\tLocal current jitter buffer size: %5.1fms",
 					media_stream_type_str(stream), stream, rtp_session_get_jitter_stats(stream->sessions.rtp_session)->jitter_buffer_size_ms);
-			} else if (evt==ORTP_EVENT_STUN_PACKET_RECEIVED){
-				if (stream->ice_check_list) {
-						ice_handle_stun_packet(stream->ice_check_list,stream->sessions.rtp_session,ortp_event_get_data(ev));
-				} else if (rtp_session_get_symmetric_rtp(stream->sessions.rtp_session)){
-					/*try to know if we can trust stun packets for symetric rtp*/
-					rtp_stats_t stats;
-					media_stream_get_local_rtp_stats(stream, &stats);
-					if (stats.packet_recv == 0 && !ms_is_multicast_addr((const struct sockaddr *)&stream->sessions.rtp_session->rtp.gs.rem_addr)) {
-						memcpy(&stream->sessions.rtp_session->rtp.gs.rem_addr,&ortp_event_get_data(ev)->source_addr,ortp_event_get_data(ev)->source_addrlen);
-						ms_message("stun packet received but no rtp yet for stream [%p], switching rtp destination address",stream);
-					}
-				}
+			} else if (evt==ORTP_EVENT_STUN_PACKET_RECEIVED && stream->ice_check_list){
+				ice_handle_stun_packet(stream->ice_check_list,stream->sessions.rtp_session,ortp_event_get_data(ev));
 			} else if ((evt == ORTP_EVENT_ZRTP_ENCRYPTION_CHANGED) || (evt == ORTP_EVENT_DTLS_ENCRYPTION_CHANGED)) {
 				ms_message("%s_stream_iterate[%p]: is %s ",media_stream_type_str(stream) , stream, media_stream_secured(stream) ? "encrypted" : "not encrypted");
 			}
@@ -434,14 +428,16 @@ bool_t media_stream_secured (const MediaStream *stream) {
 		return FALSE;
 
 	switch (stream->type) {
-	case MSAudio:
-	case MSText:
-		/*fixme need also audio stream direction to be more precise*/
-		return ms_media_stream_sessions_secured(&stream->sessions, MediaStreamSendRecv);
-	case MSVideo:{
-		VideoStream *vs = (VideoStream*)stream;
-		return ms_media_stream_sessions_secured(&stream->sessions, vs->dir);
-	}
+		case MSAudio:
+		case MSText:
+			/*fixme need also audio stream direction to be more precise*/
+			return ms_media_stream_sessions_secured(&stream->sessions, MediaStreamSendRecv);
+		case MSVideo:{
+			VideoStream *vs = (VideoStream*)stream;
+			return ms_media_stream_sessions_secured(&stream->sessions, vs->dir);
+		}
+		case MSUnknownMedia:
+		break;
 	}
 	return FALSE;
 }

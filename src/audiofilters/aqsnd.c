@@ -796,15 +796,14 @@ static void aq_start_w(MSFilter * f)
 	if (d->write_started == FALSE) {
 		OSStatus aqresult;
 #if TARGET_OS_IPHONE
-		aqresult = AudioSessionSetActive(true);
-		check_aqresult(aqresult,"AudioSessionSetActive");
-		
 		UInt32 audioCategory;
-		
 		audioCategory= kAudioSessionCategory_AmbientSound;
 		ms_message("AQ: Configuring audio session for playback");
 		aqresult =AudioSessionSetProperty(kAudioSessionProperty_AudioCategory, sizeof(audioCategory), &audioCategory);
 		check_aqresult(aqresult,"Configuring audio session ");
+
+		aqresult = AudioSessionSetActive(true);
+		check_aqresult(aqresult,"AudioSessionSetActive");
 #endif
 		d->writeAudioFormat.mSampleRate = d->rate;
 		d->writeAudioFormat.mFormatID = kAudioFormatLinearPCM;
@@ -1094,7 +1093,7 @@ MSFilterDesc aq_write_desc = {
 
 MSFilter *ms_aq_read_new(MSSndCard * card)
 {
-	MSFilter *f = ms_filter_new_from_desc(&aq_read_desc);
+	MSFilter *f = ms_factory_create_filter_from_desc(ms_snd_card_get_factory(card), &aq_read_desc);
 	AqSndDsCard *wc = (AqSndDsCard *) card->data;
 	AQData *d = (AQData *) f->data;
 	d->uidname = NULL;
@@ -1110,7 +1109,7 @@ MSFilter *ms_aq_read_new(MSSndCard * card)
 
 MSFilter *ms_aq_write_new(MSSndCard * card)
 {
-	MSFilter *f = ms_filter_new_from_desc(&aq_write_desc);
+	MSFilter *f = ms_factory_create_filter_from_desc(ms_snd_card_get_factory(card), &aq_write_desc);
 	AqSndDsCard *wc = (AqSndDsCard *) card->data;
 	AQData *d = (AQData *) f->data;
 	d->uidname = NULL;

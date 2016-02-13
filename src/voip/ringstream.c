@@ -35,7 +35,7 @@ static void ring_player_event_handler(void *ud, MSFilter *f, unsigned int evid, 
 			pinfmt.pin = 1;
 			ms_filter_call_method(stream->source, MS_FILTER_GET_OUTPUT_FMT, &pinfmt);
 		}
-		
+
 		if (stream->write_resampler){
 			ms_message("Configuring resampler input with rate=[%i], nchannels=[%i]",pinfmt.fmt->rate, pinfmt.fmt->nchannels);
 			ms_filter_call_method(stream->write_resampler,MS_FILTER_SET_NCHANNELS,(void*)&pinfmt.fmt->nchannels);
@@ -46,11 +46,11 @@ static void ring_player_event_handler(void *ud, MSFilter *f, unsigned int evid, 
 	}
 }
 
-RingStream * ring_start(const char *file, int interval, MSSndCard *sndcard){
-   return ring_start_with_cb(file,interval,sndcard,NULL,NULL);
+RingStream * ring_start(MSFactory *factory, const char *file, int interval, MSSndCard *sndcard){
+   return ring_start_with_cb(factory, file,interval,sndcard,NULL,NULL);
 }
 
-RingStream * ring_start_with_cb(const char *file,int interval,MSSndCard *sndcard, MSFilterNotifyFunc func,void * user_data)
+RingStream * ring_start_with_cb(MSFactory* factory, const char *file, int interval, MSSndCard *sndcard, MSFilterNotifyFunc func,void * user_data )
 {
 	RingStream *stream;
 	int srcchannels=1, dstchannels=1;
@@ -61,24 +61,33 @@ RingStream * ring_start_with_cb(const char *file,int interval,MSSndCard *sndcard
 
 	stream=(RingStream *)ms_new0(RingStream,1);
 	if (file) {
-		stream->source=_ms_create_av_player(file);
+		stream->source=_ms_create_av_player(file,factory);
+		if (stream->source == NULL){
+			ms_error("ring_start_with_cb(): could not create player for playing '%s'", file);
+			ms_free(stream);
+			return NULL;
+		}
 	} else {
 		/*create dummy source*/
-		stream->source=ms_filter_new(MS_FILE_PLAYER_ID);
+		stream->source=ms_factory_create_filter(factory, MS_FILE_PLAYER_ID);
 	}
 	ms_filter_add_notify_callback(stream->source,ring_player_event_handler,stream,TRUE);
 	if (func!=NULL)
 		ms_filter_add_notify_callback(stream->source,func,user_data,FALSE);
-	stream->gendtmf=ms_filter_new(MS_DTMF_GEN_ID);
+	stream->gendtmf=ms_factory_create_filter(factory, MS_DTMF_GEN_ID);
 	stream->sndwrite=ms_snd_card_create_writer(sndcard);
-	stream->write_resampler=ms_filter_new(MS_RESAMPLE_ID);
-	
+	stream->write_resampler=ms_factory_create_filter(factory, MS_RESAMPLE_ID);
+
 	if (file){
-		ms_filter_call_method(stream->source,MS_PLAYER_OPEN,(void*)file);
+		/*in we failed to open the file, we must release the stream*/
+		if (ms_filter_call_method(stream->source,MS_PLAYER_OPEN,(void*)file) != 0) {
+			ring_stop(stream);
+			return NULL;
+		}
 		ms_filter_call_method(stream->source,MS_PLAYER_SET_LOOP,&interval);
 		ms_filter_call_method_noarg(stream->source,MS_PLAYER_START);
 	}
-	
+
 	/*configure sound output filter*/
 	ms_filter_call_method(stream->source, MS_FILTER_GET_OUTPUT_FMT, &pinfmt);
 	if (pinfmt.fmt == NULL){
@@ -86,7 +95,7 @@ RingStream * ring_start_with_cb(const char *file,int interval,MSSndCard *sndcard
 		ms_filter_call_method(stream->source, MS_FILTER_GET_OUTPUT_FMT, &pinfmt);
 		if (pinfmt.fmt == NULL){
 			/*probably no file is being played, assume pcm*/
-			pinfmt.fmt = ms_factory_get_audio_format(ms_factory_get_fallback(), "pcm", 8000, 1, NULL);
+			pinfmt.fmt = ms_factory_get_audio_format(factory, "pcm", 8000, 1, NULL);
 		}
 	}
 	srcrate = pinfmt.fmt->rate;
@@ -96,27 +105,27 @@ RingStream * ring_start_with_cb(const char *file,int interval,MSSndCard *sndcard
 	ms_filter_call_method(stream->sndwrite,MS_FILTER_GET_SAMPLE_RATE,&dstrate);
 	ms_filter_call_method(stream->sndwrite,MS_FILTER_SET_NCHANNELS,&srcchannels);
 	ms_filter_call_method(stream->sndwrite,MS_FILTER_GET_NCHANNELS,&dstchannels);
-	
+
 	/*eventually create a decoder*/
 	if (strcasecmp(pinfmt.fmt->encoding, "pcm") != 0){
-		stream->decoder = ms_filter_create_decoder(pinfmt.fmt->encoding);
+		stream->decoder = ms_factory_create_decoder(factory, pinfmt.fmt->encoding);
 		if (!stream->decoder){
 			ms_error("RingStream: could not create decoder for '%s'", pinfmt.fmt->encoding);
 			ring_stop(stream);
 			return NULL;
 		}
 	}
-	
+
 	/*configure output of resampler*/
 	if (stream->write_resampler){
 		ms_filter_call_method(stream->write_resampler,MS_FILTER_SET_OUTPUT_SAMPLE_RATE,&dstrate);
 		ms_filter_call_method(stream->write_resampler,MS_FILTER_SET_OUTPUT_NCHANNELS,&dstchannels);
-	
+
 		/*the input of the resampler, as well as dtmf generator are configured within the ring_player_event_handler()
 		 * callback triggered during the open of the file player*/
 		ms_message("configuring resampler output to rate=[%i], nchannels=[%i]",dstrate,dstchannels);
 	}
-	
+
 	params.name="Ring MSTicker";
 	params.prio=MS_TICKER_PRIO_HIGH;
 	stream->ticker=ms_ticker_new_with_params(&params);
@@ -149,7 +158,7 @@ void ring_stop_dtmf(RingStream *stream){
 
 void ring_stop(RingStream *stream){
 	MSConnectionHelper h;
-	
+
 	if (stream->ticker){
 		ms_ticker_detach(stream->ticker,stream->source);
 

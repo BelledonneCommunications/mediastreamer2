@@ -35,7 +35,8 @@ struct SenderData {
 	uint32_t tsoff;
 	uint32_t last_ts;
 	int64_t last_sent_time;
-	int64_t last_stun_sent_time;
+	int64_t last_rtp_stun_sent_time;
+	int64_t last_rtcp_stun_sent_time;
 	uint32_t skip_until;
 	int rate;
 	int dtmf_duration;
@@ -50,30 +51,44 @@ struct SenderData {
 	bool_t skip;
 	bool_t mute;
 	bool_t use_task;
+	bool_t stun_enabled;
 };
 
 typedef struct SenderData SenderData;
 
 /* Send dummy STUN packet to open NAT ports ASAP. */
-static void send_stun_packet(RtpSession *s)
+static void send_stun_packet(SenderData *d, bool_t enable_rtp, bool_t enable_rtcp)
 {
 	StunMessage msg;
 	mblk_t *mp;
+	RtpSession *s = d->session;
 	char buf[STUN_MAX_MESSAGE_SIZE];
 	int len = STUN_MAX_MESSAGE_SIZE;
+
+	if (!d->stun_enabled) return;
 	if (ms_is_multicast_addr((const struct sockaddr *)&s->rtcp.gs.loc_addr)) {
 		ms_debug("Stun packet not sent for session [%p] because of multicast",s);
 		return;
 	}
+
 	memset(&msg, 0, sizeof(StunMessage));
 	stunBuildReqSimple(&msg, NULL, FALSE, FALSE, 1);
 	len = stunEncodeMessage(&msg, buf, len, NULL);
 	if (len > 0) {
-		mp = allocb(len, BPRI_MED);
-		memcpy(mp->b_wptr, buf, len);
-		mp->b_wptr += len;
-		ms_message("Stun packet sent for session [%p]",s);
-		rtp_session_sendm_with_ts(s, mp, 0);
+		if (enable_rtp) {
+			mp = allocb(len, BPRI_MED);
+			memcpy(mp->b_wptr, buf, len);
+			mp->b_wptr += len;
+			ms_message("Stun packet sent for session [%p]",s);
+			rtp_session_sendm_with_ts(s, mp, 0);
+		}
+		if (enable_rtcp) {
+			mp = allocb(len, BPRI_MED);
+			memcpy(mp->b_wptr, buf, len);
+			mp->b_wptr += len;
+			ms_message("Stun packet sent  on rtcp for session [%p]",s);
+			rtp_session_rtcp_sendm_raw(s,mp);
+		}
 	}
 }
 
@@ -97,10 +112,12 @@ static void sender_init(MSFilter * f)
 	d->relay_session_id_size=0;
 	d->last_rsi_time=0;
 	d->last_sent_time=-1;
-	d->last_stun_sent_time = -1;
+	d->last_rtp_stun_sent_time = -1;
+	d->last_rtcp_stun_sent_time = -1;
 	d->last_ts=0;
 	d->use_task= tmp ? (!!atoi(tmp)) : FALSE;
 	if (d->use_task) ms_message("MSRtpSend will use tasks to send out packet at the beginning of ticks.");
+	d->stun_enabled = TRUE;
 	f->data = d;
 }
 
@@ -142,15 +159,15 @@ static int sender_set_session(MSFilter * f, void *arg)
 	PayloadType *pt =
 		rtp_profile_get_payload(rtp_session_get_profile(s),
 								rtp_session_get_send_payload_type(s));
+	d->session = s;
 	if (pt != NULL) {
 		d->rate = pt->clock_rate;
 		d->dtmf_duration=(default_dtmf_duration_ms*d->rate)/1000;
 		d->dtmf_ts_step=(20*d->rate)/1000;
-		send_stun_packet(s);
+		send_stun_packet(d,TRUE,TRUE);
 	} else {
 		ms_warning("Sending undefined payload type ?");
 	}
-	d->session = s;
 	return 0;
 }
 
@@ -353,11 +370,17 @@ static int send_dtmf(MSFilter * f, uint32_t timestamp_start)
 static void check_stun_sending(MSFilter *f) {
 	SenderData *d = (SenderData *) f->data;
 	RtpSession *s = d->session;
-
-	if ((d->last_stun_sent_time == -1) || ((f->ticker->time- d->last_sent_time>2000) /*no need to send stun packets if media sent during last 2s*/
-											&& (f->ticker->time - d->last_stun_sent_time) >= 500)) {
-		d->last_stun_sent_time = f->ticker->time;
-		send_stun_packet(s);
+	if ((d->last_rtp_stun_sent_time == -1) || ((f->ticker->time- d->last_sent_time>2000) /*no need to send stun packets if media sent during last 2s*/
+											&& (f->ticker->time - d->last_rtp_stun_sent_time) >= 500)) {
+		d->last_rtp_stun_sent_time = f->ticker->time;
+		send_stun_packet(d,TRUE,FALSE);
+	}
+	
+	if ( rtp_session_rtcp_enabled(s) && (d->last_rtcp_stun_sent_time == -1
+										 || (rtp_session_get_stats(s)->recv_rtcp_packets == 0 /*no need to send stun packets if rtcp packet already received*/
+											 && (f->ticker->time - d->last_rtcp_stun_sent_time) >= 500))) {
+		d->last_rtcp_stun_sent_time = f->ticker->time;
+		send_stun_packet(d,FALSE,TRUE);
 	}
 }
 
@@ -464,6 +487,12 @@ static int sender_send_generic_cn(MSFilter *f, void *data){
 	return 0;
 }
 
+static int sender_enable_stun(MSFilter *f, void *data) {
+	SenderData *d = (SenderData *)f->data;
+	d->stun_enabled = *((bool_t *)data);
+	return 0;
+}
+
 static MSFilterMethod sender_methods[] = {
 	{MS_RTP_SEND_MUTE, sender_mute},
 	{MS_RTP_SEND_UNMUTE, sender_unmute},
@@ -474,6 +503,7 @@ static MSFilterMethod sender_methods[] = {
 	{MS_FILTER_GET_NCHANNELS, sender_get_ch },
 	{MS_RTP_SEND_SET_DTMF_DURATION, sender_set_dtmf_duration },
 	{MS_RTP_SEND_SEND_GENERIC_CN, sender_send_generic_cn },
+	{ MS_RTP_SEND_ENABLE_STUN, sender_enable_stun },
 	{0, NULL}
 };
 

@@ -31,6 +31,7 @@ MEDIASTREAMER2_INCLUDES := \
 	$(LOCAL_PATH)/utils \
 	$(LOCAL_PATH)/voip \
 	$(LOCAL_PATH)/audiofilters \
+	$(LOCAL_PATH)/android \
 	$(LOCAL_PATH)/otherfilters \
 	$(LOCAL_PATH)/videofilters \
 	$(LOCAL_PATH)/../include \
@@ -160,6 +161,9 @@ LOCAL_SRC_FILES += \
 	videofilters/vp8.c \
 	videofilters/jpegwriter.c \
 	videofilters/msv4l2.c \
+	android/mediacodech264dec.c \
+	android/mediacodech264enc.c \
+	android/android_mediacodec.cpp \
 	android/android-display.c \
 	android/android-display-bad.cpp \
 	android/androidvideo.cpp \
@@ -194,10 +198,10 @@ LOCAL_CFLAGS += \
 	-DNDEBUG
 
 LOCAL_C_INCLUDES += \
-	$(LOCAL_PATH)/../../../externals/libmatroska \
-	$(LOCAL_PATH)/../../../externals/libmatroska/corec \
-	$(LOCAL_PATH)/../../../externals/libmatroska/libebml2 \
-	$(LOCAL_PATH)/../../../externals/libmatroska/libmatroska2
+	$(LOCAL_PATH)/../../../externals/libmatroska-c \
+	$(LOCAL_PATH)/../../../externals/libmatroska-c/corec \
+	$(LOCAL_PATH)/../../../externals/libmatroska-c/libebml2 \
+	$(LOCAL_PATH)/../../../externals/libmatroska-c/libmatroska2
 
 LOCAL_SRC_FILES += \
 	utils/mkv_reader.c \
