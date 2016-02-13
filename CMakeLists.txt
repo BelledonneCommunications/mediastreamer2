@@ -97,6 +97,7 @@ cmake_dependent_option(ENABLE_THEORA "Enable theora video codec support." YES "E
 cmake_dependent_option(ENABLE_VPX "Build mediastreamer2 with VPX codec." YES "ENABLE_VIDEO" NO)
 option(ENABLE_MKV "Enable support of MKV files reading and writing." YES)
 cmake_dependent_option(ENABLE_QNX "Build medistreamer2 with BB10 filters." NO "ENABLE_VIDEO" NO)
+cmake_dependent_option(ENABLE_VT_H264 "Build mediastreamer2 with H264 encoder/decoder based on VirtualToolbox (iOS only)" YES "ENABLE_VIDEO" NO)
 
 
 macro(apply_compile_flags SOURCE_FILES)
@@ -460,10 +461,13 @@ endif()
 set(LINK_FLAGS )
 if(APPLE)
 	list(APPEND LINK_FLAGS "-framework CoreFoundation" "-framework AudioToolbox" "-framework CoreAudio")
-	if(IOS)
+	if(IOS) # Necessary for Mediastreamer's tools and testers
 		list(APPEND LINK_FLAGS "-framework Foundation" "-framework QuartzCore" "-framework OpenGLES" "-framework UIKit" "-framework AVFoundation")
 		if(ENABLE_VIDEO)
 			list(APPEND LINK_FLAGS "-framework CoreGraphics" "-framework CoreMedia" "-framework CoreVideo")
+			if(IOS AND ENABLE_VT_H264) # Necessary for Mediastreamer's tools and testers
+				list(APPEND LINK_FLAGS "-framework VideoToolbox")
+			endif()
 		endif()
 	else()
 		list(APPEND LINK_FLAGS "-framework AppKit")
