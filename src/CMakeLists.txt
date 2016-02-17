@@ -377,6 +377,7 @@ endif()
 
 
 set(VOIP_LIBS
+	${BCTOOLBOX_LIBRARIES}
 	${ORTP_LIBRARIES}
 	mediastreamer_base
 )
@@ -399,9 +400,6 @@ if(BZRTP_FOUND)
 endif()
 if(SRTP_FOUND)
 	list(APPEND VOIP_LIBS ${SRTP_LIBRARIES})
-endif()
-if(POLARSSL_FOUND)
-	list(APPEND VOIP_LIBS ${POLARSSL_LIBRARIES})
 endif()
 if(GSM_FOUND)
 	list(APPEND VOIP_LIBS ${GSM_LIBRARIES})
