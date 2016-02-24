@@ -177,18 +177,18 @@ static void h264_enc_process(MSFilter *f) {
 	mblk_t *frame;
 	OSStatus err;
 	CMTime p_time = CMTimeMake(f->ticker->time, 1000);
-	CVPixelBufferPoolRef pixbuf_pool;
+	//CVPixelBufferPoolRef pixbuf_pool;
 	
 	if(!ctx->is_configured) {
 		ms_queue_flush(f->inputs[0]);
 		return;
 	}
-	
+	/*
 	pixbuf_pool = VTCompressionSessionGetPixelBufferPool(ctx->session);
 	if(pixbuf_pool == NULL) {
 		ms_error("VideoToolbox: no pool of pixel buffers found");
 		return;
-	}
+	}*/
 	
 	while((frame = ms_queue_get(f->inputs[0]))) {
 		YuvBuf src_yuv_frame, dst_yuv_frame = {0};
@@ -197,7 +197,14 @@ static void h264_enc_process(MSFilter *f) {
 		int i;
 		
 		ms_yuv_buf_init_from_mblk(&src_yuv_frame, frame);
-		CVPixelBufferPoolCreatePixelBuffer(NULL, pixbuf_pool, &pixbuf);
+        CFNumberRef value;
+        CFMutableDictionaryRef pixbuf_attr = CFDictionaryCreateMutable(NULL, 0, NULL, NULL);
+        int pixel_type = kCVPixelFormatType_420YpCbCr8Planar;
+        
+        value = CFNumberCreate(NULL, kCFNumberIntType, &pixel_type);
+        CFDictionarySetValue(pixbuf_attr, kCVPixelBufferPixelFormatTypeKey, value);
+        CVPixelBufferCreate(NULL, ctx->conf.vsize.width, ctx->conf.vsize.height, kCVPixelFormatType_420YpCbCr8Planar, pixbuf_attr,  &pixbuf);
+        //CVPixelBufferPoolCreatePixelBuffer(NULL, pixbuf_pool, &pixbuf);
 		CVPixelBufferLockBaseAddress(pixbuf, 0);
 		dst_yuv_frame.w = (int)CVPixelBufferGetWidth(pixbuf);
 		dst_yuv_frame.h = (int)CVPixelBufferGetHeight(pixbuf);
