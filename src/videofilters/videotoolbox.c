@@ -24,6 +24,7 @@
 #include "mediastreamer2/rfc3984.h"
 #include "mediastreamer2/msticker.h"
 #include "mediastreamer2/videostarter.h"
+#include "TargetConditionals.h"
 
 const MSVideoConfiguration h264_video_confs[] = {
 	MS_VIDEO_CONF(1536000,  2560000, SXGA_MINUS, 25, 2),
@@ -177,19 +178,20 @@ static void h264_enc_process(MSFilter *f) {
 	mblk_t *frame;
 	OSStatus err;
 	CMTime p_time = CMTimeMake(f->ticker->time, 1000);
-	//CVPixelBufferPoolRef pixbuf_pool;
-	
+#if TARGET_OS_IPHONE
+    CVPixelBufferPoolRef pixbuf_pool;
+#endif
 	if(!ctx->is_configured) {
 		ms_queue_flush(f->inputs[0]);
 		return;
 	}
-	/*
+#if TARGET_OS_IPHONE
 	pixbuf_pool = VTCompressionSessionGetPixelBufferPool(ctx->session);
 	if(pixbuf_pool == NULL) {
 		ms_error("VideoToolbox: no pool of pixel buffers found");
 		return;
-	}*/
-	
+	}
+#endif
 	while((frame = ms_queue_get(f->inputs[0]))) {
 		YuvBuf src_yuv_frame, dst_yuv_frame = {0};
 		CVPixelBufferRef pixbuf;
@@ -197,15 +199,18 @@ static void h264_enc_process(MSFilter *f) {
 		int i;
 		
 		ms_yuv_buf_init_from_mblk(&src_yuv_frame, frame);
-        CFNumberRef value;
-        CFMutableDictionaryRef pixbuf_attr = CFDictionaryCreateMutable(NULL, 0, NULL, NULL);
-        int pixel_type = kCVPixelFormatType_420YpCbCr8Planar;
         
         value = CFNumberCreate(NULL, kCFNumberIntType, &pixel_type);
         CFDictionarySetValue(pixbuf_attr, kCVPixelBufferPixelFormatTypeKey, value);
+#if TARGET_OS_IPHONE
+        CVPixelBufferPoolCreatePixelBuffer(NULL, pixbuf_pool, &pixbuf);
+#else
+        CFNumberRef value;
+        CFMutableDictionaryRef pixbuf_attr = CFDictionaryCreateMutable(NULL, 0, NULL, NULL);
+        int pixel_type = kCVPixelFormatType_420YpCbCr8Planar;
         CVPixelBufferCreate(NULL, ctx->conf.vsize.width, ctx->conf.vsize.height, kCVPixelFormatType_420YpCbCr8Planar, pixbuf_attr,  &pixbuf);
-        //CVPixelBufferPoolCreatePixelBuffer(NULL, pixbuf_pool, &pixbuf);
-		CVPixelBufferLockBaseAddress(pixbuf, 0);
+#endif
+        CVPixelBufferLockBaseAddress(pixbuf, 0);
 		dst_yuv_frame.w = (int)CVPixelBufferGetWidth(pixbuf);
 		dst_yuv_frame.h = (int)CVPixelBufferGetHeight(pixbuf);
 		for(i=0; i<3; i++) {
