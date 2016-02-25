@@ -198,16 +198,15 @@ static void h264_enc_process(MSFilter *f) {
 		CFMutableDictionaryRef enc_param = NULL;
 		int i;
 		
-		ms_yuv_buf_init_from_mblk(&src_yuv_frame, frame);
-        
-        value = CFNumberCreate(NULL, kCFNumberIntType, &pixel_type);
-        CFDictionarySetValue(pixbuf_attr, kCVPixelBufferPixelFormatTypeKey, value);
+        ms_yuv_buf_init_from_mblk(&src_yuv_frame, frame);
 #if TARGET_OS_IPHONE
         CVPixelBufferPoolCreatePixelBuffer(NULL, pixbuf_pool, &pixbuf);
 #else
         CFNumberRef value;
         CFMutableDictionaryRef pixbuf_attr = CFDictionaryCreateMutable(NULL, 0, NULL, NULL);
         int pixel_type = kCVPixelFormatType_420YpCbCr8Planar;
+        value = CFNumberCreate(NULL, kCFNumberIntType, &pixel_type);
+        CFDictionarySetValue(pixbuf_attr, kCVPixelBufferPixelFormatTypeKey, value);
         CVPixelBufferCreate(NULL, ctx->conf.vsize.width, ctx->conf.vsize.height, kCVPixelFormatType_420YpCbCr8Planar, pixbuf_attr,  &pixbuf);
 #endif
         CVPixelBufferLockBaseAddress(pixbuf, 0);
