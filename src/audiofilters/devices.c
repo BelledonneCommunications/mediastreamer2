@@ -34,7 +34,7 @@
  * 1st column: list of triplet frequency, gain, width
  * 2nd column: mic gain in db
 */
-static SoundDeviceAudioHacks SonySGP511Hacks = { "50:0.01:100 600:0.2:100 1350:0.2:100 2000:0.2:100", -4 };
+static SoundDeviceAudioHacks SonySGP511Hacks = { "50:0.01:100 600:0.2:100 1350:0.2:100 2000:0.2:100", -4, NULL, 0 };
 
 /* 
  * 1st column: value of ro.product.manufacturer 
@@ -57,6 +57,7 @@ static SoundDeviceDescription devices[]={
 	{	"HTC",					"HTC One_M8",   		"msm8974",      0,      120 },
 	{	"LGE",					"LS670",				"",				0,	170 },
 	{	"LGE",					"Nexus 5",				"msm8974",		0,	0 , 16000 },
+	{	"LGE", 					"LG-H815",				"msm8992",	DEVICE_HAS_BUILTIN_AEC, 0 },
 	
 	{	"motorola",				"DROID RAZR",			"",				0,	400 },
 	{	"motorola",				"MB860",				"",				0,	200 },

@@ -33,6 +33,7 @@ mediastreamer2_include_HEADERS=allfilters.h \
 				msmediaplayer.h \
 				msqueue.h \
 				msrtp.h \
+				msrtt4103.h \
 				mssndcard.h \
 				mstee.h \
 				msticker.h \
@@ -50,10 +51,8 @@ mediastreamer2_include_HEADERS=allfilters.h \
 				stun.h \
 				stun_udp.h \
 				upnp_igd.h \
-				videostarter.h \
 				x11_helper.h \
-				zrtp.h \
-				msrtt4103.h
+				zrtp.h
 
 EXTRA_DIST=$(mediastreamer2_include_HEADERS)
 

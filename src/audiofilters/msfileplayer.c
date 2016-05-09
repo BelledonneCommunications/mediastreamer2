@@ -47,6 +47,7 @@ struct _PlayerData{
 	int pause_time;
 	int count;
 	int samplesize;
+	char *mime;
 	uint32_t ts;
 	bool_t swap;
 	bool_t is_raw;
@@ -71,6 +72,7 @@ static void player_init(MSFilter *f){
 	d->rate=8000;
 	d->nchannels=1;
 	d->samplesize=2;
+	d->mime = "pcm";
 	d->hsize=0;
 	d->loop_after=-1; /*by default, don't loop*/
 	d->pause_time=0;
@@ -376,22 +378,18 @@ static void player_process(MSFilter *f){
 					ms_queue_put(f->outputs[0],om);
 				}else freemsg(om);
 				if (err<bytes){
-					ms_filter_notify_no_arg(f,MS_PLAYER_EOF);
-					/*for compatibility:*/
-					ms_filter_notify_no_arg(f,MS_FILE_PLAYER_EOF);
+					
 					lseek(d->fd,d->hsize,SEEK_SET);
 
 					/* special value for playing file only once */
-					if (d->loop_after<0)
-					{
+					if (d->loop_after<0){
 						d->state=MSPlayerPaused;
-						ms_filter_unlock(f);
-						return;
-					}
-
-					if (d->loop_after>=0){
+					}else if (d->loop_after>=0){
 						d->pause_time=d->loop_after;
 					}
+					ms_filter_notify_no_arg(f,MS_PLAYER_EOF);
+					/*for compatibility:*/
+					ms_filter_notify_no_arg(f,MS_FILE_PLAYER_EOF);
 				}
 			}else{
 				ms_warning("Fail to read %i bytes: %s",bytes,strerror(errno));
@@ -439,7 +437,23 @@ static int player_get_nch(MSFilter *f, void *arg){
 static int player_get_fmtp(MSFilter *f, void *arg){
 	PlayerData *d=(PlayerData*)f->data;
 	MSPinFormat *pinfmt = (MSPinFormat*)arg;
-	if (pinfmt->pin == 0) pinfmt->fmt = ms_factory_get_audio_format(f->factory, "pcm", d->rate, d->nchannels, NULL);
+	if (pinfmt->pin == 0) pinfmt->fmt = ms_factory_get_audio_format(f->factory, d->mime, d->rate, d->nchannels, NULL);
+	return 0;
+}
+
+static int player_set_fmtp(MSFilter *f, void *arg){
+	PlayerData *d=(PlayerData*)f->data;
+	MSPinFormat *pinfmt = (MSPinFormat*)arg;
+	ms_filter_lock(f);
+	d->rate = pinfmt->fmt->rate;
+	d->nchannels = pinfmt->fmt->nchannels;
+	d->mime = pinfmt->fmt->encoding;
+	if (strcmp(d->mime, "L16") == 0) {
+		d->swap = TRUE;
+	} else {
+		d->swap = FALSE;
+	}
+	ms_filter_unlock(f);
 	return 0;
 }
 
@@ -461,6 +475,7 @@ static MSFilterMethod player_methods[]={
 	{ MS_PLAYER_GET_STATE, player_get_state },
 	{ MS_PLAYER_SET_LOOP, player_loop },
 	{ MS_FILTER_GET_OUTPUT_FMT, player_get_fmtp },
+	{ MS_FILTER_SET_OUTPUT_FMT, player_set_fmtp },
 	{	0,			NULL		}
 };
 

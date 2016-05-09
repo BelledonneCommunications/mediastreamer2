@@ -21,8 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "mediastreamer2/rfc3984.h"
 #include "mediastreamer2/msvideo.h"
 #include "mediastreamer2/msticker.h"
-#include "mediastreamer2/videostarter.h"
+#include "mediastreamer2/mscodecutils.h"
 #include "android_mediacodec.h"
+#include "h264utils.h"
 
 #include <jni.h>
 #include <media/NdkMediaCodec.h>
@@ -48,16 +49,27 @@ static const MSVideoConfiguration mediaCodecH264_conf_list[] = {
 
 typedef struct _EncData{
 	AMediaCodec *codec;
-	bool isYUV;
 	const MSVideoConfiguration *vconf_list;
 	MSVideoConfiguration vconf;
 	Rfc3984Context *packer;
 	uint64_t framenum;
-	bool_t avpf_enabled;
-	bool_t force_keyframe;
 	int mode;
 	MSVideoStarter starter;
+	MSIFrameRequestsLimiterCtx iframe_limiter;
+	mblk_t *sps,*pps; /*lastly generated SPS, PPS, in case we need to repeat them*/
+	bool_t avpf_enabled;
+	bool isYUV;
 }EncData;
+
+static void set_mblk(mblk_t **packet, mblk_t *newone){
+	if (newone){
+		newone = copyb(newone);
+	}
+	if (*packet){
+		freemsg(*packet);
+	}
+	*packet = newone;
+}
 
 static void enc_init(MSFilter *f){
 	MSVideoSize vsize;
@@ -67,7 +79,7 @@ static void enc_init(MSFilter *f){
 	d->isYUV=TRUE;
 	d->mode=1;
 	d->avpf_enabled=FALSE;
-	d->force_keyframe=FALSE;
+	
 	d->framenum=0;
 	d->vconf_list=mediaCodecH264_conf_list;
 	MS_VIDEO_SIZE_ASSIGN(vsize, CIF);
@@ -79,103 +91,78 @@ static void enc_init(MSFilter *f){
 static void enc_preprocess(MSFilter* f) {
 	AMediaCodec *codec;
 	AMediaFormat *format;
-	media_status_t status;
+	media_status_t status = AMEDIA_ERROR_UNSUPPORTED;
 	EncData *d=(EncData*)f->data;
+	
 	d->packer=rfc3984_new();
 	rfc3984_set_mode(d->packer,d->mode);
 	rfc3984_enable_stap_a(d->packer,FALSE);
 	ms_video_starter_init(&d->starter);
+	ms_iframe_requests_limiter_init(&d->iframe_limiter, 1000);
 
 	codec = AMediaCodec_createEncoderByType("video/avc");
-    d->codec = codec;
+	d->codec = codec;
 
 	format = AMediaFormat_new();
 	AMediaFormat_setString(format, "mime", "video/avc");
 	AMediaFormat_setInt32(format, "width", d->vconf.vsize.width);
 	AMediaFormat_setInt32(format, "height", d->vconf.vsize.height);
 	AMediaFormat_setInt32(format, "i-frame-interval", 20);
-	AMediaFormat_setInt32(format, "color-format", 19);
 	AMediaFormat_setInt32(format, "bitrate", d->vconf.required_bitrate);
 	AMediaFormat_setInt32(format, "frame-rate", d->vconf.fps);
 	AMediaFormat_setInt32(format, "bitrate-mode",1);
-	status = AMediaCodec_configure(d->codec, format, NULL, NULL, AMEDIACODEC_CONFIGURE_FLAG_ENCODE);
-
+	
 	if(status != 0){
 		d->isYUV = FALSE;
-		AMediaFormat_setInt32(format, "color-format", 21);
-       	AMediaCodec_configure(d->codec, format, NULL, NULL, AMEDIACODEC_CONFIGURE_FLAG_ENCODE);
+		AMediaFormat_setInt32(format, "color-format", 21); /*the semi-planar YUV*/
+		status = AMediaCodec_configure(d->codec, format, NULL, NULL, AMEDIACODEC_CONFIGURE_FLAG_ENCODE);
 	}
-
-    AMediaCodec_start(d->codec);
-    AMediaFormat_delete(format);
+	
+	if(status != 0){
+		d->isYUV = TRUE;
+		AMediaFormat_setInt32(format, "color-format", 19); /*basic YUV420P*/
+		status = AMediaCodec_configure(d->codec, format, NULL, NULL, AMEDIACODEC_CONFIGURE_FLAG_ENCODE);
+	}
+	
+	if(status != 0){
+		d->isYUV = TRUE;
+		AMediaFormat_setInt32(format, "color-format", 0x7f420888); /*the new "flexible YUV", appeared in API23*/
+		status = AMediaCodec_configure(d->codec, format, NULL, NULL, AMEDIACODEC_CONFIGURE_FLAG_ENCODE);
+	}
+	
+	if (status != 0){
+		ms_error("MSMediaCodecH264Enc: Could not configure encoder.");
+		AMediaCodec_delete(d->codec);
+		d->codec = NULL;
+	}
+	
+	if (d->codec){
+		if (AMediaCodec_start(d->codec) != AMEDIA_OK){
+			ms_error("MSMediaCodecH264Enc: Could not start encoder.");
+			AMediaCodec_delete(d->codec);
+			d->codec = NULL;
+		}
+	}
+	AMediaFormat_delete(format);
 }
 
 static void enc_postprocess(MSFilter *f) {
 	EncData *d=(EncData*)f->data;
 	rfc3984_destroy(d->packer);
-	AMediaCodec_flush(d->codec);
-	AMediaCodec_stop(d->codec);
+	if (d->codec){
+		AMediaCodec_flush(d->codec);
+		AMediaCodec_stop(d->codec);
+		AMediaCodec_delete(d->codec);
+	}
+	set_mblk(&d->sps, NULL);
+	set_mblk(&d->pps, NULL);
 	d->packer=NULL;
 }
 
 static void enc_uninit(MSFilter *f){
 	EncData *d=(EncData*)f->data;
-	AMediaCodec_stop(d->codec);
-    AMediaCodec_delete(d->codec);
+	
 	ms_free(d);
-}
-
-static void  pushNalu(uint8_t *begin, uint8_t *end, uint32_t ts, bool marker, MSQueue *nalus){
-	uint8_t *src=begin;
-	size_t nalu_len = (end-begin);
-	uint8_t nalu_byte  = *src++;
-	unsigned ecount = 0;
-
-	mblk_t *m=allocb(nalu_len,0);
-
-	// Removal of the 3 in a 003x sequence
-	// This emulation prevention byte is normally part of a NAL unit.
-	/* H.264 standard sys in par 7.4.1 page 58
-		emulation_prevention_three_byte is a byte equal to 0x03.
-		When an emulation_prevention_three_byte is present in a NAL unit, it shall be discarded by the decoding process.
-		Within the NAL unit, the following three-byte sequence shall not occur at any byte-aligned position: 0x000000, 0x000001, 0x00002
-	*/
-	*m->b_wptr++=nalu_byte;
-	while (src<end-3) {
-		if (src[0]==0 && src[1]==0 && src[2]==3){
-			*m->b_wptr++=0;
-			*m->b_wptr++=0;
-			// drop the emulation_prevention_three_byte
-			src+=3;
-			++ecount;
-			continue;
-		}
-		*m->b_wptr++=*src++;
-	}
-	*m->b_wptr++=*src++;
-	*m->b_wptr++=*src++;
-	*m->b_wptr++=*src++;
-
-	ms_queue_put(nalus, m);
-}
-
-static void extractNalus(uint8_t *frame, int frame_size, uint32_t ts, MSQueue *nalus){
-	int i;
-	uint8_t *p,*begin=NULL;
-	int zeroes=0;
-
-	for(i=0,p=frame;i<frame_size;++i){
-		if (*p==0){
-			++zeroes;
-		}else if (zeroes>=2 && *p==1 ){
-			if (begin){
-				pushNalu(begin,p-zeroes,ts,false,nalus);
-			}
-			begin=p+1;
-		}else zeroes=0;
-		++p;
-	}
-	if (begin) pushNalu(begin,p,ts,true,nalus);
 }
 
 static void enc_process(MSFilter *f){
@@ -191,12 +178,18 @@ static void enc_process(MSFilter *f){
 	}
 
 	ms_queue_init(&nalus);
-    while((im=ms_queue_get(f->inputs[0]))!=NULL){
+	while((im=ms_queue_get(f->inputs[0]))!=NULL){
 		if (ms_yuv_buf_init_from_mblk(&pic,im)==0){
 			AMediaCodecBufferInfo info;
 			uint8_t *buf=NULL;
-        	size_t bufsize;
-        	ssize_t ibufidx, obufidx;
+			size_t bufsize;
+			ssize_t ibufidx, obufidx;
+			
+			if (ms_iframe_requests_limiter_iframe_requested(&d->iframe_limiter, f->ticker->time) || 
+				(d->avpf_enabled == FALSE && ms_video_starter_need_i_frame(&d->starter, f->ticker->time))) {
+				/*Force a key-frame*/
+				AMediaCodec_setParams(d->codec,"");
+			}
 
 			ibufidx = AMediaCodec_dequeueInputBuffer(d->codec, TIMEOUT_US);
 			if (ibufidx >= 0) {
@@ -221,31 +214,65 @@ static void enc_process(MSFilter *f){
 					}
 					AMediaCodec_queueInputBuffer(d->codec, ibufidx, 0, (size_t)(pic.w * pic.h)*3/2, f->ticker->time*1000,0);
 				}
+			}else if (ibufidx == AMEDIA_ERROR_UNKNOWN){
+				ms_error("MSMediaCodecH264Enc: AMediaCodec_dequeueInputBuffer() had an exception");
 			}
 
-            obufidx = AMediaCodec_dequeueOutputBuffer(d->codec, &info, TIMEOUT_US);
-            while(obufidx >= 0) {
+			bool have_seen_sps_pps = FALSE; /*this checks whether at a single timestamp point we dequeued SPS PPS before IDR*/
+			while((obufidx = AMediaCodec_dequeueOutputBuffer(d->codec, &info, TIMEOUT_US)) >= 0) {
 				buf = AMediaCodec_getOutputBuffer(d->codec, obufidx, &bufsize);
-				extractNalus(buf,info.size,ts,&nalus);
-                AMediaCodec_releaseOutputBuffer(d->codec, obufidx, FALSE);
-				obufidx = AMediaCodec_dequeueOutputBuffer(d->codec, &info, TIMEOUT_US);
-				rfc3984_pack(d->packer,&nalus,f->outputs[0],ts);
+				if (buf){
+					mblk_t *m;
+					ms_h264_bitstream_to_nalus(buf, info.size, &nalus);
+					
+					if (!ms_queue_empty(&nalus)){
+						m = ms_queue_peek_first(&nalus);
+						switch(ms_h264_nalu_get_type(m)){
+							case MSH264NaluTypeIDR:
+								ms_iframe_requests_limiter_notify_iframe_sent(&d->iframe_limiter, f->ticker->time);
+								if (!have_seen_sps_pps){
+									ms_message("MSMediaCodecH264Enc: seeing IDR without prior SPS/PPS, so manually adding them.");
+									if (d->sps && d->pps){
+										ms_queue_insert(&nalus, m, copyb(d->sps));
+										ms_queue_insert(&nalus, m, copyb(d->pps));
+									}else{
+										ms_error("MSMediaCodecH264Enc: SPS or PPS are not known !");
+									}
+								}
+							break;
+							case MSH264NaluTypeSPS:
+								ms_iframe_requests_limiter_notify_iframe_sent(&d->iframe_limiter, f->ticker->time);
+								ms_message("MSMediaCodecH264Enc: seeing SPS");
+								have_seen_sps_pps = TRUE;
+								set_mblk(&d->sps, m);
+								m = ms_queue_next(&nalus, m);
+								if (!ms_queue_end(&nalus, m) && ms_h264_nalu_get_type(m) == MSH264NaluTypePPS){
+									ms_message("MSMediaCodecH264Enc: seeing PPS");
+									set_mblk(&d->pps, m);
+								}
+							break;
+							case MSH264NaluTypePPS:
+								ms_warning("MSMediaCodecH264Enc: unexpecting starting PPS");
+							break;
+						}
+						rfc3984_pack(d->packer,&nalus,f->outputs[0],ts);
+						if (d->framenum==0){
+							ms_video_starter_first_frame(&d->starter, f->ticker->time);
+						}
+						d->framenum++;
+					}else{
+						ms_error("MSMediaCodecH264Enc: no NALUs in buffer obtained from MediaCodec");
+					}
+				}
+				AMediaCodec_releaseOutputBuffer(d->codec, obufidx, FALSE);
 			}
-
-
-			if (d->framenum==0)
-            	ms_video_starter_first_frame(&d->starter, f->ticker->time);
-            d->framenum++;
-
+			if (obufidx == AMEDIA_ERROR_UNKNOWN){
+				ms_error("MSMediaCodecH264Enc: AMediaCodec_dequeueOutputBuffer() had an exception");
+			}
 		}
 		freemsg(im);
 	}
 
-
-	if (d->force_keyframe == TRUE) {
-		AMediaCodec_setParams(d->codec,"");
-		d->force_keyframe = FALSE;
-	}
 }
 
 static int enc_get_br(MSFilter *f, void*arg){
@@ -320,13 +347,15 @@ static int enc_set_vsize(MSFilter *f, void *arg){
 
 static int enc_notify_pli(MSFilter *f, void *data) {
 	EncData *d = (EncData *)f->data;
-	d->force_keyframe = TRUE;
+	ms_message("MSMediaCodecH264Enc: PLI requested");
+	ms_iframe_requests_limiter_request_iframe(&d->iframe_limiter);
 	return 0;
 }
 
 static int enc_notify_fir(MSFilter *f, void *data) {
 	EncData *d = (EncData *)f->data;
-	d->force_keyframe = TRUE;
+	ms_message("MSMediaCodecH264Enc: FIR requested");
+	ms_iframe_requests_limiter_request_iframe(&d->iframe_limiter);
 	return 0;
 }
 

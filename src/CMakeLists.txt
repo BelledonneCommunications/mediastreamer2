@@ -21,6 +21,9 @@
 ############################################################################
 
 find_library(LIBM NAMES m)
+if(ANDROID)
+	find_library(ANDROID_CPU_FEATURES_LIBRARY NAMES cpufeatures)
+endif()
 
 if(MSVC AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsPhone" AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
 	find_library(LIBGCC NAMES gcc)
@@ -168,6 +171,7 @@ set(VOIP_SOURCE_FILES_C
 	voip/bitratedriver.c
 	voip/ice.c
 	voip/mediastream.c
+	voip/msiframerequestslimiter.c
 	voip/msmediaplayer.c
 	voip/msvoip.c
 	voip/private.h
@@ -380,18 +384,20 @@ if(ENABLE_VIDEO)
 			voip/vp8rtpfmt.h
 		)
 	endif()
-	if(MATROSKA2_FOUND)
-		list(APPEND VOIP_SOURCE_FILES_C
-			videofilters/mkv.c
-			utils/mkv_reader.c
-		)
-	endif()
 	if(X11_FOUND)
 		list(APPEND VOIP_SOURCE_FILES_C utils/x11_helper.c)
 	endif()
 	if(XV_FOUND)
 		list(APPEND VOIP_SOURCE_FILES_C videofilters/x11video.c)
 	endif()
+endif()
+if(MATROSKA2_FOUND)
+	list(APPEND VOIP_SOURCE_FILES_C
+		videofilters/mkv.c
+		utils/mkv_reader.c
+		voip/rfc2429.h
+		voip/rfc3984.c
+	)
 endif()
 
 set(VOIP_SOURCE_FILES_ALL ${VOIP_SOURCE_FILES_C} ${VOIP_SOURCE_FILES_CXX} ${VOIP_SOURCE_FILES_OBJC})
@@ -448,7 +454,11 @@ if(VOIP_SOURCE_FILES_ASM)
 	endif()
 	get_directory_property(DIRECTORY_PROPERTY_COMPILE_OPTIONS "COMPILE_OPTIONS")
 	string(REPLACE ";" " " DIRECTORY_PROPERTY_COMPILE_OPTIONS "${DIRECTORY_PROPERTY_COMPILE_OPTIONS}")
-	set(CMAKE_ASM_COMPILE_OBJECT "<CMAKE_ASM_COMPILER> ${CMAKE_CPP_FLAGS} ${CMAKE_C_FLAGS} ${DIRECTORY_PROPERTY_COMPILE_OPTIONS} ${ARCH_OPTIONS} -o <OBJECT> -c <SOURCE>")
+	set(CMAKE_ASM_TARGET_FLAG "")
+	if(CMAKE_C_COMPILER_TARGET)
+		set(CMAKE_ASM_TARGET_FLAG "--target=${CMAKE_C_COMPILER_TARGET}")
+	endif()
+	set(CMAKE_ASM_COMPILE_OBJECT "<CMAKE_ASM_COMPILER> ${CMAKE_ASM_TARGET_FLAG} ${CMAKE_CPP_FLAGS} ${CMAKE_C_FLAGS} ${DIRECTORY_PROPERTY_COMPILE_OPTIONS} ${ARCH_OPTIONS} -o <OBJECT> -c <SOURCE>")
 	enable_language(ASM)
 endif()
 
@@ -467,6 +477,9 @@ if(WIN32)
 endif()
 if(LIBM)
 	list(APPEND VOIP_LIBS ${LIBM})
+endif()
+if(ANDROID_CPU_FEATURES_LIBRARY)
+	list(APPEND VOIP_LIBS ${ANDROID_CPU_FEATURES_LIBRARY})
 endif()
 if(ANDROID AND ENABLE_VIDEO)
 	list(APPEND VOIP_LIBS GLESv2)

@@ -1,6 +1,6 @@
 /*
  mediastreamer2 library - modular sound and video processing and streaming
- Copyright (C) 2006  Simon MORLAT (simon.morlat@linphone.org)
+ Copyright (C) 2016  Belledonne Communications SARL
 
  This program is free software; you can redistribute it and/or
  modify it under the terms of the GNU General Public License
@@ -23,7 +23,8 @@
 #include "h264utils.h"
 #include "mediastreamer2/rfc3984.h"
 #include "mediastreamer2/msticker.h"
-#include "mediastreamer2/videostarter.h"
+#include "mediastreamer2/mscodecutils.h"
+
 
 const MSVideoConfiguration h264_video_confs[] = {
 	MS_VIDEO_CONF(1536000,  2560000, SXGA_MINUS, 25, 2),
@@ -48,12 +49,12 @@ typedef struct _VTH264EncCtx {
 	bool_t is_configured;
 	bool_t bitrate_changed;
 	bool_t fps_changed;
-	bool_t vfu_requested;
 	const MSFilter *f;
 	const MSVideoConfiguration *video_confs;
 	MSVideoStarter starter;
 	bool_t enable_avpf;
 	bool_t first_frame;
+	MSIFrameRequestsLimiterCtx iframe_limiter;
 } VTH264EncCtx;
 
 static void h264_enc_output_cb(VTH264EncCtx *ctx, void *sourceFrameRefCon, OSStatus status, VTEncodeInfoFlags infoFlags, CMSampleBufferRef sampleBuffer) {
@@ -65,7 +66,7 @@ static void h264_enc_output_cb(VTH264EncCtx *ctx, void *sourceFrameRefCon, OSSta
 	int i;
 
 	if(sampleBuffer == NULL || status != noErr) {
-		ms_error("VideoToolbox: could not encode frame: error %d", status);
+		ms_error("VideoToolbox: could not encode frame: error %d", (int)status);
 		return;
 	}
 
@@ -99,6 +100,7 @@ static void h264_enc_output_cb(VTH264EncCtx *ctx, void *sourceFrameRefCon, OSSta
 				ms_queue_insert(&nalu_queue, insertion_point, nalu);
 				i++;
 			} while(i < parameter_set_count);
+			ms_message("VTH264Encoder: I-frame created");
 		}
 
 		rfc3984_pack(&ctx->packer_ctx, &nalu_queue, &ctx->queue, (uint32_t)(ctx->f->ticker->time * 90));
@@ -121,7 +123,7 @@ static void h264_enc_configure(VTH264EncCtx *ctx) {
 									NULL, pixbuf_attr, NULL, (VTCompressionOutputCallback)h264_enc_output_cb, ctx, &ctx->session);
 	CFRelease(pixbuf_attr);
 	if(err) {
-		ms_error("%s: error code %d", error_msg, err);
+		ms_error("%s: error code %d", error_msg, (int)err);
 		goto fail;
 	}
 
@@ -133,7 +135,7 @@ static void h264_enc_configure(VTH264EncCtx *ctx) {
 	VTSessionSetProperty(ctx->session, kVTCompressionPropertyKey_ExpectedFrameRate, value);
 
 	if((err = VTCompressionSessionPrepareToEncodeFrames(ctx->session)) != 0) {
-		ms_error("Could not prepare the VideoToolbox compression session: error code %d", err);
+		ms_error("Could not prepare the VideoToolbox compression session: error code %d", (int)err);
 		goto fail;
 	}
 
@@ -169,6 +171,7 @@ static void h264_enc_preprocess(MSFilter *f) {
 	VTH264EncCtx *ctx = (VTH264EncCtx *)f->data;
 	h264_enc_configure(ctx);
 	ms_video_starter_init(&ctx->starter);
+	ms_iframe_requests_limiter_init(&ctx->iframe_limiter, 1000);
 	ctx->first_frame = TRUE;
 }
 
@@ -183,14 +186,6 @@ static void h264_enc_process(MSFilter *f) {
 		return;
 	}
 
-#if 0 && TARGET_OS_IPHONE
-	CVPixelBufferPoolRef pixbuf_pool = VTCompressionSessionGetPixelBufferPool(ctx->session);
-	if(pixbuf_pool == NULL) {
-		ms_error("VideoToolbox: fails to get the pixel buffer pool");
-		return;
-	}
-#endif
-
 	while((frame = ms_queue_get(f->inputs[0]))) {
 		YuvBuf src_yuv_frame, dst_yuv_frame = {0};
 		CVPixelBufferRef pixbuf;
@@ -201,15 +196,11 @@ static void h264_enc_process(MSFilter *f) {
 
 		ms_yuv_buf_init_from_mblk(&src_yuv_frame, frame);
 
-#if 0 && TARGET_OS_IPHONE
-		CVPixelBufferPoolCreatePixelBuffer(NULL, pixbuf_pool, &pixbuf);
-#else
 		pixbuf_attr = CFDictionaryCreateMutable(NULL, 0, NULL, NULL);
 		value = CFNumberCreate(NULL, kCFNumberIntType, &pixbuf_fmt);
 		CFDictionarySetValue(pixbuf_attr, kCVPixelBufferPixelFormatTypeKey, value);
 		CVPixelBufferCreate(NULL, ctx->conf.vsize.width, ctx->conf.vsize.height, kCVPixelFormatType_420YpCbCr8Planar, pixbuf_attr,  &pixbuf);
 		CFRelease(pixbuf_attr);
-#endif
 
 		CVPixelBufferLockBaseAddress(pixbuf, 0);
 		dst_yuv_frame.w = (int)CVPixelBufferGetWidth(pixbuf);
@@ -223,7 +214,7 @@ static void h264_enc_process(MSFilter *f) {
 		freemsg(frame);
 
 		ms_filter_lock(f);
-		if(ctx->fps_changed || ctx->bitrate_changed || ctx->vfu_requested) {
+		if(ctx->fps_changed || ctx->bitrate_changed || ms_iframe_requests_limiter_iframe_requested(&ctx->iframe_limiter, f->ticker->time)) {
 			CFNumberRef value;
 			enc_param = CFDictionaryCreateMutable(NULL, 0, NULL, NULL);
 			if(ctx->fps_changed) {
@@ -236,11 +227,12 @@ static void h264_enc_process(MSFilter *f) {
 				CFDictionaryAddValue(enc_param, kVTCompressionPropertyKey_AverageBitRate, value);
 				ctx->bitrate_changed = FALSE;
 			}
-			if(ctx->vfu_requested) {
+			if(ms_iframe_requests_limiter_iframe_requested(&ctx->iframe_limiter, f->ticker->time)) {
+				ms_message("MSVTH264Encoder: requesting encoder for I-frame");
 				int force_keyframe = 1;
 				value = CFNumberCreate(NULL, kCFNumberIntType, &force_keyframe);
 				CFDictionaryAddValue(enc_param, kVTEncodeFrameOptionKey_ForceKeyFrame, value);
-				ctx->vfu_requested = FALSE;
+				ms_iframe_requests_limiter_notify_iframe_sent(&ctx->iframe_limiter, f->ticker->time);
 			}
 		}
 		ms_filter_unlock(f);
@@ -260,7 +252,7 @@ static void h264_enc_process(MSFilter *f) {
 		}
 
 		if((err = VTCompressionSessionEncodeFrame(ctx->session, pixbuf, p_time, kCMTimeInvalid, enc_param, NULL, NULL)) != noErr) {
-			ms_error("VideoToolbox: could not pass a pixbuf to the encoder: error code %d", err);
+			ms_error("VideoToolbox: could not pass a pixbuf to the encoder: error code %d", (int)err);
 		}
 		CFRelease(pixbuf);
 
@@ -296,13 +288,21 @@ static int h264_enc_get_video_size(MSFilter *f, MSVideoSize *vsize) {
 
 static int h264_enc_set_video_size(MSFilter *f, const MSVideoSize *vsize) {
 	VTH264EncCtx *ctx = (VTH264EncCtx *)f->data;
+	MSVideoConfiguration conf;
 	ms_message("VideoToolboxEnc: requested video size: %dx%d", vsize->width, vsize->height);
 	if(ctx->is_configured) {
 		ms_error("VideoToolbox: could not set video size: encoder is running");
 		return -1;
 	}
-	ctx->conf = ms_video_find_best_configuration_for_size(ctx->video_confs, *vsize, f->factory->cpu_count);
-	ms_message("VideoToolboxEnc: selected video conf: size=%dx%d, framerate=%ffps", ctx->conf.vsize.width, ctx->conf.vsize.height, ctx->conf.fps);
+	conf = ms_video_find_best_configuration_for_size(ctx->video_confs, *vsize, f->factory->cpu_count);
+	ctx->conf.vsize = conf.vsize;
+	ctx->conf.fps = conf.fps;
+	ctx->conf.bitrate_limit = conf.bitrate_limit;
+	if(ctx->conf.required_bitrate > ctx->conf.bitrate_limit) {
+		ctx->conf.required_bitrate = ctx->conf.bitrate_limit;
+	}
+	ms_message("VideoToolboxEnc: selected video conf: size=%dx%d, framerate=%ffps, bitrate=%dbit/s",
+			   ctx->conf.vsize.width, ctx->conf.vsize.height, ctx->conf.fps, ctx->conf.required_bitrate);
 	return 0;
 }
 
@@ -337,12 +337,15 @@ static int h264_enc_set_fps(MSFilter *f, const float *fps) {
 	ctx->conf.fps = *fps;
 	if(ctx->is_configured) ctx->fps_changed = TRUE;
 	ms_filter_unlock(f);
+	ms_message("VideoToolboxEnc: new frame rate target (%ffps)", ctx->conf.fps);
 	return 0;
 }
 
 static int h264_enc_req_vfu(MSFilter *f, void *ptr) {
+	VTH264EncCtx *ctx = (VTH264EncCtx *)f->data;
 	ms_filter_lock(f);
-	((VTH264EncCtx *)f->data)->vfu_requested = TRUE;
+	ms_video_starter_deactivate(&ctx->starter);
+	ms_iframe_requests_limiter_request_iframe(&ctx->iframe_limiter);
 	ms_filter_unlock(f);
 	return 0;
 }
@@ -350,9 +353,10 @@ static int h264_enc_req_vfu(MSFilter *f, void *ptr) {
 static int h264_enc_enable_avpf(MSFilter *f, const bool_t *enable_avpf) {
 	VTH264EncCtx *ctx = (VTH264EncCtx *)f->data;
 	if(ctx->is_configured) {
-		ms_error("VideoToolbox: could not %s AVPF: encoder is running", *enable_avpf ? "enable" : "disable");
+		ms_error("VideoToolboxEnc: could not %s AVPF: encoder is running", *enable_avpf ? "enable" : "disable");
 		return -1;
 	}
+	ms_message("VideoToolboxEnc: %s AVPF", *enable_avpf ? "enabling" : "disabling");
 	ctx->enable_avpf = *enable_avpf;
 	return 0;
 }
@@ -363,14 +367,34 @@ static int h264_enc_get_config_list(MSFilter *f, const MSVideoConfiguration **co
 }
 
 static int h264_enc_set_config_list(MSFilter *f, const MSVideoConfiguration **conf_list) {
-	const MSVideoConfiguration *conf = *conf_list;
-	((VTH264EncCtx *)f->data)->video_confs = conf ? conf : h264_video_confs;
+	VTH264EncCtx *ctx = (VTH264EncCtx *)f->data;
+	ctx->video_confs = *conf_list ? *conf_list : h264_video_confs;
+	ctx->conf = ms_video_find_best_configuration_for_size(ctx->video_confs, ctx->conf.vsize, f->factory->cpu_count);
+	ms_message("VideoToolboxEnc: new video settings: %dx%d, %dbit/s, %ffps",
+			   ctx->conf.vsize.width, ctx->conf.vsize.height,
+			   ctx->conf.required_bitrate, ctx->conf.fps);
 	return 0;
 }
 
 static int h264_enc_set_config(MSFilter *f, const MSVideoConfiguration *conf) {
 	VTH264EncCtx *ctx = (VTH264EncCtx *)f->data;
-	ctx->conf = *conf;
+	ms_filter_lock(f);
+	if(ctx->is_configured) {
+		if(ctx->conf.fps != conf->fps) {
+			ctx->conf.fps = conf->fps;
+			ctx->fps_changed = TRUE;
+		}
+		if(ctx->conf.required_bitrate != conf->required_bitrate) {
+			ctx->conf.required_bitrate = conf->required_bitrate;
+			ctx->bitrate_changed = TRUE;
+		}
+	} else {
+		ctx->conf = *conf;
+	}
+	ms_filter_unlock(f);
+	ms_message("VideoToolboxEnc: new video settings: %dx%d, %dbit/s, %ffps",
+			   ctx->conf.vsize.width, ctx->conf.vsize.height,
+			   ctx->conf.required_bitrate, ctx->conf.fps);
 	return 0;
 }
 
@@ -383,6 +407,9 @@ static MSFilterMethod h264_enc_methods[] = {
 	{   MS_FILTER_SET_FPS                       , (MSFilterMethodFunc)h264_enc_set_fps         },
 	{   MS_FILTER_REQ_VFU                       , (MSFilterMethodFunc)h264_enc_req_vfu         },
 	{   MS_VIDEO_ENCODER_REQ_VFU                , (MSFilterMethodFunc)h264_enc_req_vfu         },
+	{	MS_VIDEO_ENCODER_NOTIFY_FIR             , (MSFilterMethodFunc)h264_enc_req_vfu         },
+	{	MS_VIDEO_ENCODER_NOTIFY_PLI             , (MSFilterMethodFunc)h264_enc_req_vfu         },
+	{	MS_VIDEO_ENCODER_NOTIFY_SLI             , (MSFilterMethodFunc)h264_enc_req_vfu         },
 	{   MS_VIDEO_ENCODER_ENABLE_AVPF            , (MSFilterMethodFunc)h264_enc_enable_avpf     },
 	{   MS_VIDEO_ENCODER_GET_CONFIGURATION_LIST , (MSFilterMethodFunc)h264_enc_get_config_list },
 	{   MS_VIDEO_ENCODER_SET_CONFIGURATION_LIST , (MSFilterMethodFunc)h264_enc_set_config_list },
@@ -476,7 +503,7 @@ static bool_t h264_dec_update_format_description(VTH264DecCtx *ctx, const MSList
 	}
 	status = CMVideoFormatDescriptionCreateFromH264ParameterSets(NULL, ps_count, ps_ptrs, ps_sizes, H264_NALU_HEAD_SIZE, &ctx->format_desc);
 	if(status != noErr) {
-		ms_error("VideoToolboxDec: could not find out the input format: %d", status);
+		ms_error("VideoToolboxDec: could not find out the input format: %d", (int)status);
 		return FALSE;
 	}
 	return TRUE;
@@ -494,12 +521,14 @@ static void h264_dec_output_cb(VTH264DecCtx *ctx, void *sourceFrameRefCon,
 	size_t i;
 
 	if(status != noErr || imageBuffer == NULL) {
-		ms_error("VideoToolboxDecoder: fail to decode one frame: error %d", status);
-		ms_filter_notify_no_arg(ctx->f, MS_VIDEO_DECODER_DECODING_ERRORS);
+		ms_error("VideoToolboxDecoder: fail to decode one frame: error %d", (int)status);
+		
 		ms_filter_lock(ctx->f);
 		if(ctx->enable_avpf) {
 			ms_error("VideoToolboxDecoder: sending PLI");
 			ms_filter_notify_no_arg(ctx->f, MS_VIDEO_DECODER_SEND_PLI);
+		}else{
+			ms_filter_notify_no_arg(ctx->f, MS_VIDEO_DECODER_DECODING_ERRORS);
 		}
 		ms_filter_unlock(ctx->f);
 		return;
@@ -544,7 +573,7 @@ static bool_t h264_dec_init_decoder(VTH264DecCtx *ctx) {
 	status = VTDecompressionSessionCreate(NULL, ctx->format_desc, NULL, pixel_parameters, &dec_cb, &ctx->session);
 	CFRelease(pixel_parameters);
 	if(status != noErr) {
-		ms_error("VideoToolboxDecoder: could not create the decoding context: error %d", status);
+		ms_error("VideoToolboxDecoder: could not create the decoding context: error %d", (int)status);
 		return FALSE;
 	}
 	return TRUE;
@@ -586,31 +615,35 @@ static void h264_dec_process(MSFilter *f) {
 	OSStatus status;
 	MSList *parameter_sets = NULL;
 	bool_t unpacking_failed;
+	bool_t iframe_received = FALSE;
 
 	ms_queue_init(&q_nalus);
 	ms_queue_init(&q_nalus2);
 
-	// unpack RTP packet
+	// unpack RTP packets
 	unpacking_failed = FALSE;
 	while((pkt = ms_queue_get(f->inputs[0]))) {
 		unpacking_failed |= (rfc3984_unpack(&ctx->unpacker, pkt, &q_nalus) != 0);
 	}
-	if(unpacking_failed) {
-		ms_error("VideoToolboxDecoder: error while unpacking RTP packets");
-		goto fail;
+	if (unpacking_failed) {
+		ms_warning("VideoToolboxDecoder: error while unpacking RTP packets");
 	}
 
-	// Pull out SPSs and PPSs and put them into the filter context if necessary
+	// Pull SPSs and PPSs out and put them into the filter context if necessary
 	while((nalu = ms_queue_get(&q_nalus))) {
 		MSH264NaluType nalu_type = ms_h264_nalu_get_type(nalu);
 		if(nalu_type == MSH264NaluTypeSPS || nalu_type == MSH264NaluTypePPS) {
 			parameter_sets = ms_list_append(parameter_sets, nalu);
+			iframe_received = TRUE;
 		} else if(ctx->format_desc || parameter_sets) {
 			ms_queue_put(&q_nalus2, nalu);
 		} else {
-			ms_free(nalu);
+			freemsg(nalu);
 		}
 	}
+	
+	if(iframe_received) ms_message("VideoToolboxDecoder: I-frame received");
+	
 	if(parameter_sets) {
 		CMFormatDescriptionRef last_format = ctx->format_desc ? CFRetain(ctx->format_desc) : NULL;
 		h264_dec_update_format_description(ctx, parameter_sets);
@@ -673,7 +706,7 @@ static void h264_dec_process(MSFilter *f) {
 		CFRelease(sample);
 		if(status != noErr) {
 			CFRelease(stream);
-			ms_error("VideoToolboxDecoder: error while passing encoded frames to the decoder: %d", status);
+			ms_error("VideoToolboxDecoder: error while passing encoded frames to the decoder: %d", (int)status);
 			if(status == kVTInvalidSessionErr) {
 				h264_dec_uninit_decoder(ctx);
 			}
@@ -684,12 +717,12 @@ static void h264_dec_process(MSFilter *f) {
 	goto put_frames_out;
 
 fail:
-	ms_filter_notify_no_arg(f, MS_VIDEO_DECODER_DECODING_ERRORS);
+	
 	ms_filter_lock(f);
-	if(ctx->enable_avpf) {
+	if (ctx->enable_avpf) {
 		ms_message("VideoToolboxDecoder: sending PLI");
 		ms_filter_notify_no_arg(f, MS_VIDEO_DECODER_SEND_PLI);
-	}
+	}else ms_filter_notify_no_arg(f, MS_VIDEO_DECODER_DECODING_ERRORS);
 	ms_filter_unlock(f);
 
 put_frames_out:
@@ -799,16 +832,24 @@ MSFilterDesc ms_vt_h264_dec = {
 };
 
 void _register_videotoolbox_if_supported(MSFactory *factory) {
-	if (VTCompressionSessionCreate != NULL
-		&& VTDecompressionSessionCreate != NULL
-		&& CMVideoFormatDescriptionCreateFromH264ParameterSets != NULL) {
-		
+#if TARGET_OS_SIMULATOR
+	ms_warning("VideoToolbox H264 codec is not supported on simulators");
+#else
+
+#ifdef __ios
+	if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_8_0) {
+#else
+	if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber10_8) {
+#endif
+		ms_message("Registering VideoToobox H264 codec");
 		ms_factory_register_filter(factory, &ms_vt_h264_enc);
 		ms_factory_register_filter(factory, &ms_vt_h264_dec);
 	} else {
-		ms_warning("Cannot register VideoToolbox filters. Those filters"
-			" require iOS 8 or MacOSX 10.8");
+		ms_warning("Cannot register VideoToolbox H264 codec. That "
+			"requires iOS 8 or MacOSX 10.8");
 	}
+	
+#endif
 }
 
 
