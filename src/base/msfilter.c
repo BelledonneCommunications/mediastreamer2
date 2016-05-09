@@ -362,6 +362,7 @@ const char * ms_format_type_to_string(MSFormatType type){
 		case MSAudio: return "MSAudio";
 		case MSVideo: return "MSVideo";
 		case MSText: return "MSText";
+		case MSScreensharing: return "MSScreensharing";
 		case MSUnknownMedia: return "MSUnknownMedia";
 	}
 	return "invalid";

@@ -31,6 +31,7 @@ typedef enum _MSFormatType{
 	MSAudio,
 	MSVideo,
 	MSText,
+	MSScreensharing,
 	MSUnknownMedia
 }MSFormatType;
 

@@ -439,6 +439,7 @@ bool_t media_stream_secured (const MediaStream *stream) {
 			VideoStream *vs = (VideoStream*)stream;
 			return ms_media_stream_sessions_secured(&stream->sessions, vs->dir);
 		}
+		case MSScreensharing:
 		case MSUnknownMedia:
 		break;
 	}

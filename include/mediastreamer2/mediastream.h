@@ -37,10 +37,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <mediastreamer2/dtls_srtp.h>
 #include <mediastreamer2/ms_srtp.h>
 
-
 #define PAYLOAD_TYPE_FLAG_CAN_RECV	PAYLOAD_TYPE_USER_FLAG_1
 #define PAYLOAD_TYPE_FLAG_CAN_SEND	PAYLOAD_TYPE_USER_FLAG_2
 
+//#include <freerdp/freerdp.h>
+#include <freerdp/server/shadow.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -1271,6 +1272,63 @@ MS2_PUBLIC void text_stream_putchar32(TextStream *stream, uint32_t i);
 
 MS2_PUBLIC void text_stream_prepare_text(TextStream *stream);
 MS2_PUBLIC void text_stream_unprepare_text(TextStream *stream);
+
+/**
+ * @}
+**/
+
+/**
+ * @addtogroup screensharing_stream_api
+ * @{
+**/
+
+struct _ScreenStream{
+	MediaStream ms;
+	bool_t is_server;
+	rdpShadowServer* server;
+	rdpContext* client;
+	int status;
+	int tcp_port;
+	char addr_ip[64];
+};
+
+typedef struct _ScreenStream ScreenStream;
+
+/**
+ * Creates a ScreensharingStream object listening on a TCP port.
+ * @param loc_tcp_port the local TCP port to listen for screensharing.
+ * @param ipv6 TRUE if ipv6 must be used.
+ * @param factory 
+ * @return a new ScreenStream.
+**/
+MS2_PUBLIC ScreenStream *screensharing_stream_new(int loc_tcp_port, bool_t ipv6);
+
+/**
+ * Creates a ScreensharingStream object listening on a TCP port for a dedicated address.
+ * @param ip ip to listen or connect for screensharing. Can be ::, O.O.O.O or any ip4/6 addresses
+ * @param [in] loc_tcp_port the local TCP port to listen for screensharing.
+ * @param factory 
+ * @return a new ScreenStream.
+**/
+MS2_PUBLIC ScreenStream *screensharing_stream_new2(const char* ip, int loc_tcp_port);
+
+/**
+ * Starts a screensharing stream.
+ *
+ * @param[in] stream ScreensharingStream object previously created with screensharing_stream_new().
+ */
+MS2_PUBLIC ScreenStream* screensharing_stream_start(ScreenStream *stream);
+
+/**
+ *  Stops the screensharing streaming thread and free everything
+**/
+MS2_PUBLIC void screensharing_stream_stop (ScreenStream * stream);
+
+/**
+ * 
+ * @param[in] stream ScreenStream object previously created with screensharing_stream_new().
+ */
+MS2_PUBLIC void screensharing_stream_iterate(ScreenStream *stream);
 
 /**
  * @}

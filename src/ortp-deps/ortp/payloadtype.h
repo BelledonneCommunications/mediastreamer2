@@ -48,6 +48,7 @@ extern "C"{
 #define PAYLOAD_AUDIO_PACKETIZED 1
 #define PAYLOAD_VIDEO 2
 #define PAYLOAD_TEXT 4
+#define PAYLOAD_SCREEN 5
 #define PAYLOAD_OTHER 3  /* ?? */
 
 struct _PayloadType
