@@ -21,12 +21,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "private.h"
 
 #ifdef HAVE_X11_XLIB_H
-#include "../../externals/freerdp/client/X11/xf_client.h"
+#include "../../../../externals/freerdp/client/X11/xf_client.h"
 #endif
 
+#ifdef HAVE_FREERDP
 #include <freerdp/client.h>
 #include <freerdp/freerdp.h>
 #include <freerdp/server/shadow.h>
+#endif
 #include <sys/types.h>
 
 #ifndef _WIN32
@@ -37,10 +39,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 //TODO define WSA stun_udp.h
 
 static void screensharing_stream_free(ScreenStream *stream) {
+#ifdef HAVE_FREERDP
 	if(stream->server!=NULL)
 		shadow_server_uninit(stream->server);
 	else if(stream->client!=NULL)
 		freerdp_client_context_free(stream->client);
+#endif
 	media_stream_free(&stream->ms);
 	ms_free(stream);
 }
@@ -63,10 +67,12 @@ ScreenStream *screensharing_stream_new2(const char* ip, int loc_tcp_port) {
 }
 
 ScreenStream* screensharing_stream_start_client(ScreenStream *stream) {
+#ifdef HAVE_FREERDP
+#ifdef HAVE_X11_XLIB_H
 	RDP_CLIENT_ENTRY_POINTS clientEntryPoints;
 	rdpContext* client;
-
 	RdpClientEntry(&clientEntryPoints);
+	
 
 	client = freerdp_client_context_new(&clientEntryPoints);
 	if (!client)
@@ -76,14 +82,16 @@ ScreenStream* screensharing_stream_start_client(ScreenStream *stream) {
 	client->settings->ServerPort=stream->tcp_port;
 	client->settings->Authentication=FALSE;
 	client->settings->MouseAttached=FALSE;
-	//client->settings->ServerHostname=;
+	client->settings->ServerHostname="localhost";
 
 	freerdp_client_start(client);
-	
+#endif
+#endif
 	return stream;
 }
 
 ScreenStream* screensharing_stream_start_server(ScreenStream *stream) {
+#ifdef HAVE_FREERDP
 	rdpShadowServer* server;
 	int *status = &(stream->status);
 
@@ -111,6 +119,7 @@ fail_server_start:
 	shadow_server_uninit(server);
 fail_server_init:
 	shadow_server_free(server);
+#endif
 	return stream;
 }
 
@@ -121,10 +130,12 @@ ScreenStream* screensharing_stream_start(ScreenStream *stream) {
 }
 
 void screensharing_stream_stop(ScreenStream *stream) {
+#ifdef HAVE_FREERDP
 	if(stream->server!=NULL)
 		shadow_server_stop(stream->server);
 	else if(stream->client!=NULL)
 		freerdp_client_stop(stream->client);
+#endif
 	screensharing_stream_free(stream);
 }
 
