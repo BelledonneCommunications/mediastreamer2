@@ -69,3 +69,5 @@
 #cmakedefine HAVE_PCAP 1
 #cmakedefine HAVE_MATROSKA 1
 #cmakedefine HAVE_VPX 1
+#cmakedefine HAVE_FREERDP_SHADOW 1
+#cmakedefine HAVE_FREERDP_CLIENT 1
