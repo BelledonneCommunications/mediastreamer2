@@ -254,7 +254,11 @@ if(SPEEXDSP_FOUND)
 	list(APPEND VOIP_SOURCE_FILES_C audiofilters/speexec.c)
 endif()
 if(FreeRDP-Shadow_FOUND OR FreeRDP-Client_FOUND)
-	list(APPEND VOIP_SOURCE_FILES_C voip/screensharingstream.c)
+	list(APPEND VOIP_SOURCE_FILES_C
+		screensharing/screensharingstream.c
+		screensharing/screensharingclient.c
+		screensharing/screensharingserver.c
+	)
 endif()
 
 if(ENABLE_VIDEO)
@@ -562,7 +566,11 @@ if (WinPR_FOUND)
 		list(APPEND VOIP_LIBS winpr freerdp-shadow freerdp-shadow-subsystem)
 	endif()
 	if (FreeRDP-Client_FOUND)
-		list(APPEND VOIP_LIBS winpr freerdp-client)
+		if(XFREERDP-CLIENT_FOUND)
+			list(APPEND VOIP_LIBS winpr freerdp-client ${XFREERDP-CLIENT_LIBRARY})
+		else()
+			list(APPEND VOIP_LIBS winpr freerdp-client)
+		endif()
 	endif()
 	list(REMOVE_DUPLICATES VOIP_LIBS)
 endif()

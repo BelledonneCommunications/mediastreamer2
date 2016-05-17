@@ -71,3 +71,4 @@
 #cmakedefine HAVE_VPX 1
 #cmakedefine HAVE_FREERDP_SHADOW 1
 #cmakedefine HAVE_FREERDP_CLIENT 1
+#cmakedefine HAVE_XFREERDP_CLIENT 1

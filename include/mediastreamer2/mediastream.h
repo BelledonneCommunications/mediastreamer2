@@ -111,6 +111,15 @@ typedef enum MediaStreamDir{
 	MediaStreamRecvOnly
 }MediaStreamDir;
 
+
+typedef enum MSScreenSharingState{
+	MSScreenSharingInactive = 0,
+	MSScreenSharingWaiting,
+	MSScreenSharingListening,
+	MSScreenSharingConnecting,
+	MSScreenSharingStreamRunning
+} MSScreenSharingState;
+
 /**
  * Base struct for both AudioStream and VideoStream structure.
 **/
@@ -1306,10 +1315,19 @@ MS2_PUBLIC void text_stream_unprepare_text(TextStream *stream);
 struct _ScreenStream{
 	MediaStream ms;
 	bool_t is_server;
+#ifdef HAVE_FREERDP_SHADOW
 	rdpShadowServer* server;
+#else
+	void* server;
+#endif
+#ifdef HAVE_FREERDP_CLIENT
 	rdpContext* client;
+#else
+	void* client;
+#endif
 	int status;
 	int tcp_port;
+	MSScreenSharingState state;
 	char addr_ip[64];
 };
 
@@ -1332,13 +1350,6 @@ MS2_PUBLIC ScreenStream *screensharing_stream_new(int loc_tcp_port, bool_t ipv6)
  * @return a new ScreenStream.
 **/
 MS2_PUBLIC ScreenStream *screensharing_stream_new2(const char* ip, int loc_tcp_port);
-
-/**
- * Starts a screensharing stream.
- *
- * @param[in] stream ScreensharingStream object previously created with screensharing_stream_new().
- */
-MS2_PUBLIC ScreenStream* screensharing_stream_start(ScreenStream *stream);
 
 /**
  *  Stops the screensharing streaming thread and free everything
