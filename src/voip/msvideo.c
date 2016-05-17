@@ -495,7 +495,7 @@ static void ff_sws_free(MSScalerContext *ctx){
 	ms_free(ctx);
 }
 
-static MSScalerDesc ffmpeg_scaler={
+MSScalerDesc ffmpeg_scaler={
 	ff_create_swscale_context,
 	ff_sws_scale,
 	ff_sws_free
@@ -591,20 +591,29 @@ static MSScalerDesc android_scaler={
 
 #endif
 
-
-#if defined(ANDROID) && defined(__ARM_NEON__)
-#include <arm_neon.h>
-extern MSScalerDesc ms_android_scaler;
-
-static MSScalerDesc *scaler_impl=&ms_android_scaler;
-#elif !defined(NO_FFMPEG)
-static MSScalerDesc *scaler_impl=&ffmpeg_scaler;
-#else
-static MSScalerDesc *scaler_impl=NULL;
+#ifdef ANDROID
+#include "cpu-features.h"
 #endif
+
+#if defined(ANDROID) && defined(MS_HAS_ARM)
+extern MSScalerDesc ms_android_scaler;
+#endif 
+
+static MSScalerDesc *scaler_impl=NULL;
+
 
 MSScalerContext *ms_scaler_create_context(int src_w, int src_h, MSPixFmt src_fmt,
                                           int dst_w, int dst_h, MSPixFmt dst_fmt, int flags){
+	if (!scaler_impl){
+#if defined(ANDROID) && defined(MS_HAS_ARM)
+		if (android_getCpuFamily() == ANDROID_CPU_FAMILY_ARM && (android_getCpuFeatures() & ANDROID_CPU_ARM_FEATURE_NEON) != 0){
+			scaler_impl = &ms_android_scaler;
+		}
+#elif !defined(NO_FFMPEG)
+		scaler_impl=&ffmpeg_scaler;
+#endif
+	}
+	
 	if (scaler_impl)
 		return scaler_impl->create_context(src_w,src_h,src_fmt,dst_w,dst_h,dst_fmt, flags);
 	ms_fatal("No scaler implementation built-in, please supply one with ms_video_set_scaler_impl ()");
@@ -624,16 +633,15 @@ void ms_video_set_scaler_impl(MSScalerDesc *desc){
 }
 
 /* Can rotate Y, U or V plane; use step=2 for interleaved UV planes otherwise step=1*/
-static void rotate_plane(int wDest, int hDest, int full_width, const uint8_t* src, uint8_t* dst, int step, bool_t clockWise) {
-	int hSrc = wDest;
-	int wSrc = hDest;
-	int src_stride = full_width * step;
+static void rotate_plane_down_scale_by_2(int wDest, int hDest, int full_width, const uint8_t* src, uint8_t* dst, int step, bool_t clockWise,bool_t downscale) {
+	int factor = downscale?2:1;
+	int hSrc = wDest*factor;
+	int wSrc = hDest*factor;
+	int src_stride = full_width*step*factor;
 
 	int signed_dst_stride;
 	int incr;
 	int y,x;
-
-
 
 	if (clockWise) {
 		/* ms_warning("start writing destination buffer from top right");*/
@@ -646,9 +654,9 @@ static void rotate_plane(int wDest, int hDest, int full_width, const uint8_t* sr
 		incr = -1;
 		signed_dst_stride = -wDest;
 	}
-	for (y=0; y<hSrc; y++) {
+	for (y=0; y<hSrc; y+=factor) {
 		uint8_t* dst2 = dst;
-		for (x=0; x<step*wSrc; x+=step) {
+		for (x=0; x<step*wSrc; x+=step*factor) {
 			/*	Copy a line in source buffer (left to right)
 				Clockwise: Store a column in destination buffer (top to bottom)
 				Not clockwise: Store a column in destination buffer (bottom to top)
@@ -661,9 +669,8 @@ static void rotate_plane(int wDest, int hDest, int full_width, const uint8_t* sr
 	}
 }
 
-
 #ifdef ANDROID
-#include "cpu-features.h"
+
 static int hasNeon = -1;
 #elif defined (__ARM_NEON__)
 static int hasNeon = 1;
@@ -674,17 +681,14 @@ static int hasNeon = 0;
 /* Destination and source images may have their dimensions inverted.*/
 mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(MSYuvBufAllocator *allocator, const uint8_t* y, const uint8_t * cbcr, int rotation, int w, int h, int y_byte_per_row,int cbcr_byte_per_row, bool_t uFirstvSecond, bool_t down_scale) {
 	MSPicture pict;
-	int uv_w;
-	int uv_h;
-	const uint8_t* ysrc;
-	uint8_t* ydst;
-	const uint8_t* uvsrc;
+	int uv_w=w/2;
+	int uv_h=h/2;
 	const uint8_t* srcu;
 	uint8_t* dstu;
 	const uint8_t* srcv;
 	uint8_t* dstv;
-
-	mblk_t *yuv_block = ms_yuv_buf_allocator_get(allocator, &pict, w, h);
+	int factor = down_scale?2:1;
+	mblk_t * yuv_block;
 
 #ifdef ANDROID
 	if (hasNeon == -1) {
@@ -694,23 +698,14 @@ mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(MSYuvBu
 	#endif
 	}
 #endif
-
-
-#if MS_HAS_ARM
-	if (down_scale && !hasNeon) {
-		ms_error("down scaling by two requires NEON, returning empty block");
-		return yuv_block;
-	}
-#endif
+	
+	yuv_block = ms_yuv_buf_allocator_get(allocator, &pict, w, h);
 
 	if (!uFirstvSecond) {
 		unsigned char* tmp = pict.planes[1];
 		pict.planes[1] = pict.planes[2];
 		pict.planes[2] = tmp;
 	}
-
-	uv_w = w/2;
-	uv_h = h/2;
 
 	if (rotation % 180 == 0) {
 		int i,j;
@@ -725,13 +720,19 @@ mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(MSYuvBu
 			{
 				// plain copy
 				for(i=0; i<h; i++) {
-					memcpy(&pict.planes[0][i*w], &y[i*y_byte_per_row], w);
+					if (down_scale) {
+						for(j=0 ; j<w;j++) {
+							pict.planes[0][i*w+j] = y[i*2*y_byte_per_row+j*2];
+						}
+					} else {
+						memcpy(&pict.planes[0][i*w], &y[i*y_byte_per_row], w);
+					}
 				}
 				// de-interlace u/v
 				for (i=0; i<uv_h; i++) {
 					for(j=0; j<uv_w; j++) {
-						*u_dest++ = cbcr[cbcr_byte_per_row*i + 2*j];
-						*v_dest++ = cbcr[cbcr_byte_per_row*i + 2*j + 1];
+						*u_dest++ = cbcr[cbcr_byte_per_row*i*factor + 2*j*factor];
+						*v_dest++ = cbcr[cbcr_byte_per_row*i*factor + 2*j*factor + 1];
 					}
 				}
 			}
@@ -741,18 +742,19 @@ mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(MSYuvBu
 				deinterlace_down_scale_and_rotate_180_neon(y, cbcr, pict.planes[0], u_dest, v_dest, w, h, y_byte_per_row, cbcr_byte_per_row,down_scale);
 			} else
 #endif
-{
+			{
 				// 180° y rotation
-				ysrc=y;
-				ydst=&pict.planes[0][h*w-1];
-				for(i=0; i<h*w; i++) {
-					*ydst-- = *ysrc++;
+				for(i=0; i<h; i++) {
+					for(j=0 ; j<w;j++) {
+						pict.planes[0][i*w+j] = y[(h-1-i)*y_byte_per_row*factor+(w-1-j)*factor];
+					}
 				}
 				// 180° rotation + de-interlace u/v
-				uvsrc=&cbcr[uv_h*uv_w*2-2];
-				for (i=0; i<uv_h*uv_w; i++) {
-					*u_dest++ = *uvsrc--;
-					*v_dest++ = *uvsrc--;
+				for (i=0; i<uv_h; i++) {
+					for(j=0; j<uv_w; j++) {
+						*u_dest++ = cbcr[cbcr_byte_per_row*(uv_h-1-i)*factor + 2*(uv_w-1-j)*factor];
+						*v_dest++ = cbcr[cbcr_byte_per_row*(uv_h-1-i)*factor + 2*(uv_w-1-j)*factor + 1];
+					}
 				}
 			}
 		}
@@ -771,7 +773,7 @@ mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(MSYuvBu
 {
 			uint8_t* dsty = pict.planes[0];
 			uint8_t* srcy = (uint8_t*) y;
-			rotate_plane(w,h,y_byte_per_row,srcy,dsty,1, clockwise);
+			rotate_plane_down_scale_by_2(w,h,y_byte_per_row,srcy,dsty,1, clockwise, down_scale);
 		}
 
 #if defined(__arm__)
@@ -783,11 +785,11 @@ mblk_t *copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(MSYuvBu
 			// Copying U
 			srcu = cbcr;
 			dstu = pict.planes[1];
-			rotate_plane(uv_w,uv_h,cbcr_byte_per_row/2,srcu,dstu, 2, clockwise);
+			rotate_plane_down_scale_by_2(uv_w,uv_h,cbcr_byte_per_row/2,srcu,dstu, 2, clockwise, down_scale);
 			// Copying V
 			srcv = srcu + 1;
 			dstv = pict.planes[2];
-			rotate_plane(uv_w,uv_h,cbcr_byte_per_row/2,srcv,dstv, 2, clockwise);
+			rotate_plane_down_scale_by_2(uv_w,uv_h,cbcr_byte_per_row/2,srcv,dstv, 2, clockwise,down_scale);
 		}
 	}
 
