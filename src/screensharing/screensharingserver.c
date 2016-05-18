@@ -39,6 +39,8 @@ void screensharing_server_iterate(ScreenStream* stream) {
 			screensharing_server_start(stream);
 			break;
 		case MSScreenSharingStreamRunning:
+			//TODO handle error
+			
 			break;
 		case MSScreenSharingInactive:
 		case MSScreenSharingWaiting:
@@ -69,7 +71,6 @@ ScreenStream* screensharing_server_start(ScreenStream *stream) {
 
 	server->authentication = FALSE;
 
-	//server->mayInteract = FALSE;
 	server->port = (DWORD)stream->tcp_port;
 	
 	if ((*status=shadow_server_init(server)) < 0)
@@ -81,6 +82,7 @@ ScreenStream* screensharing_server_start(ScreenStream *stream) {
 	stream->state = MSScreenSharingStreamRunning;
 	return stream;
 
+//TODO error handling
 fail_server_start:
 	shadow_server_uninit(server);
 fail_server_init:

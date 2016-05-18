@@ -54,10 +54,10 @@ bool_t screensharing_client_test_server(ScreenStream *stream) {
 
 		if (serverHostEnt == NULL)
 			return FALSE;
-	
+
 		bcopy(serverHostEnt->h_addr,&serverSockAddr.sin_addr,serverHostEnt->h_length);
 	}
-	
+
 	serverSockAddr.sin_port = htons(stream->tcp_port);
 	serverSockAddr.sin_family = AF_INET;
 
@@ -67,14 +67,11 @@ bool_t screensharing_client_test_server(ScreenStream *stream) {
 	while((test=connect(socket_server,
 		(struct sockaddr *)&serverSockAddr,
 		sizeof(serverSockAddr))) < 0 && cpt < 10) {
-		printf("coucou connect\n");
 		//TODO To improve
 		cpt++;
 	}
 
 	close(socket_server);
-	if(cpt < 10)
-		printf("serveur en ligne\n");
 	return (cpt < 10);
 #else
 	return FALSE;
@@ -84,10 +81,12 @@ bool_t screensharing_client_test_server(ScreenStream *stream) {
 void screensharing_client_iterate(ScreenStream* stream) {
 	switch(stream->state){
 		case MSScreenSharingConnecting:
+			//TODO Timeout
 			if (screensharing_client_test_server(stream))
 				screensharing_client_start(stream);
 			break;
 		case MSScreenSharingStreamRunning:
+			//TODO handle error
 			break;
 		case MSScreenSharingInactive:
 		case MSScreenSharingWaiting:
@@ -123,17 +122,21 @@ ScreenStream* screensharing_client_start(ScreenStream *stream) {
 		return stream;
 
 	stream->client = client;
-	
+
 	//TODO OPTIONS ?
+	client->settings->ServerHostname = malloc(sizeof(char)*sizeof(stream->addr_ip));
+	strncpy(client->settings->ServerHostname,stream->addr_ip,sizeof(stream->addr_ip));
 	client->settings->ServerPort = stream->tcp_port;
 	client->settings->TlsSecurity = FALSE;
-	client->settings->ServerHostname = "localhost";//TODO
+	client->settings->NlaSecurity = TRUE;
+	client->settings->RdpSecurity = TRUE;
+	client->settings->ExtSecurity = FALSE;
+	client->settings->Authentication = FALSE;
 
 	//TODO timeout system
 	if (freerdp_client_start(client) < 0)
 		freerdp_client_context_free(client);
 	else stream->state = MSScreenSharingStreamRunning;
-		
 #endif
 	return stream;
 }
