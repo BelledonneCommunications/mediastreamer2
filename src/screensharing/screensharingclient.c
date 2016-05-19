@@ -45,12 +45,12 @@ bool_t screensharing_client_test_server(ScreenStream *stream) {
 	int test;
 
 	ZeroMemory(&serverSockAddr,sizeof(serverSockAddr));
-	hostAddr = inet_addr("0.0.0.0");
+	hostAddr = inet_addr(stream->addr_ip);
 
 	if ( (long)hostAddr != (long)-1)
 		bcopy(&hostAddr,&serverSockAddr.sin_addr,sizeof(hostAddr));
 	else {
-		serverHostEnt = gethostbyname("localhost");
+		serverHostEnt = gethostbyname(stream->addr_ip);
 
 		if (serverHostEnt == NULL)
 			return FALSE;
