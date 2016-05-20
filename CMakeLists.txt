@@ -68,7 +68,7 @@ option(ENABLE_STRICT "Build with strict compile options." YES)
 option(ENABLE_RELATIVE_PREFIX "Find resources relatively to the installation directory." NO)
 option(ENABLE_TOOLS "Turn on or off compilation of tools." YES)
 option(ENABLE_UNIT_TESTS "Enable compilation of unit tests." YES)
-option(ENABLE_SCREENSHARING "Enable screensharing." YES)
+option(ENABLE_SCREENSHARING "Enable screensharing." NO)
 
 option(ENABLE_SRTP "Build with the SRTP transport support." YES)
 cmake_dependent_option(ENABLE_ZRTP "Build with ZRTP support." YES "ENABLE_SRTP" NO)
