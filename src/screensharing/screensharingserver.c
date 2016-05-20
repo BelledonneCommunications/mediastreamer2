@@ -59,6 +59,7 @@ ScreenStream* screensharing_server_start(ScreenStream *stream) {
 #ifdef HAVE_FREERDP_SHADOW
 	rdpShadowServer* server;
 	int *status = &(stream->status);
+	ms_message("Screensharing server starting on port: %d",stream->tcp_port);
 
 	shadow_subsystem_set_entry_builtin(NULL);
 

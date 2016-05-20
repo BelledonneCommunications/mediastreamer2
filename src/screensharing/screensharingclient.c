@@ -110,6 +110,7 @@ ScreenStream* screensharing_client_start(ScreenStream *stream) {
 #ifdef HAVE_XFREERDP_CLIENT
 	RDP_CLIENT_ENTRY_POINTS clientEntryPoints;
 	rdpContext* client;
+	ms_message("Screensharing client connecting on: %s",stream->addr_ip);
 
 	ZeroMemory(&clientEntryPoints, sizeof(RDP_CLIENT_ENTRY_POINTS));
 	clientEntryPoints.Size = sizeof(RDP_CLIENT_ENTRY_POINTS);
