@@ -39,8 +39,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	#include <netdb.h>
 #endif
 
-//TODO define WSA stun_udp.h
-
 static void screensharing_stream_free(ScreenStream *stream) {
 	if(stream->server != NULL)
 		screensharing_server_free(stream);

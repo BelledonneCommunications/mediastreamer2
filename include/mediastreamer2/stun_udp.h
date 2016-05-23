@@ -173,9 +173,6 @@ typedef int Socket;
 #endif
 
 #define closesocket(fd) close(fd)
-#ifndef WSANOTINITIALISED
-#define WSANOTINITIALISED  EPROTONOSUPPORT
-#endif
 #endif
 
 #ifdef __cplusplus
