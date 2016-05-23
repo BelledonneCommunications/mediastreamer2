@@ -40,7 +40,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define PAYLOAD_TYPE_FLAG_CAN_RECV	PAYLOAD_TYPE_USER_FLAG_1
 #define PAYLOAD_TYPE_FLAG_CAN_SEND	PAYLOAD_TYPE_USER_FLAG_2
 
+#ifdef HAVE_FREERDP_SHADOW
 #include <freerdp/server/shadow.h>
+#endif
 #include <mediastreamer2/msequalizer.h>
 
 #ifdef __cplusplus
