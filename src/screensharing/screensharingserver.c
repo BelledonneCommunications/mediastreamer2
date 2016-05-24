@@ -50,6 +50,7 @@ void screensharing_server_iterate(ScreenStream* stream) {
 
 void screensharing_server_free(ScreenStream *stream) {
 #ifdef HAVE_FREERDP_SHADOW
+	ms_message("Screensharing Server: Free server");
 	if(stream->server != NULL)
 		shadow_server_uninit(stream->server);
 #endif
@@ -59,14 +60,19 @@ ScreenStream* screensharing_server_start(ScreenStream *stream) {
 #ifdef HAVE_FREERDP_SHADOW
 	rdpShadowServer* server;
 	int *status = &(stream->status);
-	ms_message("Screensharing server starting on port: %d",stream->tcp_port);
+	ms_message("Screensharing Server: Starting on port = %d",stream->tcp_port);
 
 	shadow_subsystem_set_entry_builtin(NULL);
 
 	server = shadow_server_new();
-
-	if(!server)
+	
+	if(!server) {
+		ms_message("Screensharing Server: Fail new server");
 		return stream;
+	}
+	
+	ms_message("Screensharing Server: New server");
+	
 	stream->server = server;
 
 	server->authentication = FALSE;
@@ -75,17 +81,22 @@ ScreenStream* screensharing_server_start(ScreenStream *stream) {
 
 	if ((*status=shadow_server_init(server)) < 0)
 		goto fail_server_init;
+	ms_message("Screensharing Server: Server init");
 
 	if ((*status=shadow_server_start(server)) < 0)
 		goto fail_server_start;
+	ms_message("Screensharing Server: Server start");
 
 	stream->state = MSScreenSharingStreamRunning;
+	ms_message("Screensharing Server: State = %d",stream->state);
 	return stream;
 
 //TODO error handling
 fail_server_start:
+	ms_message("Screensharing Server: Fail to start");
 	shadow_server_uninit(server);
 fail_server_init:
+	ms_message("Screensharing Server: Fail to init");
 	shadow_server_free(server);
 #endif
 	return stream;
@@ -93,6 +104,7 @@ fail_server_init:
 
 void screensharing_server_stop(ScreenStream *stream) {
 #ifdef HAVE_FREERDP_SHADOW
+	ms_message("Screensharing Server: Stop server");
 	if(stream->server != NULL)
 		shadow_server_stop(stream->server);
 #endif

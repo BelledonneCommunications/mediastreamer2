@@ -35,6 +35,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	#include <netdb.h>
 #endif
 
+static int cpt_time_out = 0;
+
 bool_t screensharing_client_test_server(ScreenStream *stream) {
 #ifdef HAVE_XFREERDP_CLIENT
 	int cpt=0;
@@ -66,13 +68,13 @@ bool_t screensharing_client_test_server(ScreenStream *stream) {
 
 	while((test=connect(socket_server,
 		(struct sockaddr *)&serverSockAddr,
-		sizeof(serverSockAddr))) < 0 && cpt < 10) {
+		sizeof(serverSockAddr))) < 0 && cpt < 1000) {
 		//TODO To improve
 		cpt++;
 	}
 
 	close(socket_server);
-	return (cpt < 10);
+	return (cpt < 1000);
 #else
 	return FALSE;
 #endif
@@ -82,8 +84,13 @@ void screensharing_client_iterate(ScreenStream* stream) {
 	switch(stream->state){
 		case MSScreenSharingConnecting:
 			//TODO Timeout
+			ms_message("Screensharing Client: Test server connection");
 			if (screensharing_client_test_server(stream))
 				screensharing_client_start(stream);
+			if(cpt_time_out++ >3) {
+				ms_message("Screensharing Client: Test connection time out");
+				stream->state = MSScreenSharingInactive;
+			}
 			break;
 		case MSScreenSharingStreamRunning:
 			//TODO handle error
@@ -97,6 +104,7 @@ void screensharing_client_iterate(ScreenStream* stream) {
 
 void screensharing_client_free(ScreenStream *stream) {
 #ifdef HAVE_XFREERDP_CLIENT
+	ms_message("Screensharing Client: Free client");
 	if(stream->client != NULL)
 		freerdp_client_context_free(stream->client);
 #endif
@@ -110,7 +118,7 @@ ScreenStream* screensharing_client_start(ScreenStream *stream) {
 #ifdef HAVE_XFREERDP_CLIENT
 	RDP_CLIENT_ENTRY_POINTS clientEntryPoints;
 	rdpContext* client;
-	ms_message("Screensharing client connecting on: %s",stream->addr_ip);
+	ms_message("Screensharing Client: Connecting on = %s; Port = %d",stream->addr_ip,stream->tcp_port);
 
 	ZeroMemory(&clientEntryPoints, sizeof(RDP_CLIENT_ENTRY_POINTS));
 	clientEntryPoints.Size = sizeof(RDP_CLIENT_ENTRY_POINTS);
@@ -119,8 +127,12 @@ ScreenStream* screensharing_client_start(ScreenStream *stream) {
 	RdpClientEntry(&clientEntryPoints);
 
 	client = freerdp_client_context_new(&clientEntryPoints);
-	if (!client)
+	if (!client) {
+		ms_message("Screensharing Client: Fail new client");
 		return stream;
+	}
+	
+	ms_message("Screensharing Client: New client");
 
 	stream->client = client;
 
@@ -133,18 +145,28 @@ ScreenStream* screensharing_client_start(ScreenStream *stream) {
 	client->settings->RdpSecurity = TRUE;
 	client->settings->ExtSecurity = FALSE;
 	client->settings->Authentication = FALSE;
+	client->settings->AudioPlayback = FALSE;
+	client->settings->RemoteConsoleAudio = FALSE;
 
 	//TODO timeout system
-	if (freerdp_client_start(client) < 0)
+	if (freerdp_client_start(client) < 0) {
+		ms_message("Screensharing Client: Fail to start");
 		freerdp_client_context_free(client);
+	}
 	else stream->state = MSScreenSharingStreamRunning;
+
+	ms_message("Screensharing Client: State = %d",stream->state);
 #endif
 	return stream;
 }
 
 void screensharing_client_stop(ScreenStream *stream) {
 #ifdef HAVE_XFREERDP_CLIENT
-	if(stream->client != NULL)
+	ms_message("Screensharing Client: Stop client");
+	if(stream->client != NULL) {
+		if(stream->client->instance != NULL)
+			freerdp_disconnect(stream->client->instance);
 		freerdp_client_stop(stream->client);
+	}
 #endif
 }
