@@ -1327,6 +1327,9 @@ struct _ScreenStream{
 #else
 	void* client;
 #endif
+	MSTimeSpec* timer;
+	int socket_server;
+	int time_out;
 	int status;
 	int tcp_port;
 	MSScreenSharingState state;

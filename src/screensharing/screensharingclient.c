@@ -35,46 +35,56 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	#include <netdb.h>
 #endif
 
-static int cpt_time_out = 0;
+void clock_start(MSTimeSpec *start){
+	ms_get_cur_time(start);
+}
+
+bool_t clock_elapsed(const MSTimeSpec *start, int value_ms){
+	MSTimeSpec current;
+	ms_get_cur_time(&current);
+	if ((((current.tv_sec-start->tv_sec)*1000LL) + ((current.tv_nsec-start->tv_nsec)/1000000LL))>=value_ms)
+		return TRUE;
+	return FALSE;
+}
 
 bool_t screensharing_client_test_server(ScreenStream *stream) {
 #ifdef HAVE_XFREERDP_CLIENT
-	int cpt=0;
+
 	int socket_server;
 	struct sockaddr_in serverSockAddr;
 	struct hostent *serverHostEnt = NULL;
 	long hostAddr;
-	int test;
+	int test = 0;
 
-	ZeroMemory(&serverSockAddr,sizeof(serverSockAddr));
-	hostAddr = inet_addr(stream->addr_ip);
+	if(stream->socket_server == -1) {
+		ZeroMemory(&serverSockAddr,sizeof(serverSockAddr));
+		hostAddr = inet_addr(stream->addr_ip);
 
-	if ( (long)hostAddr != (long)-1)
-		bcopy(&hostAddr,&serverSockAddr.sin_addr,sizeof(hostAddr));
-	else {
-		serverHostEnt = gethostbyname(stream->addr_ip);
+		if ( (long)hostAddr != (long)-1)
+			bcopy(&hostAddr,&serverSockAddr.sin_addr,sizeof(hostAddr));
+		else {
+			serverHostEnt = gethostbyname(stream->addr_ip);
 
-		if (serverHostEnt == NULL)
+			if (serverHostEnt == NULL)
+				return FALSE;
+
+			bcopy(serverHostEnt->h_addr,&serverSockAddr.sin_addr,serverHostEnt->h_length);
+		}
+
+		serverSockAddr.sin_port = htons(stream->tcp_port);
+		serverSockAddr.sin_family = AF_INET;
+
+		if ((socket_server = socket(AF_INET,SOCK_STREAM,0)) < 0)
 			return FALSE;
-
-		bcopy(serverHostEnt->h_addr,&serverSockAddr.sin_addr,serverHostEnt->h_length);
+		
+		stream->socket_server = socket_server;
 	}
 
-	serverSockAddr.sin_port = htons(stream->tcp_port);
-	serverSockAddr.sin_family = AF_INET;
-
-	if ((socket_server = socket(AF_INET,SOCK_STREAM,0)) < 0)
-		return FALSE;
-
-	while((test=connect(socket_server,
-		(struct sockaddr *)&serverSockAddr,
-		sizeof(serverSockAddr))) < 0 && cpt < 1000) {
-		//TODO To improve
-		cpt++;
-	}
+	test=connect(socket_server,(struct sockaddr *)&serverSockAddr,sizeof(serverSockAddr));
 
 	close(socket_server);
-	return (cpt < 1000);
+
+	return (test != -1);
 #else
 	return FALSE;
 #endif
@@ -83,14 +93,16 @@ bool_t screensharing_client_test_server(ScreenStream *stream) {
 void screensharing_client_iterate(ScreenStream* stream) {
 	switch(stream->state){
 		case MSScreenSharingConnecting:
-			//TODO Timeout
 			ms_message("Screensharing Client: Test server connection");
-			if (screensharing_client_test_server(stream))
-				screensharing_client_start(stream);
-			if(cpt_time_out++ >3) {
-				ms_message("Screensharing Client: Test connection time out");
-				stream->state = MSScreenSharingInactive;
+			if (stream->timer == NULL) {
+				stream->timer = malloc(sizeof(MSTimeSpec));
+				clock_start(stream->timer);
 			}
+			if (!clock_elapsed(stream->timer, stream->time_out)) {
+				if (screensharing_client_test_server(stream))
+					screensharing_client_start(stream);
+			} else
+				stream->state = MSScreenSharingInactive;
 			break;
 		case MSScreenSharingStreamRunning:
 			//TODO handle error
@@ -163,10 +175,7 @@ ScreenStream* screensharing_client_start(ScreenStream *stream) {
 void screensharing_client_stop(ScreenStream *stream) {
 #ifdef HAVE_XFREERDP_CLIENT
 	ms_message("Screensharing Client: Stop client");
-	if(stream->client != NULL) {
-		if(stream->client->instance != NULL)
-			freerdp_disconnect(stream->client->instance);
+	if(stream->client != NULL)
 		freerdp_client_stop(stream->client);
-	}
 #endif
 }
