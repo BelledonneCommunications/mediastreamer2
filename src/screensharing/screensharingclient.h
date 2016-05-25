@@ -26,6 +26,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 extern "C" {
 #endif
 
+extern void clock_start(MSTimeSpec *start);
+
+extern bool_t clock_elapsed(const MSTimeSpec *start, int value_ms);
+
 /**
  * Waiting until start of server socket
  */

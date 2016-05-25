@@ -33,15 +33,31 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	#include <netdb.h>
 #endif
 
+void screensharing_server_run(ScreenStream* stream) {
+	if (stream->server->clients->size <= 0) {
+		if (stream->timer == NULL) {
+			stream->timer = malloc(sizeof(MSTimeSpec));
+			clock_start(stream->timer);
+		}
+		// Time out verification
+		if (clock_elapsed(stream->timer, stream->time_out)) {
+			stream->state = MSScreenSharingInactive;
+		}
+	} else if (stream->timer != NULL)
+		stream->timer = NULL;
+}
+
 void screensharing_server_iterate(ScreenStream* stream) {
 	switch(stream->state){
 		case MSScreenSharingListening:
 			screensharing_server_start(stream);
 			break;
 		case MSScreenSharingStreamRunning:
-			//TODO handle error
+			screensharing_server_run(stream);
 			break;
 		case MSScreenSharingInactive:
+			screensharing_server_stop(stream);
+			screensharing_server_free(stream);
 		case MSScreenSharingWaiting:
 		default:
 			break;
@@ -50,9 +66,11 @@ void screensharing_server_iterate(ScreenStream* stream) {
 
 void screensharing_server_free(ScreenStream *stream) {
 #ifdef HAVE_FREERDP_SHADOW
-	ms_message("Screensharing Server: Free server");
-	if(stream->server != NULL)
+	if(stream->server != NULL) {
+		ms_message("Screensharing Server: Free server");
 		shadow_server_uninit(stream->server);
+		stream->server = NULL;
+	}
 #endif
 }
 
@@ -104,8 +122,9 @@ fail_server_init:
 
 void screensharing_server_stop(ScreenStream *stream) {
 #ifdef HAVE_FREERDP_SHADOW
-	ms_message("Screensharing Server: Stop server");
-	if(stream->server != NULL)
+	if(stream->server != NULL) {
+		ms_message("Screensharing Server: Stop server");
 		shadow_server_stop(stream->server);
+	}
 #endif
 }

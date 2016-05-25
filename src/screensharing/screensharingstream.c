@@ -48,6 +48,18 @@ static void screensharing_stream_free(ScreenStream *stream) {
 	ms_free(stream);
 }
 
+void clock_start(MSTimeSpec *start){
+	ms_get_cur_time(start);
+}
+
+bool_t clock_elapsed(const MSTimeSpec *start, int value_ms){
+	MSTimeSpec current;
+	ms_get_cur_time(&current);
+	if ((((current.tv_sec-start->tv_sec)*1000LL) + ((current.tv_nsec-start->tv_nsec)/1000000LL))>=value_ms)
+		return TRUE;
+	return FALSE;
+}
+
 ScreenStream *screensharing_stream_new(int loc_tcp_port, bool_t ipv6) {
 	return screensharing_stream_new2(ipv6 ? "::" : "0.0.0.0", loc_tcp_port);
 }

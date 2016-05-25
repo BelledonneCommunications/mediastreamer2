@@ -35,18 +35,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 	#include <netdb.h>
 #endif
 
-void clock_start(MSTimeSpec *start){
-	ms_get_cur_time(start);
-}
-
-bool_t clock_elapsed(const MSTimeSpec *start, int value_ms){
-	MSTimeSpec current;
-	ms_get_cur_time(&current);
-	if ((((current.tv_sec-start->tv_sec)*1000LL) + ((current.tv_nsec-start->tv_nsec)/1000000LL))>=value_ms)
-		return TRUE;
-	return FALSE;
-}
-
 bool_t screensharing_client_test_server(ScreenStream *stream) {
 #ifdef HAVE_XFREERDP_CLIENT
 
@@ -58,7 +46,7 @@ bool_t screensharing_client_test_server(ScreenStream *stream) {
 
 	if(stream->sockAddr == NULL) {
 		serverSockAddr = malloc(sizeof(struct sockaddr_in));
-		ZeroMemory(serverSockAddr,sizeof(serverSockAddr));
+		ZeroMemory(serverSockAddr,sizeof(*serverSockAddr));
 		hostAddr = inet_addr(stream->addr_ip);
 
 		if ((long)hostAddr != (long)-1)
@@ -80,7 +68,7 @@ bool_t screensharing_client_test_server(ScreenStream *stream) {
 	if ((sock = socket(AF_INET,SOCK_STREAM,0)) < 0)
 		return FALSE;
 
-	test=connect(sock,(struct sockaddr *)serverSockAddr,sizeof(*serverSockAddr));
+	test=connect(sock,(struct sockaddr *)stream->sockAddr,sizeof(*serverSockAddr));
 
 	close(sock);
 
@@ -94,15 +82,16 @@ void screensharing_client_iterate(ScreenStream* stream) {
 	switch(stream->state){
 		case MSScreenSharingConnecting:
 			ms_message("Screensharing Client: Test server connection");
-			/*if (stream->timer == NULL) {
+			if (stream->timer == NULL) {
 				stream->timer = malloc(sizeof(MSTimeSpec));
 				clock_start(stream->timer);
 			}
-			if (!clock_elapsed(stream->timer, 10000)) {*/
+			// Time out verification
+			if (!clock_elapsed(stream->timer, stream->time_out)) {
 				if (screensharing_client_test_server(stream))
 					screensharing_client_start(stream);
-			//} else
-			//	stream->state = MSScreenSharingInactive;
+			} else
+				stream->state = MSScreenSharingInactive;
 			break;
 		case MSScreenSharingStreamRunning:
 			//TODO handle error
