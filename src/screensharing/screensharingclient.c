@@ -56,7 +56,7 @@ bool_t screensharing_client_test_server(ScreenStream *stream) {
 	long hostAddr;
 	int test = 0;
 
-	if(stream->socket_server == -1) {
+	//if(stream->socket_server == -1) {
 		ZeroMemory(&serverSockAddr,sizeof(serverSockAddr));
 		hostAddr = inet_addr(stream->addr_ip);
 
@@ -78,7 +78,7 @@ bool_t screensharing_client_test_server(ScreenStream *stream) {
 			return FALSE;
 		
 		stream->socket_server = sock_buf;
-	}
+	//}
 
 	test=connect(stream->socket_server,(struct sockaddr *)&serverSockAddr,sizeof(serverSockAddr));
 
@@ -94,15 +94,15 @@ void screensharing_client_iterate(ScreenStream* stream) {
 	switch(stream->state){
 		case MSScreenSharingConnecting:
 			ms_message("Screensharing Client: Test server connection");
-			if (stream->timer == NULL) {
+			/*if (stream->timer == NULL) {
 				stream->timer = malloc(sizeof(MSTimeSpec));
 				clock_start(stream->timer);
 			}
-			if (!clock_elapsed(stream->timer, stream->time_out)) {
+			if (!clock_elapsed(stream->timer, 10000)) {*/
 				if (screensharing_client_test_server(stream))
 					screensharing_client_start(stream);
-			} else
-				stream->state = MSScreenSharingInactive;
+			//} else
+			//	stream->state = MSScreenSharingInactive;
 			break;
 		case MSScreenSharingStreamRunning:
 			//TODO handle error
