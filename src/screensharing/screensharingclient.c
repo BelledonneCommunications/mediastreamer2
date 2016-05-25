@@ -50,7 +50,7 @@ bool_t clock_elapsed(const MSTimeSpec *start, int value_ms){
 bool_t screensharing_client_test_server(ScreenStream *stream) {
 #ifdef HAVE_XFREERDP_CLIENT
 
-	int socket_server;
+	int sock_buf;
 	struct sockaddr_in serverSockAddr;
 	struct hostent *serverHostEnt = NULL;
 	long hostAddr;
@@ -74,15 +74,15 @@ bool_t screensharing_client_test_server(ScreenStream *stream) {
 		serverSockAddr.sin_port = htons(stream->tcp_port);
 		serverSockAddr.sin_family = AF_INET;
 
-		if ((socket_server = socket(AF_INET,SOCK_STREAM,0)) < 0)
+		if ((sock_buf = socket(AF_INET,SOCK_STREAM,0)) < 0)
 			return FALSE;
 		
-		stream->socket_server = socket_server;
+		stream->socket_server = sock_buf;
 	}
 
-	test=connect(socket_server,(struct sockaddr *)&serverSockAddr,sizeof(serverSockAddr));
+	test=connect(stream->socket_server,(struct sockaddr *)&serverSockAddr,sizeof(serverSockAddr));
 
-	close(socket_server);
+	close(stream->socket_server);
 
 	return (test != -1);
 #else
