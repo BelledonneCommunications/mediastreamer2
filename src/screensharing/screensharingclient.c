@@ -50,39 +50,39 @@ bool_t clock_elapsed(const MSTimeSpec *start, int value_ms){
 bool_t screensharing_client_test_server(ScreenStream *stream) {
 #ifdef HAVE_XFREERDP_CLIENT
 
-	int sock_buf;
-	struct sockaddr_in serverSockAddr;
+	int sock;
+	struct sockaddr_in *serverSockAddr;
 	struct hostent *serverHostEnt = NULL;
 	long hostAddr;
 	int test = 0;
 
-	//if(stream->socket_server == -1) {
-		ZeroMemory(&serverSockAddr,sizeof(serverSockAddr));
+	if(stream->sockAddr == NULL) {
+		serverSockAddr = malloc(sizeof(struct sockaddr_in));
+		ZeroMemory(serverSockAddr,sizeof(serverSockAddr));
 		hostAddr = inet_addr(stream->addr_ip);
 
-		if ( (long)hostAddr != (long)-1)
-			bcopy(&hostAddr,&serverSockAddr.sin_addr,sizeof(hostAddr));
+		if ((long)hostAddr != (long)-1)
+			bcopy(&hostAddr,&(serverSockAddr->sin_addr),sizeof(hostAddr));
 		else {
 			serverHostEnt = gethostbyname(stream->addr_ip);
 
 			if (serverHostEnt == NULL)
 				return FALSE;
 
-			bcopy(serverHostEnt->h_addr,&serverSockAddr.sin_addr,serverHostEnt->h_length);
+			bcopy(serverHostEnt->h_addr,&(serverSockAddr->sin_addr),serverHostEnt->h_length);
 		}
 
-		serverSockAddr.sin_port = htons(stream->tcp_port);
-		serverSockAddr.sin_family = AF_INET;
+		serverSockAddr->sin_port = htons(stream->tcp_port);
+		serverSockAddr->sin_family = AF_INET;
+		stream->sockAddr = serverSockAddr;
+	}
 
-		if ((sock_buf = socket(AF_INET,SOCK_STREAM,0)) < 0)
-			return FALSE;
-		
-		stream->socket_server = sock_buf;
-	//}
+	if ((sock = socket(AF_INET,SOCK_STREAM,0)) < 0)
+		return FALSE;
 
-	test=connect(stream->socket_server,(struct sockaddr *)&serverSockAddr,sizeof(serverSockAddr));
+	test=connect(sock,(struct sockaddr *)serverSockAddr,sizeof(*serverSockAddr));
 
-	close(stream->socket_server);
+	close(sock);
 
 	return (test != -1);
 #else

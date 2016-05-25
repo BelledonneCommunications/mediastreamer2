@@ -61,7 +61,7 @@ ScreenStream *screensharing_stream_new2(const char* ip, int loc_tcp_port) {
 	stream->server = NULL;
 	stream->client = NULL;
 	stream->timer = NULL;
-	stream->socket_server = -1;
+	stream->sockAddr = NULL;
 	stream->time_out = 3000; // Option ?
 	stream->tcp_port = loc_tcp_port;
 	stream->ms.owns_sessions = TRUE;

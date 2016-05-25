@@ -1328,7 +1328,7 @@ struct _ScreenStream{
 	void* client;
 #endif
 	MSTimeSpec* timer;
-	int socket_server;
+	struct sockaddr_in *sockAddr;
 	int time_out;
 	int status;
 	int tcp_port;
