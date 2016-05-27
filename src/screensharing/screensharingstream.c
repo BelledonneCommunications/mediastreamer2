@@ -95,3 +95,19 @@ void screensharing_stream_iterate(ScreenStream *stream) {
 		screensharing_client_iterate(stream);
 	media_stream_iterate(&stream->ms);
 }
+
+bool_t screensharing_client_supported() {
+#ifdef HAVE_FREERDP_CLIENT
+	return TRUE;
+#else
+	return FALSE;
+#endif
+}
+
+bool_t screensharing_server_supported() {
+#ifdef HAVE_FREERDP_SHADOW
+	return TRUE;
+#else
+	return FALSE;
+#endif
+}
