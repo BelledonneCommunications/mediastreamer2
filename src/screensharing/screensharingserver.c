@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifdef HAVE_FREERDP_SHADOW
 #include <freerdp/freerdp.h>
 #include <freerdp/server/shadow.h>
+#include <winpr/wlog.h>
 #endif
 
 #include <sys/types.h>
@@ -77,6 +78,7 @@ void screensharing_server_free(ScreenStream *stream) {
 ScreenStream* screensharing_server_start(ScreenStream *stream) {
 #ifdef HAVE_FREERDP_SHADOW
 	rdpShadowServer* server;
+	wLog* root;
 	int *status = &(stream->status);
 	ms_message("Screensharing Server: Starting on port = %d",stream->tcp_port);
 
@@ -96,6 +98,10 @@ ScreenStream* screensharing_server_start(ScreenStream *stream) {
 	server->authentication = FALSE;
 
 	server->port = (DWORD)stream->tcp_port;
+	
+	//Remove output log
+	root = WLog_GetRoot();
+	WLog_SetStringLogLevel(root, "OFF");
 
 	if ((*status=shadow_server_init(server)) < 0)
 		goto fail_server_init;

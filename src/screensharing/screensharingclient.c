@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifdef HAVE_XFREERDP_CLIENT
 #include <freerdp/freerdp.h>
 #include <freerdp/client.h>
-#include <freerdp/client/cmdline.h>
+#include <winpr/wlog.h>
 #endif
 #include <stdio.h>
 #include <string.h>
@@ -119,6 +119,7 @@ ScreenStream* screensharing_client_start(ScreenStream *stream) {
 #ifdef HAVE_XFREERDP_CLIENT
 	RDP_CLIENT_ENTRY_POINTS clientEntryPoints;
 	rdpContext* client;
+	wLog* root;
 	ms_message("Screensharing Client: Connecting on = %s; Port = %d",stream->addr_ip,stream->tcp_port);
 
 	ZeroMemory(&clientEntryPoints, sizeof(RDP_CLIENT_ENTRY_POINTS));
@@ -148,6 +149,10 @@ ScreenStream* screensharing_client_start(ScreenStream *stream) {
 	client->settings->Authentication = FALSE;
 	client->settings->AudioPlayback = FALSE;
 	client->settings->RemoteConsoleAudio = FALSE;
+	
+	//Remove output log
+	root = WLog_GetRoot();
+	WLog_SetStringLogLevel(root, "OFF");
 
 	//TODO timeout system
 	if (freerdp_client_start(client) < 0) {
