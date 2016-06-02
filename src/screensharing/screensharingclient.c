@@ -142,6 +142,7 @@ ScreenStream* screensharing_client_start(ScreenStream *stream) {
 	client->settings->ServerHostname = malloc(sizeof(char)*sizeof(stream->addr_ip));
 	strncpy(client->settings->ServerHostname,stream->addr_ip,sizeof(stream->addr_ip));
 	client->settings->ServerPort = stream->tcp_port;
+	client->settings->SmartSizing = TRUE;//testing
 	client->settings->TlsSecurity = FALSE;
 	client->settings->NlaSecurity = TRUE;
 	client->settings->RdpSecurity = TRUE;
