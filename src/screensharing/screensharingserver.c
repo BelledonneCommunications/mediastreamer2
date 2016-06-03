@@ -69,7 +69,7 @@ void screensharing_server_free(ScreenStream *stream) {
 #ifdef HAVE_FREERDP_SHADOW
 	if(stream->server != NULL) {
 		ms_message("Screensharing Server: Free server");
-		shadow_server_uninit(stream->server);
+		shadow_server_free(stream->server);
 		stream->server = NULL;
 	}
 #endif
@@ -130,7 +130,7 @@ void screensharing_server_stop(ScreenStream *stream) {
 #ifdef HAVE_FREERDP_SHADOW
 	if(stream->server != NULL) {
 		ms_message("Screensharing Server: Stop server");
-		shadow_server_stop(stream->server);
+		shadow_server_uninit(stream->server);
 	}
 #endif
 }

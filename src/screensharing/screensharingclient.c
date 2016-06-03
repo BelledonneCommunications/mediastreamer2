@@ -108,6 +108,14 @@ void screensharing_client_free(ScreenStream *stream) {
 	ms_message("Screensharing Client: Free client");
 	if(stream->client != NULL)
 		freerdp_client_context_free(stream->client);
+	if(stream->sockAddr != NULL) {
+		free(stream->sockAddr);
+		stream->sockAddr = NULL;
+	}
+	if(stream->timer != NULL) {
+		free(stream->timer);
+		stream->timer = NULL;
+	}
 #endif
 }
 
