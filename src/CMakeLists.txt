@@ -23,6 +23,7 @@
 find_library(LIBM NAMES m)
 if(ANDROID)
 	find_library(ANDROID_CPU_FEATURES_LIBRARY NAMES cpufeatures)
+	find_library(ANDROID_SUPPORT_LIBRARY NAMES support)
 endif()
 
 if(MSVC AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsPhone" AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
@@ -183,7 +184,6 @@ set(VOIP_SOURCE_FILES_C
 	voip/rfc4103_textstream.c
 	voip/ringstream.c
 	voip/stun.c
-	voip/stun_udp.c
 )
 set(VOIP_SOURCE_FILES_CXX )
 set(VOIP_SOURCE_FILES_OBJC )
@@ -481,6 +481,9 @@ if(LIBM)
 endif()
 if(ANDROID_CPU_FEATURES_LIBRARY)
 	list(APPEND VOIP_LIBS ${ANDROID_CPU_FEATURES_LIBRARY})
+endif()
+if(ANDROID_SUPPORT_LIBRARY)
+	list(APPEND VOIP_LIBS ${ANDROID_SUPPORT_LIBRARY})
 endif()
 if(ANDROID AND ENABLE_VIDEO)
 	list(APPEND VOIP_LIBS GLESv2)
