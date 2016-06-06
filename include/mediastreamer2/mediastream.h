@@ -1367,9 +1367,9 @@ MS2_PUBLIC void screensharing_stream_stop (ScreenStream * stream);
  */
 MS2_PUBLIC void screensharing_stream_iterate(ScreenStream *stream);
 
-MS2_PUBLIC bool_t screensharing_client_supported();
+MS2_PUBLIC bool_t screensharing_client_supported(void);
 
-MS2_PUBLIC bool_t screensharing_server_supported();
+MS2_PUBLIC bool_t screensharing_server_supported(void);
 
 /**
  * @}
