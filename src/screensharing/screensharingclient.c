@@ -91,13 +91,14 @@ void screensharing_client_iterate(ScreenStream* stream) {
 				if (screensharing_client_test_server(stream))
 					screensharing_client_start(stream);
 			} else
-				stream->state = MSScreenSharingInactive;
+				stream->state = MSScreenSharingError;
 			break;
 		case MSScreenSharingStreamRunning:
 			//TODO handle error
 			break;
 		case MSScreenSharingInactive:
 		case MSScreenSharingWaiting:
+		case MSScreenSharingError:
 		default:
 			break;
 	}

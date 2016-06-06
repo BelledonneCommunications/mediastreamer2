@@ -119,7 +119,8 @@ typedef enum MSScreenSharingState{
 	MSScreenSharingWaiting,
 	MSScreenSharingListening,
 	MSScreenSharingConnecting,
-	MSScreenSharingStreamRunning
+	MSScreenSharingStreamRunning,
+	MSScreenSharingError
 } MSScreenSharingState;
 
 /**

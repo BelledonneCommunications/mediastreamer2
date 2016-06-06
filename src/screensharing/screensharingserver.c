@@ -42,7 +42,7 @@ void screensharing_server_run(ScreenStream* stream) {
 		}
 		// Time out verification
 		if (clock_elapsed(stream->timer, stream->time_out)) {
-			stream->state = MSScreenSharingInactive;
+			stream->state = MSScreenSharingError;
 		}
 	} else if (stream->timer != NULL)
 		stream->timer = NULL;
@@ -57,6 +57,7 @@ void screensharing_server_iterate(ScreenStream* stream) {
 			screensharing_server_run(stream);
 			break;
 		case MSScreenSharingInactive:
+		case MSScreenSharingError:
 			screensharing_server_stop(stream);
 			screensharing_server_free(stream);
 		case MSScreenSharingWaiting:
