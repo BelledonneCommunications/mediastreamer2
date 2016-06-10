@@ -40,10 +40,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #endif
 
 static void screensharing_stream_free(ScreenStream *stream) {
+#ifdef HAVE_FREERDP_SHADOW
 	if(stream->server != NULL)
 		screensharing_server_free(stream);
+#endif
+#ifdef HAVE_XFREERDP_CLIENT
 	if(stream->client != NULL)
 		screensharing_client_free(stream);
+#endif
 	media_stream_free(&stream->ms);
 	ms_free(stream);
 }
@@ -81,18 +85,27 @@ ScreenStream *screensharing_stream_new2(const char* ip, int loc_tcp_port) {
 }
 
 void screensharing_stream_stop(ScreenStream *stream) {
+#ifdef HAVE_FREERDP_SHADOW
 	if(stream->server != NULL)
 		screensharing_server_stop(stream);
+#endif
+#ifdef HAVE_XFREERDP_CLIENT
 	if(stream->client != NULL)
 		screensharing_client_stop(stream);
+#endif
 	screensharing_stream_free(stream);
 }
 
 void screensharing_stream_iterate(ScreenStream *stream) {
-	if(stream->is_server)
+	if(stream->is_server) {
+#ifdef HAVE_FREERDP_SHADOW
 		screensharing_server_iterate(stream);
-	else
+#endif
+	} else {
+#ifdef HAVE_XFREERDP_CLIENT
 		screensharing_client_iterate(stream);
+#endif
+	}
 	media_stream_iterate(&stream->ms);
 }
 

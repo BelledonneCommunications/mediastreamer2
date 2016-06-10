@@ -153,6 +153,7 @@ set(VOIP_SOURCE_FILES_C
 	crypto/ms_srtp.c
 	crypto/zrtp.c
 	otherfilters/msrtp.c
+	screensharing/screensharingstream.c
 	utils/_kiss_fft_guts.h
 	utils/audiodiff.c
 	utils/dsptools.c
@@ -247,18 +248,21 @@ endif()
 if(ENABLE_RESAMPLE)
 	list(APPEND VOIP_SOURCE_FILES_C audiofilters/msresample.c)
 endif()
+if(FreeRDP-Shadow_FOUND)
+       list(APPEND VOIP_SOURCE_FILES_C
+               screensharing/screensharingserver.c
+       )
+endif()
+if(FreeRDP-Client_FOUND)
+       list(APPEND VOIP_SOURCE_FILES_C
+               screensharing/screensharingclient.c
+       )
+endif()
 if(SPEEX_FOUND)
 	list(APPEND VOIP_SOURCE_FILES_C audiofilters/msspeex.c)
 endif()
 if(SPEEXDSP_FOUND)
 	list(APPEND VOIP_SOURCE_FILES_C audiofilters/speexec.c)
-endif()
-if(FreeRDP-Shadow_FOUND OR FreeRDP-Client_FOUND)
-	list(APPEND VOIP_SOURCE_FILES_C
-		screensharing/screensharingstream.c
-		screensharing/screensharingclient.c
-		screensharing/screensharingserver.c
-	)
 endif()
 
 if(ENABLE_VIDEO)

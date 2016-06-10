@@ -21,11 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "private.h"
 #include "screensharingserver.h"
 
-#ifdef HAVE_FREERDP_SHADOW
 #include <freerdp/freerdp.h>
 #include <freerdp/server/shadow.h>
 #include <winpr/wlog.h>
-#endif
 
 #include <sys/types.h>
 
@@ -67,17 +65,14 @@ void screensharing_server_iterate(ScreenStream* stream) {
 }
 
 void screensharing_server_free(ScreenStream *stream) {
-#ifdef HAVE_FREERDP_SHADOW
 	if(stream->server != NULL) {
 		ms_message("Screensharing Server: Free server");
 		shadow_server_free(stream->server);
 		stream->server = NULL;
 	}
-#endif
 }
 
 ScreenStream* screensharing_server_start(ScreenStream *stream) {
-#ifdef HAVE_FREERDP_SHADOW
 	rdpShadowServer* server;
 	wLog* root;
 	int *status = &(stream->status);
@@ -123,15 +118,12 @@ fail_server_start:
 fail_server_init:
 	ms_message("Screensharing Server: Fail to init");
 	shadow_server_free(server);
-#endif
 	return stream;
 }
 
 void screensharing_server_stop(ScreenStream *stream) {
-#ifdef HAVE_FREERDP_SHADOW
 	if(stream->server != NULL) {
 		ms_message("Screensharing Server: Stop server");
 		shadow_server_uninit(stream->server);
 	}
-#endif
 }
