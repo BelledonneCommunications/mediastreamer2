@@ -135,7 +135,7 @@ typedef enum _MSPlayerState MSPlayerState;
 	MS_FILTER_METHOD(MSFilterPlayerInterface,7,int)
 
 #define MS_PLAYER_GET_CURRENT_POSITION \
-	MS_FILTER_METHOD(MSFilterPlayerInterface,8,int)
+	MS_FILTER_METHOD(MSFilterPlayerInterface,8,int64_t)
 
 #define MS_PLAYER_EOF \
 	MS_FILTER_EVENT_NO_ARG(MSFilterPlayerInterface,0)
@@ -171,6 +171,12 @@ typedef enum _MSRecorderState MSRecorderState;
 
 #define MS_RECORDER_NEEDS_FIR \
 	MS_FILTER_EVENT_NO_ARG(MSFilterRecorderInterface,0)
+
+#define MS_RECORDER_SET_MAX_SIZE \
+	MS_FILTER_METHOD(MSFilterRecorderInterface,6,int)
+
+#define MS_RECORDER_MAX_SIZE_REACHED \
+	MS_FILTER_EVENT_NO_ARG(MSFilterRecorderInterface,1)
 
 
 /** Interface definitions for echo cancellers */

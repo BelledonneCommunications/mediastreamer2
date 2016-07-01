@@ -61,6 +61,9 @@ void mediastreamer2_tester_init(void(*ftester_printf)(int level, const char *fmt
 	bc_tester_add_suite(&neon_test_suite);
 #endif
 	bc_tester_add_suite(&text_stream_test_suite);
+#ifdef HAVE_PCAP
+	bc_tester_add_suite(&codec_impl_test_suite);
+#endif
 }
 
 void mediastreamer2_tester_uninit(void) {
@@ -106,7 +109,7 @@ int main (int argc, char *argv[]) {
 
 	// this allows to launch tester from outside of tester directory
 	if (strstr(argv[0], ".libs")) {
-		int prefix_length = strstr(argv[0], ".libs") - argv[0] + 1;
+		long prefix_length = strstr(argv[0], ".libs") - argv[0] + 1;
 		char *prefix = ms_strdup_printf("%s%.*s", argv[0][0] == '/' ? "" : "./", prefix_length, argv[0]);
 		ms_warning("Resource prefix set to %s", prefix);
 		bc_tester_set_resource_dir_prefix(prefix);

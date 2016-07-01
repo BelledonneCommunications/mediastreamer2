@@ -34,7 +34,7 @@ tools/CMakeLists.txt
 
 ACLOCAL_AMFLAGS = -I m4 $(ACLOCAL_MACOS_FLAGS)
 
-SUBDIRS=po src build m4 include tools tester help
+SUBDIRS=po src m4 include tools tester help
 
 ACLOCAL_FLAGS=-I$(top_srcdir)/m4
 
@@ -111,7 +111,6 @@ build/android/voipdescs.h \
 build/git-pre-commit-hook \
 build/iphone/basedescs.h \
 build/iphone/voipdescs.h \
-build/winmob/echo/echo.vcproj \
 build/wp8 \
 java/.classpath \
 java/.project \

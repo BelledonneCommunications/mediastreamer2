@@ -1281,12 +1281,6 @@ AC_CONFIG_FILES(
 	include/mediastreamer2/Makefile
 	src/Makefile
 	tools/Makefile
-	build/Makefile
-	build/win32native/Makefile
-	build/win32native/mediastream/Makefile
-	build/win32-novideo/Makefile
-	build/wince/Makefile
-	build/winmob/Makefile
 	mediastreamer.pc
 	mediastreamer2.spec
 	help/Makefile

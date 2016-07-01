@@ -469,8 +469,8 @@ typedef struct _VTH264DecCtx {
 	MSFilter *f;
 } VTH264DecCtx;
 
-static bool_t h264_dec_update_format_description(VTH264DecCtx *ctx, const MSList *parameter_sets) {
-	const MSList *it;
+static CMFormatDescriptionRef format_desc_from_sps_pps(const bctbx_list_t *parameter_sets) {
+	const bctbx_list_t *it;
 	const size_t max_ps_count = 20;
 	size_t ps_count;
 	const uint8_t *ps_ptrs[max_ps_count];
@@ -478,13 +478,12 @@ static bool_t h264_dec_update_format_description(VTH264DecCtx *ctx, const MSList
 	int sps_count = 0, pps_count = 0;
 	int i;
 	OSStatus status;
+	CMFormatDescriptionRef format_desc;
 
-	if(ctx->format_desc) CFRelease(ctx->format_desc);
-	ctx->format_desc = NULL;
-	ps_count = ms_list_size(parameter_sets);
+	ps_count = bctbx_list_size(parameter_sets);
 	if(ps_count > max_ps_count) {
 		ms_error("VideoToolboxDec: too much SPS/PPS");
-		return FALSE;
+		return NULL;
 	}
 	for(it=parameter_sets,i=0; it; it=it->next,i++) {
 		mblk_t *m = (mblk_t *)it->data;
@@ -495,18 +494,18 @@ static bool_t h264_dec_update_format_description(VTH264DecCtx *ctx, const MSList
 	}
 	if(sps_count==0) {
 		ms_error("VideoToolboxDec: no SPS");
-		return FALSE;
+		return NULL;
 	}
 	if(pps_count==0) {
 		ms_error("VideoToolboxDec: no PPS");
-		return FALSE;
+		return NULL;
 	}
-	status = CMVideoFormatDescriptionCreateFromH264ParameterSets(NULL, ps_count, ps_ptrs, ps_sizes, H264_NALU_HEAD_SIZE, &ctx->format_desc);
+	status = CMVideoFormatDescriptionCreateFromH264ParameterSets(NULL, ps_count, ps_ptrs, ps_sizes, H264_NALU_HEAD_SIZE, &format_desc);
 	if(status != noErr) {
 		ms_error("VideoToolboxDec: could not find out the input format: %d", (int)status);
-		return FALSE;
+		return NULL;
 	}
-	return TRUE;
+	return format_desc;
 }
 
 static void h264_dec_output_cb(VTH264DecCtx *ctx, void *sourceFrameRefCon,
@@ -613,7 +612,7 @@ static void h264_dec_process(MSFilter *f) {
 	CMSampleTimingInfo timing_info;
 	MSPicture pixbuf_desc;
 	OSStatus status;
-	MSList *parameter_sets = NULL;
+	bctbx_list_t *parameter_sets = NULL;
 	bool_t unpacking_failed;
 	bool_t iframe_received = FALSE;
 
@@ -633,7 +632,7 @@ static void h264_dec_process(MSFilter *f) {
 	while((nalu = ms_queue_get(&q_nalus))) {
 		MSH264NaluType nalu_type = ms_h264_nalu_get_type(nalu);
 		if(nalu_type == MSH264NaluTypeSPS || nalu_type == MSH264NaluTypePPS) {
-			parameter_sets = ms_list_append(parameter_sets, nalu);
+			parameter_sets = bctbx_list_append(parameter_sets, nalu);
 			iframe_received = TRUE;
 		} else if(ctx->format_desc || parameter_sets) {
 			ms_queue_put(&q_nalus2, nalu);
@@ -645,22 +644,19 @@ static void h264_dec_process(MSFilter *f) {
 	if(iframe_received) ms_message("VideoToolboxDecoder: I-frame received");
 	
 	if(parameter_sets) {
-		CMFormatDescriptionRef last_format = ctx->format_desc ? CFRetain(ctx->format_desc) : NULL;
-		h264_dec_update_format_description(ctx, parameter_sets);
-		parameter_sets = ms_list_free_with_data(parameter_sets, (void (*)(void *))freemsg);
-		if(ctx->format_desc == NULL) goto fail;
-		if(last_format) {
-			CMVideoDimensions last_vsize = CMVideoFormatDescriptionGetDimensions(last_format);
-			CMVideoDimensions vsize = CMVideoFormatDescriptionGetDimensions(ctx->format_desc);
-			if(last_vsize.width != vsize.width || last_vsize.height != vsize.height) {
+		CMFormatDescriptionRef new_format_desc = format_desc_from_sps_pps(parameter_sets);
+		parameter_sets = bctbx_list_free_with_data(parameter_sets, (void (*)(void *))freemsg);
+		if(ctx->format_desc) {
+			CMVideoDimensions last_vsize = CMVideoFormatDescriptionGetDimensions(ctx->format_desc);
+			CMVideoDimensions new_vsize = CMVideoFormatDescriptionGetDimensions(new_format_desc);
+			if(last_vsize.width != new_vsize.width || last_vsize.height != new_vsize.height) {
 				ms_message("VideoToolboxDecoder: new encoded video size %dx%d -> %dx%d",
-						   (int)last_vsize.width, (int)last_vsize.height, (int)vsize.width, (int)vsize.height);
-				ms_message("VideoToolboxDecoder: destroying decoding session");
-				VTDecompressionSessionInvalidate(ctx->session);
-				CFRelease(ctx->session);
-				ctx->session = NULL;
+						   (int)last_vsize.width, (int)last_vsize.height, (int)new_vsize.width, (int)new_vsize.height);
+				h264_dec_uninit_decoder(ctx);
+				ctx->format_desc = new_format_desc;
 			}
-			CFRelease(last_format);
+		} else {
+			ctx->format_desc = new_format_desc;
 		}
 	}
 
@@ -833,7 +829,7 @@ MSFilterDesc ms_vt_h264_dec = {
 
 void _register_videotoolbox_if_supported(MSFactory *factory) {
 #if TARGET_OS_SIMULATOR
-	ms_warning("VideoToolbox H264 codec is not supported on simulators");
+	ms_message("VideoToolbox H264 codec is not supported on simulators");
 #else
 
 #ifdef __ios
@@ -845,7 +841,7 @@ void _register_videotoolbox_if_supported(MSFactory *factory) {
 		ms_factory_register_filter(factory, &ms_vt_h264_enc);
 		ms_factory_register_filter(factory, &ms_vt_h264_dec);
 	} else {
-		ms_warning("Cannot register VideoToolbox H264 codec. That "
+		ms_message("Cannot register VideoToolbox H264 codec. That "
 			"requires iOS 8 or MacOSX 10.8");
 	}
 	

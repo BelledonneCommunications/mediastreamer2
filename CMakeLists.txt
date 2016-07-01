@@ -21,14 +21,14 @@
 ############################################################################
 
 cmake_minimum_required(VERSION 3.0)
-project(mediastreamer2 VERSION 2.12.1 LANGUAGES C CXX)
+project(mediastreamer2 VERSION 2.13.0 LANGUAGES C CXX)
 
 
 set(MEDIASTREAMER_MAJOR_VERSION ${PROJECT_VERSION_MAJOR})
 set(MEDIASTREAMER_MINOR_VERSION ${PROJECT_VERSION_MINOR})
 set(MEDIASTREAMER_MICRO_VERSION ${PROJECT_VERSION_PATCH})
 set(MEDIASTREAMER_VERSION ${PROJECT_VERSION})
-set(MEDIASTREAMER_SO_VERSION "7") # incremented on January, the 20th 2016. DO NOT INCREMENT BEFORE MEDIASTREAMER 2.13
+set(MEDIASTREAMER_SO_VERSION "8") # incremented on June, the 2nd 2016. DO NOT INCREMENT BEFORE MEDIASTREAMER 2.14
 
 string(REGEX MATCH "^(arm*|aarch64)" FIXED_POINT_PROCESSOR "${CMAKE_SYSTEM_PROCESSOR}")
 if(FIXED_POINT_PROCESSOR)
@@ -53,6 +53,15 @@ if(UNIX)
 endif()
 if(UNIX AND NOT APPLE)
 	set(LINUX_OR_BSD 1)
+endif()
+
+if(ENABLE_STATIC)
+	set(MS2_LIBS_FOR_TOOLS mediastreamer_voip-static mediastreamer_base-static)
+	if(XV_FOUND)
+		list(APPEND MS2_LIBS_FOR_TOOLS Xext)
+	endif()
+else()
+	set(MS2_LIBS_FOR_TOOLS mediastreamer_voip mediastreamer_base)
 endif()
 
 include(CMakeDependentOption)
@@ -80,7 +89,9 @@ cmake_dependent_option(ENABLE_ARTSC "Enable artsc (KDE<4) sound input/output." N
 cmake_dependent_option(ENABLE_MACSND "Enable MAC OS X Audio Units sound support." ${ENABLE_MACSND_DEFAULT_VALUE} "ENABLE_SOUND;APPLE" NO)
 cmake_dependent_option(ENABLE_MACAQSND "Enable native MAC OS X Audio Queue sound support." ${ENABLE_MACAQSND_DEFAULT_VALUE} "ENABLE_SOUND;APPLE" NO)
 cmake_dependent_option(ENABLE_QSA "Enable QSA (QNX Sound Architecture) support." NO "ENABLE_SOUND" NO)
-cmake_dependent_option(ENABLE_OSS "Enable OSS support." YES "ENABLE_SOUND;LINUX_OR_BSD" NO)
+# OSS is mostly deprecated in 2016, so it should not be built by default (it won't work anyway). Let user defines it
+# itself only if he REALLY needs it.
+cmake_dependent_option(ENABLE_OSS "Enable OSS support." NO "ENABLE_SOUND;LINUX_OR_BSD" NO)
 cmake_dependent_option(ENABLE_PORTAUDIO "Enable portaudio native support." NO "ENABLE_SOUND" NO)
 cmake_dependent_option(ENABLE_PULSEAUDIO "Enable pulseaudio support." YES "ENABLE_SOUND" NO)
 option(ENABLE_GSM "Build mediastreamer2 with the GSM codec." YES)
@@ -531,7 +542,12 @@ endif()
 set(STRICT_OPTIONS_CPP )
 set(STRICT_OPTIONS_C )
 set(STRICT_OPTIONS_OBJC "-Wno-error")
-if(NOT MSVC)
+if(MSVC)
+	list(APPEND STRICT_OPTIONS_CPP "/wd4142") # Disable "benign redefinition of type" warnings
+	if(ENABLE_STRICT)
+		list(APPEND STRICT_OPTIONS_CPP "/WX")
+	endif()
+else()
 	list(APPEND STRICT_OPTIONS_CPP "-Wall" "-Wuninitialized")
 	list(APPEND STRICT_OPTIONS_C "-Wdeclaration-after-statement" "-Wstrict-prototypes" "-Wno-error=strict-prototypes")
 	if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
@@ -599,3 +615,5 @@ install(FILES
 	"${CMAKE_CURRENT_BINARY_DIR}/Mediastreamer2ConfigVersion.cmake"
 	DESTINATION ${CONFIG_PACKAGE_LOCATION}
 )
+
+

@@ -143,7 +143,7 @@ static void enc_process (MSFilter *f){
 	short *buf= NULL;
 	mblk_t *inputMessage = NULL, *outputMessage = NULL;
 	int frame_per_packet=s->ptime/5;
-	int in_rcvd_bytes = 0;
+	size_t in_rcvd_bytes = 0;
 
 	in_rcvd_bytes = SIGNAL_FRAME_SIZE * frame_per_packet;
 	buf=(short*)alloca(in_rcvd_bytes);
@@ -339,7 +339,8 @@ MSFilterDesc ms_bv16_dec_desc={
 	dec_process,
 	dec_postprocess,
 	dec_uninit,
-	dec_methods
+	dec_methods,
+	MS_FILTER_IS_PUMP
 };
 
 #else
@@ -357,7 +358,8 @@ MSFilterDesc ms_bv16_dec_desc={
 	.process=dec_process,
 	.postprocess =dec_postprocess,
 	.uninit=dec_uninit,
-	.methods=dec_methods
+	.methods=dec_methods,
+	.flags = MS_FILTER_IS_PUMP
 };
 
 #endif

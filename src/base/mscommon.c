@@ -1,6 +1,6 @@
 /*
 mediastreamer2 library - modular sound and video processing and streaming
-Copyright (C) 2006  Simon MORLAT (simon.morlat@linphone.org)
+Copyright (C) 2006  Belledonne Communications SARL
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -58,103 +58,51 @@ void ms_set_cpu_count(unsigned int c) {
 }
 
 MSList *ms_list_new(void *data){
-	MSList *new_elem=(MSList *)ms_new0(MSList,1);
-	new_elem->data=data;
-	return new_elem;
+	return bctbx_list_new(data);
 }
 
 MSList *ms_list_append_link(MSList *elem, MSList *new_elem){
-	MSList *it=elem;
-	if (elem==NULL) return new_elem;
-	while (it->next!=NULL) it=ms_list_next(it);
-	it->next=new_elem;
-	new_elem->prev=it;
-	return elem;
+	return bctbx_list_append_link(elem, new_elem);
 }
 
 MSList * ms_list_append(MSList *elem, void * data){
-	MSList *new_elem=ms_list_new(data);
-	return ms_list_append_link(elem,new_elem);
+	return bctbx_list_append(elem, data);
 }
 
 MSList * ms_list_prepend(MSList *elem, void *data){
-	MSList *new_elem=ms_list_new(data);
-	if (elem!=NULL) {
-		new_elem->next=elem;
-		elem->prev=new_elem;
-	}
-	return new_elem;
+	return bctbx_list_prepend(elem, data);
 }
 
-
 MSList * ms_list_concat(MSList *first, MSList *second){
-	MSList *it=first;
-	if (it==NULL) return second;
-	while(it->next!=NULL) it=ms_list_next(it);
-	it->next=second;
-	second->prev=it;
-	return first;
+	return bctbx_list_concat(first, second);
 }
 
 MSList * ms_list_free_with_data(MSList *list, void (*freefunc)(void*)){
-	MSList *elem;
-	MSList *tmp;
-
-	for (elem=list;elem!=NULL;){
-		tmp=elem->next;
-		if (freefunc) freefunc(elem->data);
-		ms_free(elem);
-		elem=tmp;
-	}
-	return NULL;
+	return bctbx_list_free_with_data(list, freefunc);
 }
 
 MSList * ms_list_free(MSList *elem){
-	return ms_list_free_with_data(elem,NULL);
+	return bctbx_list_free(elem);
 }
 
 MSList * ms_list_remove(MSList *first, void *data){
-	MSList *it;
-	it=ms_list_find(first,data);
-	if (it) return ms_list_remove_link(first,it);
-	else {
-		ms_warning("ms_list_remove: no element with %p data was in the list", data);
-		return first;
-	}
+	return bctbx_list_remove(first, data);
 }
 
 MSList * ms_list_remove_custom(MSList *first, MSCompareFunc compare_func, const void *user_data) {
-	MSList *cur;
-	MSList *elem = first;
-	while (elem != NULL) {
-		cur = elem;
-		elem = elem->next;
-		if (compare_func(cur->data, user_data) == 0) {
-			first = ms_list_remove(first, cur->data);
-		}
-	}
-	return first;
+	return bctbx_list_remove_custom(first, compare_func, user_data);
 }
 
 int ms_list_size(const MSList *first){
-	int n=0;
-	while(first!=NULL){
-		++n;
-		first=first->next;
-	}
-	return n;
+	return (int)bctbx_list_size(first);
 }
 
 void ms_list_for_each(const MSList *list, void (*func)(void *)){
-	for(;list!=NULL;list=list->next){
-		func(list->data);
-	}
+	bctbx_list_for_each(list, func);
 }
 
 void ms_list_for_each2(const MSList *list, void (*func)(void *, void *y), void *user_data){
-	for(;list!=NULL;list=list->next){
-		func(list->data,user_data);
-	}
+	bctbx_list_for_each2(list, func, user_data);
 }
 
 void ms_list_for_each3(const MSList *list, void (*func)(void *, void *, void*), void *user_data, void* factory){
@@ -164,131 +112,52 @@ void ms_list_for_each3(const MSList *list, void (*func)(void *, void *, void*), 
 }
 
 MSList *ms_list_remove_link(MSList *list, MSList *elem){
-	MSList *ret;
-	if (elem==list){
-		ret=elem->next;
-		elem->prev=NULL;
-		elem->next=NULL;
-		if (ret!=NULL) ret->prev=NULL;
-		ms_free(elem);
-		return ret;
-	}
-	elem->prev->next=elem->next;
-	if (elem->next!=NULL) elem->next->prev=elem->prev;
-	elem->next=NULL;
-	elem->prev=NULL;
-	ms_free(elem);
-	return list;
+	return bctbx_list_remove_link(list, elem);
 }
 
 MSList *ms_list_find(MSList *list, void *data){
-	for(;list!=NULL;list=list->next){
-		if (list->data==data) return list;
-	}
-	return NULL;
+	return bctbx_list_find(list, data);
 }
 
 MSList *ms_list_find_custom(MSList *list, int (*compare_func)(const void *, const void*), const void *user_data){
-	for(;list!=NULL;list=list->next){
-		if (compare_func(list->data,user_data)==0) return list;
-	}
-	return NULL;
+	return bctbx_list_find_custom(list, compare_func, user_data);
 }
 
 void * ms_list_nth_data(const MSList *list, int index){
-	int i;
-	for(i=0;list!=NULL;list=list->next,++i){
-		if (i==index) return list->data;
-	}
-	ms_error("ms_list_nth_data: no such index in list.");
-	return NULL;
+	return bctbx_list_nth_data(list, index);
 }
 
 int ms_list_position(const MSList *list, MSList *elem){
-	int i;
-	for(i=0;list!=NULL;list=list->next,++i){
-		if (elem==list) return i;
-	}
-	ms_error("ms_list_position: no such element in list.");
-	return -1;
+	return bctbx_list_position(list, elem);
 }
 
 int ms_list_index(const MSList *list, void *data){
-	int i;
-	for(i=0;list!=NULL;list=list->next,++i){
-		if (data==list->data) return i;
-	}
-	ms_error("ms_list_index: no such element in list.");
-	return -1;
+	return bctbx_list_index(list, data);
 }
 
 MSList *ms_list_insert_sorted(MSList *list, void *data, int (*compare_func)(const void *, const void*)){
-	MSList *it,*previt=NULL;
-	MSList *nelem;
-	MSList *ret=list;
-	if (list==NULL) return ms_list_append(list,data);
-	else{
-		nelem=ms_list_new(data);
-		for(it=list;it!=NULL;it=it->next){
-			previt=it;
-			if (compare_func(data,it->data)<=0){
-				nelem->prev=it->prev;
-				nelem->next=it;
-				if (it->prev!=NULL)
-					it->prev->next=nelem;
-				else{
-					ret=nelem;
-				}
-				it->prev=nelem;
-				return ret;
-			}
-		}
-		previt->next=nelem;
-		nelem->prev=previt;
-	}
-	return ret;
+	return bctbx_list_insert_sorted(list, data, compare_func);
 }
 
 MSList *ms_list_insert(MSList *list, MSList *before, void *data){
-	MSList *elem;
-	if (list==NULL || before==NULL) return ms_list_append(list,data);
-	for(elem=list;elem!=NULL;elem=ms_list_next(elem)){
-		if (elem==before){
-			if (elem->prev==NULL)
-				return ms_list_prepend(list,data);
-			else{
-				MSList *nelem=ms_list_new(data);
-				nelem->prev=elem->prev;
-				nelem->next=elem;
-				elem->prev->next=nelem;
-				elem->prev=nelem;
-			}
-		}
-	}
-	return list;
+	return bctbx_list_insert(list, before, data);
 }
 
 MSList *ms_list_copy(const MSList *list){
-	MSList *copy=NULL;
-	const MSList *iter;
-	for(iter=list;iter!=NULL;iter=ms_list_next(iter)){
-		copy=ms_list_append(copy,iter->data);
-	}
-	return copy;
+	return bctbx_list_copy(list);
 }
 
 MSList *ms_list_copy_with_data(const MSList *list, void *(*copyfunc)(void *)){
-	MSList *copy=NULL;
-	const MSList *iter;
-	for(iter=list;iter!=NULL;iter=ms_list_next(iter)){
-		copy=ms_list_append(copy,copyfunc(iter->data));
-	}
-	return copy;
+	return bctbx_list_copy_with_data(list, copyfunc);
 }
 
-char * ms_tags_list_as_string(const MSList *list) {
+MSList* ms_list_next(const MSList *list) {
+	return bctbx_list_next(list);
+}
+
+char * ms_tags_list_as_string(const bctbx_list_t *list) {
 	char *tags_str = NULL;
-	const MSList *elem = list;
+	const bctbx_list_t *elem = list;
 	while (elem != NULL) {
 		char *elem_str = (char *)elem->data;
 		if (tags_str == NULL) {
@@ -303,8 +172,8 @@ char * ms_tags_list_as_string(const MSList *list) {
 	return tags_str;
 }
 
-bool_t ms_tags_list_contains_tag(const MSList *list, const char *tag) {
-	const MSList *elem = list;
+bool_t ms_tags_list_contains_tag(const bctbx_list_t *list, const char *tag) {
+	const bctbx_list_t *elem = list;
 	while (elem != NULL) {
 		char *tag_from_list = (char *)elem->data;
 		if (strcasecmp(tag, tag_from_list) == 0)
@@ -431,7 +300,7 @@ struct _MSConcealerContext {
 	int64_t sample_time;
 	int64_t plc_start_time;
 	unsigned long total_number_for_plc;
-	unsigned int max_plc_time;
+	uint32_t max_plc_time;
 };
 
 /*** plc context begin***/
@@ -439,7 +308,7 @@ unsigned long ms_concealer_context_get_total_number_of_plc(MSConcealerContext* o
 	return obj->total_number_for_plc;
 }
 
-MSConcealerContext* ms_concealer_context_new(unsigned int max_plc_time){
+MSConcealerContext* ms_concealer_context_new(uint32_t max_plc_time){
 	MSConcealerContext *obj=(MSConcealerContext *) ms_new0(MSConcealerContext,1);
 	obj->sample_time=-1;
 	obj->plc_start_time=-1;
@@ -452,29 +321,28 @@ void ms_concealer_context_destroy(MSConcealerContext* context) {
 	ms_free(context);
 }
 
-int ms_concealer_inc_sample_time(MSConcealerContext* obj, uint64_t current_time, int time_increment, int got_packet){
-	int plc_duration=0;
+uint32_t ms_concealer_inc_sample_time(MSConcealerContext* obj, uint64_t current_time, uint32_t time_increment, bool_t got_packet){
+	uint32_t plc_duration=0;
 	if (obj->sample_time==-1){
 		obj->sample_time=(int64_t)current_time;
 	}
 	obj->sample_time+=time_increment;
 	if (obj->plc_start_time!=-1 && got_packet){
-		plc_duration=(int)(current_time-obj->plc_start_time);
+		plc_duration=(uint32_t)(current_time-obj->plc_start_time);
 		obj->plc_start_time=-1;
 		if (plc_duration>obj->max_plc_time) plc_duration=obj->max_plc_time;
 	}
 	return plc_duration;
 }
 
-unsigned int ms_concealer_context_is_concealement_required(MSConcealerContext* obj,uint64_t current_time) {
-
+unsigned int ms_concealer_context_is_concealement_required(MSConcealerContext* obj, uint64_t current_time) {
 	if(obj->sample_time == -1) return 0; /*no valid value*/
 
-	if (obj->sample_time <= current_time){
-		int plc_duration;
+	if ((uint64_t)obj->sample_time <= current_time){
+		uint32_t plc_duration;
 		if (obj->plc_start_time==-1)
 			obj->plc_start_time=obj->sample_time;
-		plc_duration=current_time-obj->plc_start_time;
+		plc_duration=(uint32_t)(current_time-(uint64_t)obj->plc_start_time);
 		if (plc_duration<obj->max_plc_time) {
 			obj->total_number_for_plc++;
 			return 1;
@@ -513,14 +381,14 @@ void ms_concealer_ts_context_destroy(MSConcealerTsContext* context) {
 	ms_free(context);
 }
 
-int ms_concealer_ts_context_inc_sample_ts(MSConcealerTsContext* obj, uint64_t current_ts, int ts_increment, int got_packet){
-	int plc_duration=0;
+uint32_t ms_concealer_ts_context_inc_sample_ts(MSConcealerTsContext* obj, uint64_t current_ts, uint32_t ts_increment, bool_t got_packet){
+	uint32_t plc_duration=0;
 	if (obj->sample_ts==-1){
 		obj->sample_ts=(int64_t)current_ts;
 	}
 	obj->sample_ts+=ts_increment;
 	if (obj->plc_start_ts!=-1 && got_packet){
-		plc_duration=current_ts-obj->plc_start_ts;
+		plc_duration=(uint32_t)(current_ts-(uint64_t)obj->plc_start_ts);
 		obj->plc_start_ts=-1;
 		if (plc_duration>obj->max_plc_ts) plc_duration=obj->max_plc_ts;
 	}
@@ -530,11 +398,11 @@ int ms_concealer_ts_context_inc_sample_ts(MSConcealerTsContext* obj, uint64_t cu
 unsigned int ms_concealer_ts_context_is_concealement_required(MSConcealerTsContext* obj, uint64_t current_ts) {
 	if(obj->sample_ts == -1) return 0; /*no valid value*/
 
-	if (obj->sample_ts < current_ts){
-		int plc_duration;
+	if ((uint64_t)obj->sample_ts < current_ts){
+		uint32_t plc_duration;
 		if (obj->plc_start_ts==-1)
 			obj->plc_start_ts=obj->sample_ts;
-		plc_duration=current_ts-obj->plc_start_ts;
+		plc_duration=(uint32_t)(current_ts-(uint64_t)obj->plc_start_ts);
 		if (plc_duration<obj->plc_start_ts) {
 			obj->total_number_for_plc++;
 			return 1;

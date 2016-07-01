@@ -47,6 +47,7 @@ set(BASE_SOURCE_FILES_C
 	base/msvideopresets.c
 	base/mswebcam.c
 	base/mtu.c
+	base/msasync.c
 	otherfilters/itc.c
 	otherfilters/join.c
 	otherfilters/tee.c
@@ -77,10 +78,10 @@ add_definitions(
 )
 
 set(BASE_LIBS
-	${ORTP_LIBRARIES}
+	${BCTOOLBOX_CORE_LIBRARIES} ${ORTP_LIBRARIES}
 )
 if(WIN32 AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsPhone" AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
-	list(APPEND BASE_LIBS ${LIBGCC} ${LIBMINGWEX} ole32 oleaut32 uuid)
+	list(APPEND BASE_LIBS ${LIBGCC} ${LIBMINGWEX} ole32 oleaut32 uuid Winmm Ws2_32)
 endif()
 if(HAVE_DLOPEN)
 	list(APPEND BASE_LIBS dl)
@@ -107,11 +108,11 @@ if(ENABLE_SHARED)
 		# Do not version shared library on Android
 		set_target_properties(mediastreamer_base PROPERTIES SOVERSION ${MEDIASTREAMER_SO_VERSION})
 	endif()
-	target_link_libraries(mediastreamer_base ${BASE_LIBS})
+	target_link_libraries(mediastreamer_base PRIVATE ${BASE_LIBS})
 	add_dependencies(mediastreamer_base ms2-git-version ms2-basedescs-header)
 	if(MSVC)
-		if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-			install(FILES ${CMAKE_CURRENT_BINARY_DIR}/Debug/mediastreamer_base.pdb
+		if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+			install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/mediastreamer_base.pdb
 				DESTINATION ${CMAKE_INSTALL_BINDIR}
 				PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 			)
@@ -143,6 +144,8 @@ set(VOIP_SOURCE_FILES_C
 	audiofilters/l16.c
 	audiofilters/msfileplayer.c
 	audiofilters/msfilerec.c
+	audiofilters/asyncrw.c
+	audiofilters/asyncrw.h
 	audiofilters/msg722.c
 	audiofilters/msvaddtx.c
 	audiofilters/msvolume.c
@@ -474,7 +477,7 @@ set(VOIP_LIBS
 )
 if(WIN32)
 	if(NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsPhone" AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
-		list(APPEND VOIP_LIBS ${LIBGCC} ${LIBMINGWEX} ole32 oleaut32 uuid)
+		list(APPEND VOIP_LIBS ${LIBGCC} ${LIBMINGWEX} ole32 oleaut32 uuid Ws2_32)
 		if(ENABLE_VIDEO)
 			list(APPEND VOIP_LIBS gdi32 strmiids user32 vfw32)
 		endif()
@@ -616,8 +619,8 @@ if(ENABLE_SHARED)
 	endif()
 	target_link_libraries(mediastreamer_voip mediastreamer_base ${VOIP_LIBS})
 	if(MSVC)
-		if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-			install(FILES ${CMAKE_CURRENT_BINARY_DIR}/Debug/mediastreamer_voip.pdb
+		if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+			install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/mediastreamer_voip.pdb
 				DESTINATION ${CMAKE_INSTALL_BINDIR}
 				PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 			)
@@ -659,8 +662,8 @@ if(ENABLE_VIDEO AND CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
 		PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 	)
 
-	if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-		install(FILES ${CMAKE_CURRENT_BINARY_DIR}/Debug/mswinrtjpeg2yuv.pdb
+	if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+		install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/mswinrtjpeg2yuv.pdb
 			DESTINATION ${CMAKE_INSTALL_BINDIR}
 			PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 		)

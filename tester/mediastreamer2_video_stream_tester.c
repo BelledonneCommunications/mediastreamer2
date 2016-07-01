@@ -54,24 +54,24 @@ MSWebCam* mediastreamer2_tester_get_mire_webcam(MSWebCamManager *mgr) {
 }
 
 struct _CodecsManager {
-	MSList *encoders;
-	MSList *decoders;
+	bctbx_list_t *encoders;
+	bctbx_list_t *decoders;
 };
 
 typedef void (*CodecManagerTestFunc)(void);
 
 static CodecsManager *codecs_manager_new(MSFactory *factory, const char *mime) {
-	MSList *it;
+	bctbx_list_t *it;
 	CodecsManager *cm = ms_new0(CodecsManager, 1);
 	cm->decoders = NULL;
 	cm->encoders = NULL;
-	for (it=factory->desc_list; it; it=ms_list_next(it)) {
+	for (it=factory->desc_list; it; it=bctbx_list_next(it)) {
 		MSFilterDesc *desc = (MSFilterDesc *)it->data;
 		if (desc->enc_fmt && strcasecmp(desc->enc_fmt, mime) == 0 && (desc->flags & MS_FILTER_IS_ENABLED)) {
 			if (desc->category == MS_FILTER_ENCODER) {
-				cm->encoders = ms_list_append(cm->encoders, desc);
+				cm->encoders = bctbx_list_append(cm->encoders, desc);
 			} else if (desc->category == MS_FILTER_DECODER) {
-				cm->decoders = ms_list_append(cm->decoders, desc);
+				cm->decoders = bctbx_list_append(cm->decoders, desc);
 			}
 		}
 	}
@@ -79,12 +79,12 @@ static CodecsManager *codecs_manager_new(MSFactory *factory, const char *mime) {
 }
 
 static void codecs_manager_free(CodecsManager *cm) {
-	ms_list_free(cm->decoders);
-	ms_list_free(cm->encoders);
+	bctbx_list_free(cm->decoders);
+	bctbx_list_free(cm->encoders);
 }
 
 static void codecs_manager_enable_all_codecs(const CodecsManager *cm, MSFilterCategory category, bool_t enable) {
-	const MSList *it;
+	const bctbx_list_t *it;
 	if (category == MS_FILTER_ENCODER) {
 		it = cm->encoders;
 	} else if (category == MS_FILTER_DECODER) {
@@ -93,7 +93,7 @@ static void codecs_manager_enable_all_codecs(const CodecsManager *cm, MSFilterCa
 		ms_error("CodecsManager: fail to enable all codecs: invalid category [%d]", category);
 		return;
 	}
-	for (; it; it=ms_list_next(it)) {
+	for (; it; it=bctbx_list_next(it)) {
 		MSFilterDesc *desc = (MSFilterDesc *)it->data;
 		if (enable) desc->flags |= MS_FILTER_IS_ENABLED;
 		else desc->flags &= ~MS_FILTER_IS_ENABLED;
@@ -108,11 +108,11 @@ static void codecs_manager_enable_only_one_codec(const CodecsManager *cm, MSFilt
 }
 
 static void codecs_manager_test_all_combinations(const CodecsManager *cm, CodecManagerTestFunc test_func) {
-	const MSList *enc_it, *dec_it;
-	for (enc_it=cm->encoders; enc_it; enc_it=ms_list_next(enc_it)) {
+	const bctbx_list_t *enc_it, *dec_it;
+	for (enc_it=cm->encoders; enc_it; enc_it=bctbx_list_next(enc_it)) {
 		MSFilterDesc *enc_desc = (MSFilterDesc *)enc_it->data;
 		codecs_manager_enable_only_one_codec(cm, enc_desc);
-		for (dec_it=cm->decoders; dec_it; dec_it=ms_list_next(dec_it)) {
+		for (dec_it=cm->decoders; dec_it; dec_it=bctbx_list_next(dec_it)) {
 			MSFilterDesc *dec_desc = (MSFilterDesc *)dec_it->data;
 			codecs_manager_enable_only_one_codec(cm, dec_desc);
 			ms_message("CodecsManager: calling test function [%p] with %s as encoder and %s as decoder",
@@ -486,7 +486,7 @@ static void multicast_video_stream(void) {
 
 		video_stream_get_local_rtp_stats(marielle->vs, &marielle->stats.rtp);
 		video_stream_get_local_rtp_stats(margaux->vs, &marielle->stats.rtp);
-		BC_ASSERT_EQUAL(margaux->stats.rtp.sent,marielle->stats.rtp.recv,int,"%d");
+		BC_ASSERT_EQUAL(margaux->stats.rtp.sent,marielle->stats.rtp.recv,unsigned long long,"%llu");
 
 		uninit_video_streams(marielle, margaux);
 	} else {
@@ -609,8 +609,8 @@ static void avpf_rpsi_count(void) {
 		wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms,  &dummy, 1, delay, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats);
 		BC_ASSERT_EQUAL(marielle->stats.number_of_sent_RPSI,4,int,"%d");
 		BC_ASSERT_EQUAL(margaux->stats.number_of_sent_RPSI,4,int,"%d");
-		BC_ASSERT_LOWER(fabs(video_stream_get_received_framerate(marielle->vs)-margaux->vconf->fps), 2.f, float, "%f");
-		BC_ASSERT_LOWER(fabs(video_stream_get_received_framerate(margaux->vs)-marielle->vconf->fps), 2.f, float, "%f");
+		BC_ASSERT_LOWER((float)fabs(video_stream_get_received_framerate(marielle->vs)-margaux->vconf->fps), 2.f, float, "%f");
+		BC_ASSERT_LOWER((float)fabs(video_stream_get_received_framerate(margaux->vs)-marielle->vconf->fps), 2.f, float, "%f");
 		uninit_video_streams(marielle, margaux);
 	} else {
 		ms_error("VP8 codec is not supported!");

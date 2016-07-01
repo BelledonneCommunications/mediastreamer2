@@ -113,7 +113,7 @@ typedef struct _IceSession {
 	IceRole role;	/**< Role played by the agent for this session */
 	IceSessionState state;	/**< State of the session */
 	uint64_t tie_breaker;	/**< Random number used to resolve role conflicts (see paragraph 5.2 of the RFC 5245) */
-	uint32_t ta;	/**< Duration of timer for sending connectivity checks in ms */
+	int32_t ta;	/**< Duration of timer for sending connectivity checks in ms */
 	int event_value;	/** Value of the event to send */
 	MSTimeSpec event_time;	/**< Time when an event must be sent */
 	struct sockaddr_storage ss;	/**< STUN server address to use for the candidates gathering process */
@@ -188,7 +188,7 @@ typedef struct _IceCandidatePair {
 	IceCandidatePairState state;	/**< State of the candidate pair */
 	uint64_t priority;	/**< Priority of the candidate pair */
 	MSTimeSpec transmission_time;	/**< Time when the connectivity check for the candidate pair has been sent */
-	uint32_t rto;	/**< Duration of the retransmit timer for the connectivity check sent for the candidate pair in ms */
+	int32_t rto;	/**< Duration of the retransmit timer for the connectivity check sent for the candidate pair in ms */
 	uint8_t retransmissions;	/**< Number of retransmissions for the connectivity check sent for the candidate pair */
 	IceRole role;	/**< Role of the agent when the connectivity check has been sent for the candidate pair */
 	bool_t is_default;	/**< Boolean value telling whether this candidate pair is a default candidate pair or not */
@@ -502,8 +502,9 @@ MS2_PUBLIC bool_t ice_session_candidates_gathered(const IceSession *session);
  * @param session A pointer to a session
  * @param ss The STUN server address
  * @param ss_len The length of the STUN server address
+ * @return TRUE if the gathering is in progress, FALSE if no gathering is happening.
  */
-MS2_PUBLIC void ice_session_gather_candidates(IceSession *session, const struct sockaddr * ss, socklen_t ss_len);
+MS2_PUBLIC bool_t ice_session_gather_candidates(IceSession *session, const struct sockaddr * ss, socklen_t ss_len);
 
 /**
  * Tell the duration of the gathering process for an ICE session in ms.
