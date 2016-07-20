@@ -26,11 +26,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "mediastreamer2/mswebcam.h"
 #include "nowebcam.h"
 
-#import <QTKit/QTKit.h>
-
+#import <AVFoundation/AVFoundation.h>
 struct v4mState;
 
-// Define != NULL to have QT Framework convert hardware device pixel format to another one.
+// Define != NULL to have AV Framework convert hardware device pixel format to another one.
 static OSType forcedPixelFormat=kCVPixelFormatType_422YpCbCr8_yuvs;
 //static OSType forcedPixelFormat=0;
 
@@ -60,9 +59,9 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 
 @interface NsMsWebCam : NSObject
 {
-	QTCaptureDeviceInput *input;
-	QTCaptureDecompressedVideoOutput * output;
-	QTCaptureSession *session;
+	AVCaptureDeviceInput *input;
+	AVCaptureVideoDataOutput * output;
+	AVCaptureSession *session;
 	MSYuvBufAllocator *allocator;
 	ms_mutex_t mutex;
 	queue_t rq;
@@ -75,12 +74,12 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 - (int)stop;
 - (void)setSize:(MSVideoSize) size;
 - (MSVideoSize)getSize;
-- (QTCaptureDevice*)initDevice:(NSString*)deviceId;
+- (AVCaptureDevice*)initDevice:(NSString*)deviceId;
 - (void)openDevice:(NSString*) deviceId;
 - (int)getPixFmt;
 
 
-- (QTCaptureSession *)session;
+- (AVCaptureSession *)session;
 - (queue_t*)rq;
 - (ms_mutex_t *)mutex;
 
@@ -91,14 +90,14 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 
 @implementation NsMsWebCam 
 
-- (void)captureOutput:(QTCaptureOutput *)captureOutput didOutputVideoFrame:(CVImageBufferRef)frame withSampleBuffer:(QTSampleBuffer *)sampleBuffer fromConnection:(QTCaptureConnection *)connection
+- (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputVideoFrame:(CVImageBufferRef)frame withSampleBuffer:(CMSampleBufferRef *)sampleBuffer fromConnection:(AVCaptureConnection *)connection
 {
 	ms_mutex_lock(&mutex);	
 
     	//OSType pixelFormat = CVPixelBufferGetPixelFormatType(frame);
     if (rq.q_mcount >= 5){
     	/*don't let too much buffers to be queued here, it makes no sense for a real time processing and would consume too much memory*/
-    	ms_warning("QTCapture: dropping %i frames", rq.q_mcount);
+    	ms_warning("AVCapture: dropping %i frames", rq.q_mcount);
     	flushq(&rq, 0);
     }
 
@@ -148,10 +147,10 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 - (id)init {
 	qinit(&rq);
 	ms_mutex_init(&mutex,NULL);
-	session = [[QTCaptureSession alloc] init];
-	output = [[QTCaptureDecompressedVideoOutput alloc] init];
-	[output automaticallyDropsLateVideoFrames];
-	[output setDelegate: self];
+	session = [[AVCaptureSession alloc] init];
+    output = [[AVCaptureVideoDataOutput alloc] init];
+    [output alwaysDiscardsLateVideoFrames];
+	//[output setDelegate: self];
 	allocator = ms_yuv_buf_allocator_new();
 	isStretchingCamera = FALSE;
 	return self;
@@ -199,16 +198,16 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 		return msfmt;
 	}
 
-	QTCaptureDevice *device = [input device];
+	AVCaptureDevice *device = [input device];
 	// Return the first pixel format of the hardware device compatible with mediastreamer
 	// Could be improved by choosing the best through all the formats supported by the hardware.
 	if([device isOpen]) {
 		NSArray * array = [device formatDescriptions];
 	
 		NSEnumerator *enumerator = [array objectEnumerator];
-		QTFormatDescription *desc;
+		CMFormatDescriptionRef *desc;
 		while ((desc = [enumerator nextObject])) {
-			if ([desc mediaType] == QTMediaTypeVideo) {
+			if ([desc mediaType] == AVMediaTypeVideo) {
 				UInt32 fmt = [desc formatType];
 				MSPixFmt msfmt = ostype_to_pix_fmt(fmt, true);
 				if (msfmt != MS_PIX_FMT_UNKNOWN) {
@@ -249,13 +248,14 @@ static bool is_stretching_camera(const char *modelID){
 	return false;
 }
 
-- (QTCaptureDevice*)initDevice:(NSString*)deviceId {
+- (AVCaptureDevice*)initDevice:(NSString*)deviceId {
 	unsigned int i = 0;
-	QTCaptureDevice * device = NULL;
+	AVCaptureDevice * device = NULL;
 
-	NSArray * array = [QTCaptureDevice inputDevicesWithMediaType:QTMediaTypeVideo];
+    NSArray * array = [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo];
+
 	for (i = 0 ; i < [array count]; i++) {
-		QTCaptureDevice * currentDevice = [array objectAtIndex:i];
+		AVCaptureDevice * currentDevice = [array objectAtIndex:i];
 		if([[currentDevice uniqueID] isEqualToString:deviceId]) {
 			device = currentDevice;
 			break;
@@ -263,7 +263,8 @@ static bool is_stretching_camera(const char *modelID){
 	}
 	if (device == NULL) {
 		ms_error("Error: camera %s not found, using default one", [deviceId UTF8String]);
-		device = [QTCaptureDevice defaultInputDeviceWithMediaType:QTMediaTypeVideo];
+        device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+
 	}
 	isStretchingCamera = is_stretching_camera([[device modelUniqueID] UTF8String]);
 	return device;
@@ -271,18 +272,19 @@ static bool is_stretching_camera(const char *modelID){
 
 - (void)openDevice:(NSString*)deviceId {
 	NSError *error = nil;
-	QTCaptureDevice * device = [self initDevice:deviceId];
+	AVCaptureDevice * device = [self initDevice:deviceId];
 	
-	bool success = [device open:&error];
-	if (success) ms_message("Device opened, model is %s", [[device modelUniqueID] UTF8String]);
+    
+    [device open:&error];
+	if (error) ms_message("Device opened, model is %s", [[device modelUniqueID] UTF8String]);
 	else {
 		ms_error("Error while opening camera: %s", [[error localizedDescription] UTF8String]);
 		return;
 	}
 
-	input = [[QTCaptureDeviceInput alloc] initWithDevice:device];
+	input = [[AVCaptureDeviceInput alloc] initWithDevice:device];
 	
-	success = [session addInput:input error:&error];
+	 bool success = [session addInput:input error:&error];
 	if (!success) ms_error("%s", [[error localizedDescription] UTF8String]);
 	
 
@@ -309,13 +311,13 @@ static bool is_stretching_camera(const char *modelID){
 		}
 	}
 	if (!ms_video_size_equal(new_size, size)){
-		ms_message("QTCatpure video size requested is %ix%i, but adapted to %ix%i in order to avoid stretching", size.width, size.height,
+		ms_message("AVCatpure video size requested is %ix%i, but adapted to %ix%i in order to avoid stretching", size.width, size.height,
 					new_size.width, new_size.height);
 		size = new_size;
 	}
 	
 	if (forcedPixelFormat != 0) {
-		ms_message("QTCapture set size w=%i, h=%i fmt=%i", size.width, size.height, (unsigned int)forcedPixelFormat);
+		ms_message("AVCapture set size w=%i, h=%i fmt=%i", size.width, size.height, (unsigned int)forcedPixelFormat);
 		dic = [NSDictionary dictionaryWithObjectsAndKeys:
 		 [NSNumber numberWithInteger:size.width], (id)kCVPixelBufferWidthKey,
 		 [NSNumber numberWithInteger:size.height],(id)kCVPixelBufferHeightKey,
@@ -345,7 +347,7 @@ static bool is_stretching_camera(const char *modelID){
 	return size;
 }
 
-- (QTCaptureSession *)session {
+- (AVCaptureSession *)session {
 	return	session;
 }
 
@@ -385,7 +387,7 @@ static int v4m_start(MSFilter *f, void *arg) {
 	NSAutoreleasePool* myPool = [[NSAutoreleasePool alloc] init];
 	v4mState *s = (v4mState*)f->data;
 	[s->webcam performSelectorOnMainThread:@selector(start) withObject:nil waitUntilDone:NO];
-	ms_message("qtcapture video device opened.");
+	ms_message("AVCapture video device opened.");
 	[myPool drain];
 	return 0;
 }
@@ -394,7 +396,7 @@ static int v4m_stop(MSFilter *f, void *arg) {
 	NSAutoreleasePool* myPool = [[NSAutoreleasePool alloc] init];
 	v4mState *s = (v4mState*)f->data;
 	[s->webcam performSelectorOnMainThread:@selector(stop) withObject:nil waitUntilDone:NO];
-	ms_message("qtcapture video device closed.");
+	ms_message("AVCapture video device closed.");
 	[myPool drain];
 	return 0;
 }
@@ -513,7 +515,7 @@ static MSFilterMethod methods[] = {
 
 MSFilterDesc ms_v4m_desc={
 	.id=MS_V4L_ID,
-	.name="MSQtCapture",
+	.name="MSAVCapture",
 	.text="A video for macosx compatible source filter to stream pictures.",
 	.ninputs=0,
 	.noutputs=1,
@@ -550,7 +552,7 @@ static MSFilter *ms_v4m_create_reader(MSWebCam *obj) {
 }
 
 MSWebCamDesc ms_v4m_cam_desc = {
-	"QT Capture",
+	"AV Capture",
 	&ms_v4m_detect,
 	&ms_v4m_cam_init,
 	&ms_v4m_create_reader,
@@ -562,12 +564,12 @@ static void ms_v4m_detect(MSWebCamManager *obj) {
 	unsigned int i = 0;
 	NSAutoreleasePool* myPool = [[NSAutoreleasePool alloc] init];
 	
-	NSArray * array = [QTCaptureDevice inputDevicesWithMediaType:QTMediaTypeVideo];
+    NSArray * array = [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo];
 	
 	for(i = 0 ; i < [array count]; i++) {
-		QTCaptureDevice * device = [array objectAtIndex:i];
+		AVCaptureDevice * device = [array objectAtIndex:i];
 		MSWebCam *cam = ms_web_cam_new(&ms_v4m_cam_desc);
-		cam->name = ms_strdup([[device localizedDisplayName] UTF8String]);
+		cam->name = ms_strdup([[device localizedName] UTF8String]);
 		cam->data = ms_strdup([[device uniqueID] UTF8String]);
 		ms_web_cam_manager_add_cam(obj,cam);
 	}
