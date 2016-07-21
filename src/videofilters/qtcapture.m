@@ -130,7 +130,7 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 		}
 		CVPixelBufferUnlockBaseAddress(frame, 0);
 		putq(&rq, yuv_block);
-	} else {
+	} /*else {
 		// Buffer doesn't contain a plannar image.
 		uint8_t * data = (uint8_t *)[sampleBuffer bytesForAllSamples];
 		int size = [sampleBuffer lengthForAllSamples];
@@ -138,7 +138,7 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 		memcpy(buf->b_wptr, data, size);
 		buf->b_wptr+=size;
 		putq(&rq, buf);
-	}
+	}*/
 
 
 	ms_mutex_unlock(&mutex);
@@ -192,7 +192,7 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 }
 
 - (int)getPixFmt {
-	if (forcedPixelFormat != 0) {
+	/*if (forcedPixelFormat != 0) {
 		MSPixFmt msfmt=ostype_to_pix_fmt(forcedPixelFormat, true);
 		ms_message("getPixFmt forced capture FMT: %i", msfmt);
 		return msfmt;
@@ -230,7 +230,7 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 		  nil];
 		  [output setVideoSettings:dic];
 	}
-
+*/
 	return MS_YUV420P;
 }
 
@@ -275,7 +275,7 @@ static bool is_stretching_camera(const char *modelID){
 	AVCaptureDevice * device = [self initDevice:deviceId];
 	
     
-    [device open:&error];
+    //[device open:&error];
 	if (!error) ms_message("Device opened, model is %s", [[device uniqueID] UTF8String]);
 	else {
 		ms_error("Error while opening camera: %s", [[error localizedDescription] UTF8String]);
@@ -283,7 +283,9 @@ static bool is_stretching_camera(const char *modelID){
 	}
 
 	input = [AVCaptureDeviceInput deviceInputWithDevice:device error:&error];
-	
+    [input retain]; // keep reference on an externally allocated object
+    [session addInput:input];
+
 	if (!input) ms_error("%s", [[error localizedDescription] UTF8String]);
 	
 
@@ -454,14 +456,14 @@ static void v4m_process(MSFilter * obj){
 
 static void v4m_preprocess(MSFilter *f) {
 	v4mState *s = (v4mState *)f->data;
-	ms_average_fps_init(&s->afps, "QuickTime capture average fps = %f");
+	ms_average_fps_init(&s->afps, "AV capture average fps = %f");
 	v4m_start(f,NULL);    
 }
 
 static void v4m_postprocess(MSFilter *f) {
 	v4mState *s = (v4mState *)f->data;
 	v4m_stop(f,NULL);
-	ms_average_fps_init(&s->afps, "QuickTime capture average fps = %f");
+	ms_average_fps_init(&s->afps, "AV capture average fps = %f");
 }
 
 static int v4m_set_fps(MSFilter *f, void *arg) {
