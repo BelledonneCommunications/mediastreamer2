@@ -221,14 +221,14 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 
 	ms_warning("No compatible format found, using MS_YUV420P pixel format");
 	// Configure the output to convert the uncompatible hardware pixel format to MS_YUV420P
-	NSDictionary *old_dic = [output pixelBufferAttributes];
+	NSDictionary *old_dic = [output videoSettings];
 	if ([[old_dic objectForKey:(id)kCVPixelBufferPixelFormatTypeKey] integerValue] != kCVPixelFormatType_420YpCbCr8Planar) {
 		NSDictionary *dic = [NSDictionary dictionaryWithObjectsAndKeys:
 		 [NSNumber numberWithInteger:[[old_dic objectForKey:(id)kCVPixelBufferWidthKey] integerValue]], (id)kCVPixelBufferWidthKey,
 		 [NSNumber numberWithInteger:[[old_dic objectForKey:(id)kCVPixelBufferHeightKey] integerValue]],(id)kCVPixelBufferHeightKey,
 		 [NSNumber numberWithUnsignedInteger:kCVPixelFormatType_420YpCbCr8Planar], (id)kCVPixelBufferPixelFormatTypeKey,
 		  nil];
-		  [output setPixelBufferAttributes:dic];
+		  [output setVideoSettings:dic];
 	}
 
 	return MS_YUV420P;
@@ -266,7 +266,7 @@ static bool is_stretching_camera(const char *modelID){
         device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
 
 	}
-	isStretchingCamera = is_stretching_camera([[device modelUniqueID] UTF8String]);
+	isStretchingCamera = is_stretching_camera([[device uniqueID] UTF8String]);
 	return device;
 }
 
@@ -276,20 +276,19 @@ static bool is_stretching_camera(const char *modelID){
 	
     
     [device open:&error];
-	if (error) ms_message("Device opened, model is %s", [[device modelUniqueID] UTF8String]);
+	if (!error) ms_message("Device opened, model is %s", [[device uniqueID] UTF8String]);
 	else {
 		ms_error("Error while opening camera: %s", [[error localizedDescription] UTF8String]);
 		return;
 	}
 
-	input = [[AVCaptureDeviceInput alloc] initWithDevice:device];
+	input = [AVCaptureDeviceInput deviceInputWithDevice:device error:&error];
 	
-	 bool success = [session addInput:input error:&error];
-	if (!success) ms_error("%s", [[error localizedDescription] UTF8String]);
+	if (!input) ms_error("%s", [[error localizedDescription] UTF8String]);
 	
 
-	success = [session addOutput:output error:&error];
-	if (!success) ms_error("%s", [[error localizedDescription] UTF8String]);
+    [session addOutput:output];
+	if (!output) ms_error("%s", [[error localizedDescription] UTF8String]);
 	
 }
 
@@ -330,7 +329,7 @@ static bool is_stretching_camera(const char *modelID){
 		  nil];
 	}
 	
-	[output setPixelBufferAttributes:dic];
+	[output setVideoSettings:dic];
 }
 
 - (MSVideoSize)getSize {
@@ -340,7 +339,7 @@ static bool is_stretching_camera(const char *modelID){
 	size.height = MS_VIDEO_SIZE_QCIF_H;
 	
 	if(output) {
-		NSDictionary * dic = [output pixelBufferAttributes];
+		NSDictionary * dic = [output videoSettings];
 		size.width = [[dic objectForKey:(id)kCVPixelBufferWidthKey] integerValue];
 		size.height = [[dic objectForKey:(id)kCVPixelBufferHeightKey] integerValue];
 	}
