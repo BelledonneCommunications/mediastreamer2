@@ -94,11 +94,14 @@ static void capture_queue_cleanup(void* p) {
 
 @implementation NsMsWebCam 
 
-- (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputVideoFrame:(CVImageBufferRef)frame withSampleBuffer:(CMSampleBufferRef *)sampleBuffer fromConnection:(AVCaptureConnection *)connection
+- (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputSampleBuffer:( )sampleBuffer
+       fromConnection:(AVCaptureConnection *)connection 
+
 {
     @synchronized(self) {
-	ms_message("AVCapture: callback is working before");
+	//ms_message("AVCapture: callback is working before");
         ms_mutex_lock(&mutex);
+        CVImageBufferRef frame = CMSampleBufferGetImageBuffer(sampleBuffer);
     	//OSType pixelFormat = CVPixelBufferGetPixelFormatType(frame);
     if (rq.q_mcount >= 5){
     	/*don't let too much buffers to be queued here, it makes no sense for a real time processing and would consume too much memory*/
@@ -135,7 +138,7 @@ static void capture_queue_cleanup(void* p) {
 		}
 		CVPixelBufferUnlockBaseAddress(frame, 0);
 		putq(&rq, yuv_block);
-	} /*else {
+    }else {/*
 		// Buffer doesn't contain a plannar image.
 		uint8_t * data = (uint8_t *)[sampleBuffer bytesForAllSamples];
 		int size = [sampleBuffer lengthForAllSamples];
@@ -143,9 +146,20 @@ static void capture_queue_cleanup(void* p) {
 		memcpy(buf->b_wptr, data, size);
 		buf->b_wptr+=size;
 		putq(&rq, buf);
-	}*/
+        CVPixelBufferLockBaseAddress(frame, 0);
+        GLubyte *rawImageBytes = CVPixelBufferGetBaseAddress(frame);
+         size_t bytesPerRow = CVPixelBufferGetBytesPerRow(frame);
+         NSData *dataForRawBytes = [NSData dataWithBytes:rawImageBytes length:bytesPerRow * CVPixelBufferGetHeight(frame)];
+        uint8_t *dataWithBytes = (uint8_t*)[dataForRawBytes bytes];
+        int size = dataForRawBytes.length;
+        mblk_t *buf=allocb( size, 0);
+        memcpy(buf->b_wptr, dataWithBytes, size);
+        buf->b_wptr+=size;
+        putq(&rq, buf);*/
 
-    ms_message("AVCapture: callback is working after");
+	}
+
+    //ms_message("AVCapture: callback is working after");
         ms_mutex_unlock(&mutex);
     }
 }
@@ -221,7 +235,7 @@ static void capture_queue_cleanup(void* p) {
 }
 
 - (int)getPixFmt {
-	/*if (forcedPixelFormat != 0) {
+    /*if (forcedPixelFormat != 0) {
 		MSPixFmt msfmt=ostype_to_pix_fmt(forcedPixelFormat, true);
 		ms_message("getPixFmt forced capture FMT: %i", msfmt);
 		return msfmt;
