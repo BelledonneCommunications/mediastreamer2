@@ -57,7 +57,7 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
         }
 }
 
-@interface NsMsWebCam : NSObject
+@interface NsMsWebCam : NSObject<AVCaptureVideoDataOutputSampleBufferDelegate>
 {
 	AVCaptureDeviceInput *input;
 	AVCaptureVideoDataOutput * output;
@@ -85,6 +85,10 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 
 @end
 
+static void capture_queue_cleanup(void* p) {
+    NsMsWebCam *capture = (NsMsWebCam *)p;
+    [capture release];
+}
 
 
 
@@ -92,8 +96,9 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 
 - (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputVideoFrame:(CVImageBufferRef)frame withSampleBuffer:(CMSampleBufferRef *)sampleBuffer fromConnection:(AVCaptureConnection *)connection
 {
-	ms_mutex_lock(&mutex);	
-
+    @synchronized(self) {
+	ms_message("AVCapture: callback is working before");
+        ms_mutex_lock(&mutex);
     	//OSType pixelFormat = CVPixelBufferGetPixelFormatType(frame);
     if (rq.q_mcount >= 5){
     	/*don't let too much buffers to be queued here, it makes no sense for a real time processing and would consume too much memory*/
@@ -140,8 +145,9 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 		putq(&rq, buf);
 	}*/
 
-
-	ms_mutex_unlock(&mutex);
+    ms_message("AVCapture: callback is working after");
+        ms_mutex_unlock(&mutex);
+    }
 }
 
 - (id)init {
@@ -150,7 +156,6 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 	session = [[AVCaptureSession alloc] init];
     output = [[AVCaptureVideoDataOutput alloc] init];
     [output alwaysDiscardsLateVideoFrames];
-	//[output setDelegate: self];
 	allocator = ms_yuv_buf_allocator_new();
 	isStretchingCamera = FALSE;
 	return self;
@@ -182,12 +187,36 @@ static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
 }
 
 - (int)start {
+    NSAutoreleasePool* myPool = [[NSAutoreleasePool alloc] init];
+    @synchronized(self) {
+    if (!session.running) {
+    // Init queue
+    dispatch_queue_t queue = dispatch_queue_create("CaptureQueue", NULL);
+    dispatch_set_context(queue, [self retain]);
+    dispatch_set_finalizer_f(queue, capture_queue_cleanup);
+    [output setSampleBufferDelegate:self queue:queue];
+    dispatch_release(queue);
+    
+
 	[session startRunning];
+        ms_message("AVCapture: Engine started");
+    }
+    }
+    [myPool drain];
 	return 0;
 }
 
 - (int)stop {
+    NSAutoreleasePool* myPool = [[NSAutoreleasePool alloc] init];
+    @synchronized(self) {
+       if (session.running) {
 	[session stopRunning];
+    
+           [output setSampleBufferDelegate:nil queue:nil];
+            ms_message("AVCapture: Engine stopped");
+    }
+}
+[myPool drain];
 	return 0;
 }
 
@@ -296,7 +325,8 @@ static bool is_stretching_camera(const char *modelID){
 
 
 
-- (void)setSize:(MSVideoSize)size {	
+- (void)setSize:(MSVideoSize)size {
+    @synchronized(self) {
 	NSDictionary *dic;
 	MSVideoSize new_size = size;
 	
@@ -332,6 +362,7 @@ static bool is_stretching_camera(const char *modelID){
 	}
 	
 	[output setVideoSettings:dic];
+    }
 }
 
 - (MSVideoSize)getSize {
