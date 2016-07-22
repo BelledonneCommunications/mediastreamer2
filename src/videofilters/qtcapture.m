@@ -146,6 +146,8 @@ static void capture_queue_cleanup(void* p) {
 		memcpy(buf->b_wptr, data, size);
 		buf->b_wptr+=size;
 		putq(&rq, buf);
+        
+            */
         CVPixelBufferLockBaseAddress(frame, 0);
         GLubyte *rawImageBytes = CVPixelBufferGetBaseAddress(frame);
          size_t bytesPerRow = CVPixelBufferGetBytesPerRow(frame);
@@ -155,7 +157,8 @@ static void capture_queue_cleanup(void* p) {
         mblk_t *buf=allocb( size, 0);
         memcpy(buf->b_wptr, dataWithBytes, size);
         buf->b_wptr+=size;
-        putq(&rq, buf);*/
+        putq(&rq, buf);
+        CVPixelBufferUnlockBaseAddress(frame, 0);
 
 	}
 
@@ -261,8 +264,8 @@ static void capture_queue_cleanup(void* p) {
     } else {
         ms_error("The camera wasn't opened when asking for pixel format");
     }
-
-	ms_warning("No compatible format found, using MS_YUV420P pixel format");
+*/
+   //ms_warning("No compatible format found, using MS_YUV420P pixel format");
 	// Configure the output to convert the uncompatible hardware pixel format to MS_YUV420P
 	NSDictionary *old_dic = [output videoSettings];
 	if ([[old_dic objectForKey:(id)kCVPixelBufferPixelFormatTypeKey] integerValue] != kCVPixelFormatType_420YpCbCr8Planar) {
@@ -273,7 +276,7 @@ static void capture_queue_cleanup(void* p) {
 		  nil];
 		  [output setVideoSettings:dic];
 	}
-*/
+
 	return MS_YUV420P;
 }
 
