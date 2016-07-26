@@ -97,9 +97,7 @@ static void capture_queue_cleanup(void* p) {
 - (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputSampleBuffer:( CMSampleBufferRef)sampleBuffer
        fromConnection:(AVCaptureConnection *)connection 
 
-{
-    @synchronized(self) {
-	//ms_message("AVCapture: callback is working before");
+{	//ms_message("AVCapture: callback is working before");
         ms_mutex_lock(&mutex);
         CVImageBufferRef frame = CMSampleBufferGetImageBuffer(sampleBuffer);
     	//OSType pixelFormat = CVPixelBufferGetPixelFormatType(frame);
@@ -164,7 +162,7 @@ static void capture_queue_cleanup(void* p) {
 
     //ms_message("AVCapture: callback is working after");
         ms_mutex_unlock(&mutex);
-    }
+ 
 }
 
 - (id)init {
@@ -181,6 +179,7 @@ static void capture_queue_cleanup(void* p) {
 - (void)dealloc {
 	[self stop];
 	
+    
 	if (session) {		
 		[session release];
 		session = nil;
@@ -204,9 +203,7 @@ static void capture_queue_cleanup(void* p) {
 }
 
 - (int)start {
-    NSAutoreleasePool* myPool = [[NSAutoreleasePool alloc] init];
-    @synchronized(self) {
-    if (!session.running) {
+       if (!session.running) {
     // Init queue
     dispatch_queue_t queue = dispatch_queue_create("CaptureQueue", NULL);
     dispatch_set_context(queue, [self retain]);
@@ -218,22 +215,19 @@ static void capture_queue_cleanup(void* p) {
 	[session startRunning];
         ms_message("AVCapture: Engine started");
     }
-    }
-    [myPool drain];
 	return 0;
 }
 
 - (int)stop {
-    NSAutoreleasePool* myPool = [[NSAutoreleasePool alloc] init];
-    @synchronized(self) {
        if (session.running) {
-	[session stopRunning];
+           [session removeInput:input];
+           [session removeOutput:output];
+
+            [session stopRunning];
     
            [output setSampleBufferDelegate:nil queue:nil];
             ms_message("AVCapture: Engine stopped");
-    }
 }
-[myPool drain];
 	return 0;
 }
 
@@ -320,25 +314,23 @@ static bool is_stretching_camera(const char *modelID){
 - (void)openDevice:(NSString*)deviceId {
 	NSError *error = nil;
 	AVCaptureDevice * device = [self initDevice:deviceId];
-	
-    
-    //[device open:&error];
-	if (!error) ms_message("Device opened, model is %s", [[device uniqueID] UTF8String]);
-	else {
-		ms_error("Error while opening camera: %s", [[error localizedDescription] UTF8String]);
-		return;
-	}
-
-	input = [AVCaptureDeviceInput deviceInputWithDevice:device error:&error];
-    [input retain]; // keep reference on an externally allocated object
-    [session addInput:input];
-
-	if (!input) ms_error("%s", [[error localizedDescription] UTF8String]);
-	
-
-    [session addOutput:output];
-	if (!output) ms_error("%s", [[error localizedDescription] UTF8String]);
-	
+    input = [AVCaptureDeviceInput deviceInputWithDevice:device error:&error];
+        if (error )
+        {
+            ms_error("%s", [[error localizedDescription] UTF8String]);
+            return;
+        }
+    if ( input && [session canAddInput:input] ){
+        [input retain]; // keep reference on an externally allocated object
+        [session addInput:input];
+    } else {
+        ms_error("Error: input nil or cannot be added: %p", input);
+    }
+    if( output && [session canAddOutput:output] ){
+        [session addOutput:output];
+    } else {
+        ms_error("Error: output nil or cannot be added: %p", output);
+    }
 }
 
 
