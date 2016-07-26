@@ -37,7 +37,7 @@ plc_context_t *generic_plc_create_context(int sample_rate) {
 	 *     - the second TRANSITION_DELAY ms are mixed for smooth transition with the begining of arrived frame
 	 */
 	context->continuity_buffer = ms_malloc0(2*sample_rate*sizeof(int16_t)*TRANSITION_DELAY/1000); /* continuity buffer introduce a TRANSITION_DELAY ms delay */
-	context->plc_buffer_len = sample_rate*sizeof(int16_t)*PLC_BUFFER_LEN; /* length in bytes of the plc_buffer */
+	context->plc_buffer_len = (uint16_t)(sample_rate*sizeof(int16_t)*PLC_BUFFER_LEN); /* length in bytes of the plc_buffer */
 	context->plc_buffer = ms_malloc0(context->plc_buffer_len);
 	context->hamming_window = ms_malloc0(sample_rate*PLC_BUFFER_LEN*sizeof(float));
 	context->plc_out_buffer = ms_malloc0(2*context->plc_buffer_len);
@@ -193,7 +193,10 @@ void generic_plc_update_plc_buffer(plc_context_t *context, unsigned char *data, 
 
 void generic_plc_update_continuity_buffer(plc_context_t *context, unsigned char *data, size_t data_len) {
 	size_t transitionBufferSize = context->sample_rate*sizeof(int16_t)*TRANSITION_DELAY/1000;
-	unsigned char *buffer=ms_malloc(transitionBufferSize);
+	unsigned char *buffer;
+
+	if (transitionBufferSize > data_len) transitionBufferSize = data_len;
+	buffer=ms_malloc(transitionBufferSize);
 
 	/* get the last TRANSITION_DELAY ms in a temp buffer */
 	memcpy(buffer, data+data_len-transitionBufferSize, transitionBufferSize);

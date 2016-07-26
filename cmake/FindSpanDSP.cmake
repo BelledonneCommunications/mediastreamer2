@@ -1,6 +1,6 @@
 ############################################################################
-# gitversion.cmake
-# Copyright (C) 2014  Belledonne Communications, Grenoble France
+# FindSpanDSP.txt
+# Copyright (C) 2016  Belledonne Communications, Grenoble France
 #
 ############################################################################
 #
@@ -19,31 +19,30 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #
 ############################################################################
+#
+# - Find the spandsp include file and library
+#
+#  SPANDSP_FOUND - system has spandsp
+#  SPANDSP_INCLUDE_DIRS - the spandsp include directory
+#  SPANDSP_LIBRARIES - The libraries needed to use spandsp
 
-if(GIT_EXECUTABLE)
-	macro(GIT_COMMAND OUTPUT_VAR)
-		set(GIT_ARGS ${ARGN})
-		execute_process(
-			COMMAND ${GIT_EXECUTABLE} ${ARGN}
-			WORKING_DIRECTORY ${WORK_DIR}
-			OUTPUT_VARIABLE ${OUTPUT_VAR}
-			OUTPUT_STRIP_TRAILING_WHITESPACE
-		)
-	endmacro()
-
-	GIT_COMMAND(GIT_DESCRIBE describe --always)
-	GIT_COMMAND(GIT_TAG describe --abbrev=0)
-	GIT_COMMAND(GIT_REVISION rev-parse HEAD)
+find_path(SPANDSP_INCLUDE_DIRS
+	NAMES spandsp.h
+	PATH_SUFFIXES include
+)
+if(SPANDSP_INCLUDE_DIRS)
+	set(HAVE_SPANDSP_H 1)
 endif()
 
-if(GIT_DESCRIBE)
-	if(NOT GIT_TAG STREQUAL MEDIASTREAMER_VERSION)
-		message(FATAL_ERROR "MEDIASTREAMER_VERSION and git tag differ. Please put them identical")
-	endif()
-	set(GIT_VERSION "${GIT_DESCRIBE}")
-elseif(GIT_REVISION)
-	set(GIT_VERSION "${MEDIASTREAMER_VERSION}_${GIT_REVISION}")
-else()
-	set(GIT_VERSION "unknown")
-endif()
-configure_file("${WORK_DIR}/gitversion.h.in" "${OUTPUT_DIR}/gitversion.h" @ONLY)
+find_library(SPANDSP_LIBRARIES
+	NAMES spandsp
+	PATH_SUFFIXES bin lib
+)
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(SpanDSP
+	DEFAULT_MSG
+	SPANDSP_INCLUDE_DIRS SPANDSP_LIBRARIES HAVE_SPANDSP_H
+)
+
+mark_as_advanced(SPANDSP_INCLUDE_DIRS SPANDSP_LIBRARIES HAVE_SPANDSP_H)

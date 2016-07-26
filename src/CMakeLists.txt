@@ -47,6 +47,7 @@ set(BASE_SOURCE_FILES_C
 	base/msvideopresets.c
 	base/mswebcam.c
 	base/mtu.c
+	base/msasync.c
 	otherfilters/itc.c
 	otherfilters/join.c
 	otherfilters/tee.c
@@ -143,6 +144,8 @@ set(VOIP_SOURCE_FILES_C
 	audiofilters/l16.c
 	audiofilters/msfileplayer.c
 	audiofilters/msfilerec.c
+	audiofilters/asyncrw.c
+	audiofilters/asyncrw.h
 	audiofilters/msg722.c
 	audiofilters/msvaddtx.c
 	audiofilters/msvolume.c
@@ -235,6 +238,9 @@ if(WIN32 AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsPhone" AND NOT CMAKE_SYSTEM_
 	list(APPEND VOIP_SOURCE_FILES_C audiofilters/winsnd3.c)
 endif()
 
+if(ENABLE_G726)
+	list(APPEND VOIP_SOURCE_FILES_C audiofilters/g726.c)
+endif()
 if(GSM_FOUND)
 	list(APPEND VOIP_SOURCE_FILES_C audiofilters/gsm.c)
 endif()
@@ -438,7 +444,14 @@ endif()
 
 
 if(ENABLE_VIDEO AND ANDROID AND CMAKE_SYSTEM_PROCESSOR STREQUAL "armeabi-v7a")
-	set_source_files_properties(voip/msvideo_neon.c voip/scaler.c PROPERTIES COMPILE_FLAGS "-mfpu=neon")
+	set(NEON_SOURCE_FILES
+		voip/msvideo_neon.c
+		voip/scaler.c
+	)
+	foreach(file ${NEON_SOURCE_FILES})
+		get_source_file_property(NEON_COMPILE_FLAGS ${file} COMPILE_FLAGS)
+		set_source_files_properties(${file} PROPERTIES COMPILE_FLAGS "${NEON_COMPILE_FLAGS} -mfpu=neon")
+	endforeach()
 endif()
 
 
@@ -492,6 +505,9 @@ if(BZRTP_FOUND)
 endif()
 if(SRTP_FOUND)
 	list(APPEND VOIP_LIBS ${SRTP_LIBRARIES})
+endif()
+if(SPANDSP_FOUND)
+	list(APPEND VOIP_LIBS ${SPANDSP_LIBRARIES})
 endif()
 if(GSM_FOUND)
 	list(APPEND VOIP_LIBS ${GSM_LIBRARIES})
@@ -608,11 +624,17 @@ if(ENABLE_SHARED)
 endif()
 
 if(FFMPEG_FOUND AND NOT WIN32)
-	set_source_files_properties(
+	set(NO_DEPRECATED_DECLARATIONS_SOURCE_FILES
 		videofilters/jpegwriter.c
 		videofilters/videoenc.c
-		PROPERTIES COMPILE_FLAGS "-Wno-error=deprecated-declarations"
+		videofilters/videodec.c
+		videofilters/nowebcam.c
+		videofilters/h264dec.c
 	)
+	foreach(file ${NO_DEPRECATED_DECLARATIONS_SOURCE_FILES})
+		get_source_file_property(NO_DEPRECATED_DECLARATIONS_COMPILE_FLAGS ${file} COMPILE_FLAGS)
+		set_source_files_properties(${file} PROPERTIES COMPILE_FLAGS "${NO_DEPRECATED_DECLARATIONS_COMPILE_FLAGS} -Wno-error=deprecated-declarations")
+	endforeach()
 endif()
 
 if(ENABLE_VIDEO)
