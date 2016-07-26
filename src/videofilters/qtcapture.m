@@ -30,10 +30,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 struct v4mState;
 
 // Define != NULL to have AV Framework convert hardware device pixel format to another one.
-static OSType forcedPixelFormat=kCVPixelFormatType_422YpCbCr8_yuvs;
-//static OSType forcedPixelFormat=0;
+//static OSType forcedPixelFormat=kCVPixelFormatType_420YpCbCr8Planar;
+static OSType forcedPixelFormat=0;
 
-static MSPixFmt ostype_to_pix_fmt(OSType pixelFormat, bool printFmtName){
+static MSPixFmt ostype_to_pix_fmt(FourCharCode pixelFormat, bool printFmtName){
         ms_message("OSType= %i", (int)pixelFormat);
         switch(pixelFormat){
                 case kCVPixelFormatType_420YpCbCr8Planar:
@@ -94,7 +94,7 @@ static void capture_queue_cleanup(void* p) {
 
 @implementation NsMsWebCam 
 
-- (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputSampleBuffer:( )sampleBuffer
+- (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputSampleBuffer:( CMSampleBufferRef)sampleBuffer
        fromConnection:(AVCaptureConnection *)connection 
 
 {
@@ -151,7 +151,7 @@ static void capture_queue_cleanup(void* p) {
         CVPixelBufferLockBaseAddress(frame, 0);
         GLubyte *rawImageBytes = CVPixelBufferGetBaseAddress(frame);
          size_t bytesPerRow = CVPixelBufferGetBytesPerRow(frame);
-         NSData *dataForRawBytes = [NSData dataWithBytes:rawImageBytes length:bytesPerRow * CVPixelBufferGetHeight(frame)];
+        NSData *dataForRawBytes = [NSData dataWithBytesNoCopy:rawImageBytes length:bytesPerRow * CVPixelBufferGetHeight(frame) freeWhenDone:YES];
         uint8_t *dataWithBytes = (uint8_t*)[dataForRawBytes bytes];
         int size = dataForRawBytes.length;
         mblk_t *buf=allocb( size, 0);
@@ -238,7 +238,7 @@ static void capture_queue_cleanup(void* p) {
 }
 
 - (int)getPixFmt {
-    /*if (forcedPixelFormat != 0) {
+    if (forcedPixelFormat != 0) {
 		MSPixFmt msfmt=ostype_to_pix_fmt(forcedPixelFormat, true);
 		ms_message("getPixFmt forced capture FMT: %i", msfmt);
 		return msfmt;
@@ -247,25 +247,26 @@ static void capture_queue_cleanup(void* p) {
 	AVCaptureDevice *device = [input device];
 	// Return the first pixel format of the hardware device compatible with mediastreamer
 	// Could be improved by choosing the best through all the formats supported by the hardware.
-	if([device isOpen]) {
-		NSArray * array = [device formatDescriptions];
+	//if([device isOpen]) {
+		NSArray * array = device.formats;
 	
 		NSEnumerator *enumerator = [array objectEnumerator];
-		CMFormatDescriptionRef *desc;
+		AVCaptureDeviceFormat *desc;
 		while ((desc = [enumerator nextObject])) {
 			if ([desc mediaType] == AVMediaTypeVideo) {
-				UInt32 fmt = [desc formatType];
+                CMFormatDescriptionRef fmtref = [desc formatDescription] ;
+                FourCharCode fmt = CMFormatDescriptionGetMediaSubType(fmtref);
 				MSPixFmt msfmt = ostype_to_pix_fmt(fmt, true);
 				if (msfmt != MS_PIX_FMT_UNKNOWN) {
 					return msfmt;
 				}
             }
         }
-    } else {
-        ms_error("The camera wasn't opened when asking for pixel format");
-    }
-*/
-   //ms_warning("No compatible format found, using MS_YUV420P pixel format");
+    //} else {
+      //  ms_error("The camera wasn't opened when asking for pixel format");
+    //}
+
+   ms_warning("No compatible format found, using MS_YUV420P pixel format");
 	// Configure the output to convert the uncompatible hardware pixel format to MS_YUV420P
 	NSDictionary *old_dic = [output videoSettings];
 	if ([[old_dic objectForKey:(id)kCVPixelBufferPixelFormatTypeKey] integerValue] != kCVPixelFormatType_420YpCbCr8Planar) {
