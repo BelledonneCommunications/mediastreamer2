@@ -213,6 +213,7 @@ static void capture_queue_cleanup(void* p) {
     
 
 	[session startRunning];
+        
         ms_message("AVCapture: Engine started");
     }
 	return 0;
@@ -336,10 +337,10 @@ static bool is_stretching_camera(const char *modelID){
 
 
 - (void)setSize:(MSVideoSize)size {
-    @synchronized(self) {
 	NSDictionary *dic;
 	MSVideoSize new_size = size;
 	
+
 	/*mac cameras are not able to capture between VGA and 720P without doing an ugly stretching.  Workaround this problem here for SVGA, which a common format
 	used by mediastreamer2 encoders.
 	*/
@@ -372,20 +373,20 @@ static bool is_stretching_camera(const char *modelID){
 	}
 	
 	[output setVideoSettings:dic];
-    }
 }
 
 - (MSVideoSize)getSize {
 	MSVideoSize size;
 	
-	size.width = MS_VIDEO_SIZE_QCIF_W;
-	size.height = MS_VIDEO_SIZE_QCIF_H;
-	
 	if(output) {
 		NSDictionary * dic = [output videoSettings];
 		size.width = [[dic objectForKey:(id)kCVPixelBufferWidthKey] integerValue];
 		size.height = [[dic objectForKey:(id)kCVPixelBufferHeightKey] integerValue];
-	}
+    }
+    if (size.width == 0 || size.height == 0){
+        size.width = MS_VIDEO_SIZE_QCIF_W;
+        size.height = MS_VIDEO_SIZE_QCIF_H;
+    }
 	return size;
 }
 
