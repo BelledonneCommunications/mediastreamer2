@@ -32,19 +32,33 @@ import org.linphone.mediastream.Version;
  */
 public class AndroidCameraConfiguration {
 	public static AndroidCamera[] retrieveCameras() {
-		initCamerasCache();
+		initCamerasCache(true);
+		return camerasCache;
+	}
+
+	public static AndroidCamera[] retrieveCameras(boolean cameraTwoEnabled) {
+		initCamerasCache(cameraTwoEnabled);
 		return camerasCache;
 	}
 	
 	public static boolean hasSeveralCameras() {
-		initCamerasCache();
+		initCamerasCache(true);
 		return camerasCache.length > 1;
 	}
 
 	public static boolean hasFrontCamera() {
-		initCamerasCache();
+		initCamerasCache(true);
 		for (AndroidCamera cam:  camerasCache) {
 			if (cam.frontFacing) 
+				return true;
+		}
+		return false;
+	}
+
+	public static boolean hasFrontCamera(boolean cameraTwoEnabled) {
+		initCamerasCache(cameraTwoEnabled);
+		for (AndroidCamera cam:  camerasCache) {
+			if (cam.frontFacing)
 				return true;
 		}
 		return false;
@@ -52,7 +66,7 @@ public class AndroidCameraConfiguration {
 	
 	private static AndroidCameraConfiguration.AndroidCamera[] camerasCache;
 	
-	private static void initCamerasCache() {
+	private static void initCamerasCache(boolean cameraTwoEnabled) {
 		// cache already filled and valid ?
 		if (camerasCache != null && camerasCache.length!=0)
 			return;
@@ -61,7 +75,7 @@ public class AndroidCameraConfiguration {
 			if (Version.sdk() < 9) {
 				camerasCache = AndroidCameraConfiguration.probeCamerasSDK5();
 			} else {
-				if (Version.sdk() >= 21) {
+				if (Version.sdk() >= 21 && cameraTwoEnabled) {
 					camerasCache = AndroidCameraConfiguration.probeCamerasSDK21();
 				} else {
 					camerasCache = AndroidCameraConfiguration.probeCamerasSDK9();
