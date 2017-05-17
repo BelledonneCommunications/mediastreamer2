@@ -560,6 +560,7 @@ static void cancel_audio_unit_timer(au_card_t* card){
 	if (card->shutdown_timer){
 		CFRunLoopRemoveTimer(CFRunLoopGetMain(), card->shutdown_timer,kCFRunLoopCommonModes);
 		CFRunLoopTimerInvalidate(card->shutdown_timer);
+        CFRelease(card->shutdown_timer);
 		card->shutdown_timer=NULL;
 	}
 }
