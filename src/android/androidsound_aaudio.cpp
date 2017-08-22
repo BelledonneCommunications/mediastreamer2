@@ -39,11 +39,8 @@ static int DeviceFavoriteSampleRate = 44100;
 #ifdef __cplusplus
 extern "C" {
 #endif
-JNIEXPORT void JNICALL Java_org_linphone_mediastream_MediastreamerAndroidContext_setDeviceFavoriteSampleRate(JNIEnv* env, jclass thiz, jint samplerate) {
+JNIEXPORT void JNICALL Java_org_linphone_mediastream_MediastreamerAndroidContext_setAAudioDeviceFavoriteSampleRate(JNIEnv* env, jclass thiz, jint samplerate) {
 	DeviceFavoriteSampleRate = (int)samplerate;
-}
-JNIEXPORT void JNICALL Java_org_linphone_mediastream_MediastreamerAndroidContext_setDeviceFavoriteBufferSize(JNIEnv* env, jclass thiz, jint buffersize) {
-	// Unused
 }
 #ifdef __cplusplus
 }
@@ -77,7 +74,6 @@ struct AAudioInputContext {
 		qinit(&q);
 		ms_mutex_init(&mutex,NULL);
 		mTickerSynchronizer = NULL;
-		aec = NULL;
 		mAvSkew = 0;
 	}
 
@@ -348,8 +344,6 @@ static int android_snd_write_get_nchannels(MSFilter *obj, void *data) {
 
 static aaudio_data_callback_result_t aaudio_player_callback(AAudioStream *stream, void *userData, void *audioData, int32_t numFrames) {
 	AAudioOutputContext *octx = (AAudioOutputContext*)userData;
-
-	detectUnderrunAndAdjustBufferSize(octx, stream);
 
 	ms_mutex_lock(&octx->mutex);
 	int ask = sizeof(int16_t) * numFrames * octx->samplesPerFrame;
