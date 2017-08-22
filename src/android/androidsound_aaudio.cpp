@@ -29,7 +29,7 @@
 #include <jni.h>
 #include <dlfcn.h>
 
-#include <audio_common.h>
+#include <aaudio/AAudio.h>
 
 static const int flowControlIntervalMs = 5000;
 static const int flowControlThresholdMs = 40;
@@ -190,7 +190,7 @@ static void android_snd_read_preprocess(MSFilter *obj) {
 	AAudioStreamBuilder_setSharingMode(ictx->aaudio_context->builder, AAUDIO_SHARING_MODE_EXCLUSIVE); // If EXCLUSIVE mode isn't available the builder will fall back to SHARED mode.
 	AAudioStreamBuilder_setSampleRate(ictx->aaudio_context->builder, ictx->aaudio_context->samplerate);
 	AAudioStreamBuilder_setChannelCount(ictx->aaudio_context->builder, ictx->aaudio_context->nchannels);
-	AAudioStreamBuilder_setFormat(ictx->aaudio_context->builder, AAUDIO__FORMAT_PCM_I16);
+	AAudioStreamBuilder_setFormat(ictx->aaudio_context->builder, AAUDIO_FORMAT_PCM_I16);
 	AAudioStreamBuilder_setDataCallback(ictx->aaudio_context->builder, aaudio_recorder_callback, ictx);
 	AAudioStreamBuilder_setPerformanceMode(ictx->aaudio_context->builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
 	//AAudioStreamBuilder_setSamplesPerFrame(ictx->aaudio_context->builder, AAUDIO_UNSPECIFIED); // Let the device decide
@@ -244,21 +244,21 @@ static int android_snd_read_set_sample_rate(MSFilter *obj, void *data) {
 static int android_snd_read_get_sample_rate(MSFilter *obj, void *data) {
 	int *n = (int*)data;
 	AAudioInputContext *ictx = (AAudioInputContext*)obj->data;
-	*n = ictx->opensles_context->samplerate;
+	*n = ictx->aaudio_context->samplerate;
 	return 0;
 }
 
 static int android_snd_read_set_nchannels(MSFilter *obj, void *data) {
 	int *n = (int*)data;
 	AAudioInputContext *ictx = (AAudioInputContext*)obj->data;
-	ictx->opensles_context->nchannels = *n;
+	ictx->aaudio_context->nchannels = *n;
 	return 0;
 }
 
 static int android_snd_read_get_nchannels(MSFilter *obj, void *data) {
 	int *n = (int*)data;
 	AAudioInputContext *ictx = (AAudioInputContext*)obj->data;
-	*n = ictx->opensles_context->nchannels;
+	*n = ictx->aaudio_context->nchannels;
 	return 0;
 }
 
@@ -327,22 +327,22 @@ static int android_snd_write_set_sample_rate(MSFilter *obj, void *data) {
 static int android_snd_write_get_sample_rate(MSFilter *obj, void *data) {
 	int *n = (int*)data;
 	AAudioOutputContext *octx = (AAudioOutputContext*)obj->data;
-	*n = octx->opensles_context->samplerate;
+	*n = octx->aaudio_context->samplerate;
 	return 0;
 }
 
 static int android_snd_write_set_nchannels(MSFilter *obj, void *data) {
 	int *n = (int*)data;
 	AAudioOutputContext *octx = (AAudioOutputContext*)obj->data;
-	octx->opensles_context->nchannels = *n;
-	ms_flow_controlled_bufferizer_set_nchannels(&octx->buffer, octx->opensles_context->nchannels);
+	octx->aaudio_context->nchannels = *n;
+	ms_flow_controlled_bufferizer_set_nchannels(&octx->buffer, octx->aaudio_context->nchannels);
 	return 0;
 }
 
 static int android_snd_write_get_nchannels(MSFilter *obj, void *data) {
 	int *n = (int*)data;
 	AAudioOutputContext *octx = (AAudioOutputContext*)obj->data;
-	*n = octx->opensles_context->nchannels;
+	*n = octx->aaudio_context->nchannels;
 	return 0;
 }
 
@@ -355,7 +355,7 @@ static aaudio_data_callback_result_t aaudio_player_callback(AAudioStream *stream
 	int ask = sizeof(int16_t) * numFrames * octx->samplesPerFrame;
 	int avail = ms_flow_controlled_bufferizer_get_avail(&octx->buffer);
 	
-	ms_flow_controlled_bufferizer_read(&octx->buffer, audioData, avail);
+	ms_flow_controlled_bufferizer_read(&octx->buffer, (uint8_t *)audioData, avail);
 	if (avail < ask) {
 		memset(static_cast<int16_t *>(audioData) + avail, 0, ask - avail);
 	}
@@ -373,7 +373,7 @@ static void android_snd_write_preprocess(MSFilter *obj) {
 	AAudioStreamBuilder_setSharingMode(octx->aaudio_context->builder, AAUDIO_SHARING_MODE_EXCLUSIVE); // If EXCLUSIVE mode isn't available the builder will fall back to SHARED mode.
 	AAudioStreamBuilder_setSampleRate(octx->aaudio_context->builder, octx->aaudio_context->samplerate);
 	AAudioStreamBuilder_setChannelCount(octx->aaudio_context->builder, octx->aaudio_context->nchannels);
-	AAudioStreamBuilder_setFormat(octx->aaudio_context->builder, AAUDIO__FORMAT_PCM_I16);
+	AAudioStreamBuilder_setFormat(octx->aaudio_context->builder, AAUDIO_FORMAT_PCM_I16);
 	AAudioStreamBuilder_setDataCallback(octx->aaudio_context->builder, aaudio_player_callback, octx);
 	AAudioStreamBuilder_setPerformanceMode(octx->aaudio_context->builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
 	AAudioStreamBuilder_setSamplesPerFrame(octx->aaudio_context->builder, AAUDIO_UNSPECIFIED); // Let the device decide
