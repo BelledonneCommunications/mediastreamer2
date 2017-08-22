@@ -218,6 +218,7 @@ if(ENABLE_ANDROIDSND)
 		android/androidsound.cpp
 		android/androidsound_depr.cpp
 		android/androidsound_opensles.cpp
+		android/androidsound_aaudio.cpp
 		android/AudioRecord.cpp
 		android/AudioSystem.cpp
 		android/AudioTrack.cpp
