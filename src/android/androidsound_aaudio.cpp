@@ -57,16 +57,9 @@ struct AAudioContext {
 		builtin_aec = false;
 	}
 
-	~AAudioContext() {
-		AAudioStreamBuilder_delete(builder);
-	}
-
 	int samplerate;
 	int nchannels;
 	bool builtin_aec;
-
-	AAudioStreamBuilder *builder;
-	AAudioStream *stream;	
 };
 
 struct AAudioInputContext {
@@ -87,6 +80,7 @@ struct AAudioInputContext {
 	}
 	
 	AAudioContext *aaudio_context;
+	AAudioStream *stream;
 
 	queue_t q;
 	ms_mutex_t mutex;
@@ -118,6 +112,7 @@ struct AAudioOutputContext {
 	}
 
 	AAudioContext *aaudio_context;
+	AAudioStream *stream;
 
 	MSFilter *mFilter;
 	MSFlowControlledBufferizer buffer;
@@ -137,6 +132,15 @@ int initAAudio() {
 	if ((handle = dlopen("libaaudio.so", RTLD_NOW)) == NULL){
 		ms_warning("Fail to load libAAudio : %s", dlerror());
 		result = -1;
+	} else {
+		dlerror(); // Clear previous message if present
+
+		AAudioStreamBuilder *builder;
+		aaudio_result_t result = AAudio_createStreamBuilder(&builder);
+		if (result != AAUDIO_OK && !builder) {
+			ms_error("[AAudio] Couldn't create stream builder: %i", result);
+			result += 1;
+		}
 	}
 	return result;
 }
@@ -177,6 +181,10 @@ static aaudio_data_callback_result_t aaudio_recorder_callback(AAudioStream *stre
 	AAudioInputContext *ictx = (AAudioInputContext *)userData;
 	ictx->read_samples += numFrames * ictx->samplesPerFrame;
 
+	if (numFrames <= 0) {
+		ms_error("[AAudio] aaudio_recorder_callback has %i frames", numFrames);
+	}
+
 	int32_t bufferSize = sizeof(int16_t) * numFrames * ictx->samplesPerFrame;
 	mblk_t *m = allocb(bufferSize, 0);
 	memcpy(m->b_wptr, audioData, bufferSize);
@@ -190,30 +198,54 @@ static aaudio_data_callback_result_t aaudio_recorder_callback(AAudioStream *stre
 	return AAUDIO_CALLBACK_RESULT_CONTINUE;	
 }
 
+static void aaudio_recorder_callback_error(AAudioStream *stream, void *userData, aaudio_result_t error) {
+	//AAudioInputContext *ictx = (AAudioInputContext *)userData;
+	ms_error("[AAudio] aaudio_recorder_callback_error has result: %i", error);
+
+	aaudio_stream_state_t streamState = AAudioStream_getState(stream);
+	if (streamState == AAUDIO_STREAM_STATE_DISCONNECTED) {
+		ms_warning("[AAudio] Recorder stream has disconnected");
+		//TODO restart
+	}
+}
+
 static void android_snd_read_preprocess(MSFilter *obj) {
 	AAudioInputContext *ictx = (AAudioInputContext*) obj->data;
 	ictx->mFilter = obj;
 	ictx->read_samples = 0;
 
-	aaudio_result_t result = AAudio_createStreamBuilder(&ictx->aaudio_context->builder);
-	AAudioStreamBuilder_setDeviceId(ictx->aaudio_context->builder, AAUDIO_UNSPECIFIED); // Default recorder
-	AAudioStreamBuilder_setDirection(ictx->aaudio_context->builder, AAUDIO_DIRECTION_INPUT);
-	AAudioStreamBuilder_setSharingMode(ictx->aaudio_context->builder, AAUDIO_SHARING_MODE_EXCLUSIVE); // If EXCLUSIVE mode isn't available the builder will fall back to SHARED mode.
-	AAudioStreamBuilder_setSampleRate(ictx->aaudio_context->builder, ictx->aaudio_context->samplerate);
-	AAudioStreamBuilder_setChannelCount(ictx->aaudio_context->builder, ictx->aaudio_context->nchannels);
-	AAudioStreamBuilder_setFormat(ictx->aaudio_context->builder, AAUDIO_FORMAT_PCM_I16);
-	AAudioStreamBuilder_setDataCallback(ictx->aaudio_context->builder, aaudio_recorder_callback, ictx);
-	AAudioStreamBuilder_setPerformanceMode(ictx->aaudio_context->builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-	//AAudioStreamBuilder_setSamplesPerFrame(ictx->aaudio_context->builder, AAUDIO_UNSPECIFIED); // Let the device decide
-	//AAudioStreamBuilder_setBufferCapacityInFrames(ictx->aaudio_context->builder, AAUDIO_UNSPECIFIED); // Let the device decide
-	
-	result = AAudioStreamBuilder_openStream(ictx->aaudio_context->builder, &ictx->aaudio_context->stream);
-	int32_t framesPerBust = AAudioStream_getFramesPerBurst(ictx->aaudio_context->stream);
-	// Set the buffer size to the burst size - this will give us the minimum possible latency
-	AAudioStream_setBufferSizeInFrames(ictx->aaudio_context->stream, framesPerBust);
-	ictx->samplesPerFrame = AAudioStream_getSamplesPerFrame(ictx->aaudio_context->stream);
+	AAudioStreamBuilder *builder;
+	aaudio_result_t result = AAudio_createStreamBuilder(&builder);
+	if (result != AAUDIO_OK && !builder) {
+		ms_error("[AAudio] Couldn't create stream builder for recorder: %i", result);
+	}
 
-	result = AAudioStream_requestStart(ictx->aaudio_context->stream);
+	AAudioStreamBuilder_setDeviceId(builder, AAUDIO_UNSPECIFIED); // Default recorder
+	AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_INPUT);
+	AAudioStreamBuilder_setSampleRate(builder, ictx->aaudio_context->samplerate);
+	AAudioStreamBuilder_setDataCallback(builder, aaudio_recorder_callback, ictx);
+	AAudioStreamBuilder_setFormat(builder, AAUDIO_FORMAT_PCM_I16);
+	AAudioStreamBuilder_setChannelCount(builder, ictx->aaudio_context->nchannels);
+	AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_EXCLUSIVE); // If EXCLUSIVE mode isn't available the builder will fall back to SHARED mode.
+	AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+	AAudioStreamBuilder_setErrorCallback(builder, aaudio_recorder_callback_error, ictx);
+	ms_message("[AAudio] Record stream configured with samplerate %i and %i channels", ictx->aaudio_context->samplerate, ictx->aaudio_context->nchannels);
+	
+	result = AAudioStreamBuilder_openStream(builder, &(ictx->stream));
+	if (result != AAUDIO_OK && !ictx->stream) {
+		ms_error("[AAudio] Open stream for recorder failed: %i", result);
+	}
+	int32_t framesPerBust = AAudioStream_getFramesPerBurst(ictx->stream);
+	// Set the buffer size to the burst size - this will give us the minimum possible latency
+	AAudioStream_setBufferSizeInFrames(ictx->stream, framesPerBust);
+	ictx->samplesPerFrame = AAudioStream_getSamplesPerFrame(ictx->stream);
+
+	result = AAudioStream_requestStart(ictx->stream);
+	if (result != AAUDIO_OK) {
+		ms_error("[AAudio] Start stream for recorder failed: %i", result);
+	}
+
+	AAudioStreamBuilder_delete(builder);
 }
 
 static void android_snd_read_process(MSFilter *obj) {
@@ -233,8 +265,8 @@ static void android_snd_read_process(MSFilter *obj) {
 static void android_snd_read_postprocess(MSFilter *obj) {
 	AAudioInputContext *ictx = (AAudioInputContext*)obj->data;
 
-	aaudio_result_t result = AAudioStream_requestStop(ictx->aaudio_context->stream);
-	result = AAudioStream_close(ictx->aaudio_context->stream);
+	aaudio_result_t result = AAudioStream_requestStop(ictx->stream);
+	result = AAudioStream_close(ictx->stream);
 
 	ms_ticker_set_synchronizer(obj->ticker, NULL);
 	ms_mutex_lock(&ictx->mutex);
@@ -359,6 +391,10 @@ static int android_snd_write_get_nchannels(MSFilter *obj, void *data) {
 
 static aaudio_data_callback_result_t aaudio_player_callback(AAudioStream *stream, void *userData, void *audioData, int32_t numFrames) {
 	AAudioOutputContext *octx = (AAudioOutputContext*)userData;
+	
+	if (numFrames <= 0) {
+		ms_error("[AAudio] aaudio_player_callback has %i frames", numFrames);
+	}
 
 	ms_mutex_lock(&octx->mutex);
 	int ask = sizeof(int16_t) * numFrames * octx->samplesPerFrame;
@@ -373,28 +409,52 @@ static aaudio_data_callback_result_t aaudio_player_callback(AAudioStream *stream
 	return AAUDIO_CALLBACK_RESULT_CONTINUE;	
 }
 
+static void aaudio_player_callback_error(AAudioStream *stream, void *userData, aaudio_result_t error) {
+	//AAudioOutputContext *octx = (AAudioOutputContext *)userData;
+	ms_error("[AAudio] aaudio_player_callback_error has result: %i", error);
+
+	aaudio_stream_state_t streamState = AAudioStream_getState(stream);
+	if (streamState == AAUDIO_STREAM_STATE_DISCONNECTED) {
+		ms_warning("[AAudio] Player stream has disconnected");
+		//TODO restart
+	}
+}
+
 static void android_snd_write_preprocess(MSFilter *obj) {
 	AAudioOutputContext *octx = (AAudioOutputContext*)obj->data;
 
-	aaudio_result_t result = AAudio_createStreamBuilder(&octx->aaudio_context->builder);
-	AAudioStreamBuilder_setDeviceId(octx->aaudio_context->builder, AAUDIO_UNSPECIFIED); // Default speaker
-	AAudioStreamBuilder_setDirection(octx->aaudio_context->builder, AAUDIO_DIRECTION_OUTPUT);
-	AAudioStreamBuilder_setSharingMode(octx->aaudio_context->builder, AAUDIO_SHARING_MODE_EXCLUSIVE); // If EXCLUSIVE mode isn't available the builder will fall back to SHARED mode.
-	AAudioStreamBuilder_setSampleRate(octx->aaudio_context->builder, octx->aaudio_context->samplerate);
-	AAudioStreamBuilder_setChannelCount(octx->aaudio_context->builder, octx->aaudio_context->nchannels);
-	AAudioStreamBuilder_setFormat(octx->aaudio_context->builder, AAUDIO_FORMAT_PCM_I16);
-	AAudioStreamBuilder_setDataCallback(octx->aaudio_context->builder, aaudio_player_callback, octx);
-	AAudioStreamBuilder_setPerformanceMode(octx->aaudio_context->builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-	AAudioStreamBuilder_setSamplesPerFrame(octx->aaudio_context->builder, AAUDIO_UNSPECIFIED); // Let the device decide
-	AAudioStreamBuilder_setBufferCapacityInFrames(octx->aaudio_context->builder, AAUDIO_UNSPECIFIED); // Let the device decide
-	
-	result = AAudioStreamBuilder_openStream(octx->aaudio_context->builder, &octx->aaudio_context->stream);
-	int32_t framesPerBust = AAudioStream_getFramesPerBurst(octx->aaudio_context->stream);
-	// Set the buffer size to the burst size - this will give us the minimum possible latency
-	AAudioStream_setBufferSizeInFrames(octx->aaudio_context->stream, framesPerBust);
-	octx->samplesPerFrame = AAudioStream_getSamplesPerFrame(octx->aaudio_context->stream);
+	AAudioStreamBuilder *builder;
+	aaudio_result_t result = AAudio_createStreamBuilder(&builder);
+	if (result != AAUDIO_OK && !builder) {
+		ms_error("[AAudio] Couldn't create stream builder for player: %i", result);
+	}
 
-	result = AAudioStream_requestStart(octx->aaudio_context->stream);
+	AAudioStreamBuilder_setDeviceId(builder, AAUDIO_UNSPECIFIED); // Default speaker
+	AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_OUTPUT);
+	AAudioStreamBuilder_setSampleRate(builder, octx->aaudio_context->samplerate);
+	AAudioStreamBuilder_setDataCallback(builder, aaudio_player_callback, octx);
+	AAudioStreamBuilder_setFormat(builder, AAUDIO_FORMAT_PCM_I16);
+	AAudioStreamBuilder_setChannelCount(builder, octx->aaudio_context->nchannels);
+	AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_EXCLUSIVE); // If EXCLUSIVE mode isn't available the builder will fall back to SHARED mode.
+	AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+	AAudioStreamBuilder_setErrorCallback(builder, aaudio_player_callback_error, octx);
+	ms_message("[AAudio] Player stream configured with samplerate %i and %i channels", octx->aaudio_context->samplerate, octx->aaudio_context->nchannels);
+	
+	result = AAudioStreamBuilder_openStream(builder, &(octx->stream));
+	if (result != AAUDIO_OK && !octx->stream) {
+		ms_error("[AAudio] Open stream for player failed: %i", result);
+	}
+	int32_t framesPerBust = AAudioStream_getFramesPerBurst(octx->stream);
+	// Set the buffer size to the burst size - this will give us the minimum possible latency
+	AAudioStream_setBufferSizeInFrames(octx->stream, framesPerBust);
+	octx->samplesPerFrame = AAudioStream_getSamplesPerFrame(octx->stream);
+
+	result = AAudioStream_requestStart(octx->stream);
+	if (result != AAUDIO_OK) {
+		ms_error("[AAudio] Start stream for player failed: %i", result);
+	}
+	
+	AAudioStreamBuilder_delete(builder);
 }
 
 static void android_snd_write_process(MSFilter *obj) {
@@ -407,8 +467,8 @@ static void android_snd_write_process(MSFilter *obj) {
 static void android_snd_write_postprocess(MSFilter *obj) {
 	AAudioOutputContext *octx = (AAudioOutputContext*)obj->data;
 
-	aaudio_result_t result = AAudioStream_requestStop(octx->aaudio_context->stream);
-	result = AAudioStream_close(octx->aaudio_context->stream);
+	aaudio_result_t result = AAudioStream_requestStop(octx->stream);
+	result = AAudioStream_close(octx->stream);
 }
 
 static MSFilterMethod android_snd_write_methods[] = {
