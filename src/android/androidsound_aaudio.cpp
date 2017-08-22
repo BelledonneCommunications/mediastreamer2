@@ -130,13 +130,28 @@ static AAudioContext* aaudio_context_init() {
 	return ctx;
 }
 
+int initAAudio() {
+	int result = 0;
+	void *handle;
+
+	if ((handle = dlopen("libaaudio.so", RTLD_NOW)) == NULL){
+		ms_warning("Fail to load libAAudio : %s", dlerror());
+		result = -1;
+	}
+	return result;
+}
+
 static void android_snd_card_detect(MSSndCardManager *m) {
 	SoundDeviceDescription* d = NULL;
 	MSDevicesInfo *devices = NULL;
-	devices = ms_factory_get_devices_info(m->factory);
-	d = ms_devices_info_get_sound_device_description(devices);
-	MSSndCard *card = android_snd_card_new(m);
-	ms_snd_card_manager_add_card(m, card);
+	if (initAAudio() == 0) { // Try to dlopen libOpenSLES
+		devices = ms_factory_get_devices_info(m->factory);
+		d = ms_devices_info_get_sound_device_description(devices);
+		MSSndCard *card = android_snd_card_new(m);
+		ms_snd_card_manager_add_card(m, card);
+	} else {
+		ms_warning("Failed to dlopen libAAudio, AAudio MS soundcard unavailable");
+	}
 }
 
 static void android_native_snd_card_init(MSSndCard *card) {
