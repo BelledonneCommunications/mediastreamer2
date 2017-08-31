@@ -215,11 +215,7 @@ static void aaudio_recorder_callback_error(AAudioStream *stream, void *userData,
 	}
 }
 
-static void android_snd_read_preprocess(MSFilter *obj) {
-	AAudioInputContext *ictx = (AAudioInputContext*) obj->data;
-	ictx->mFilter = obj;
-	ictx->read_samples = 0;
-
+static void aaudio_recorder_init(AAudioInputContext *ictx) {
 	AAudioStreamBuilder *builder;
 	aaudio_result_t result = AAudio_createStreamBuilder(&builder);
 	if (result != AAUDIO_OK && !builder) {
@@ -259,6 +255,13 @@ static void android_snd_read_preprocess(MSFilter *obj) {
 	AAudioStreamBuilder_delete(builder);
 }
 
+static void android_snd_read_preprocess(MSFilter *obj) {
+	AAudioInputContext *ictx = (AAudioInputContext*) obj->data;
+	ictx->mFilter = obj;
+	ictx->read_samples = 0;
+	aaudio_recorder_init(ictx);	
+}
+
 static void android_snd_read_process(MSFilter *obj) {
 	AAudioInputContext *ictx = (AAudioInputContext*) obj->data;
 	mblk_t *m;
@@ -273,9 +276,7 @@ static void android_snd_read_process(MSFilter *obj) {
 	}
 }
 
-static void android_snd_read_postprocess(MSFilter *obj) {
-	AAudioInputContext *ictx = (AAudioInputContext*)obj->data;
-
+static void aaudio_recorder_stop(AAudioInputContext *ictx) {
 	aaudio_result_t result = AAudioStream_requestStop(ictx->stream);
 	if (result != AAUDIO_OK) {
 		ms_error("[AAudio] Recorder stream stop failed: %i", result);
@@ -289,6 +290,11 @@ static void android_snd_read_postprocess(MSFilter *obj) {
 	} else {
 		ms_message("[AAudio] Recorder stream closed");
 	}
+}
+
+static void android_snd_read_postprocess(MSFilter *obj) {
+	AAudioInputContext *ictx = (AAudioInputContext*)obj->data;
+	aaudio_recorder_stop(ictx);	
 
 	ms_ticker_set_synchronizer(obj->ticker, NULL);
 	ms_mutex_lock(&ictx->mutex);
@@ -434,20 +440,9 @@ static aaudio_data_callback_result_t aaudio_player_callback(AAudioStream *stream
 	return AAUDIO_CALLBACK_RESULT_CONTINUE;	
 }
 
-static void aaudio_player_callback_error(AAudioStream *stream, void *userData, aaudio_result_t error) {
-	//AAudioOutputContext *octx = (AAudioOutputContext *)userData;
-	ms_error("[AAudio] aaudio_player_callback_error has result: %i", error);
+static void aaudio_player_callback_error(AAudioStream *stream, void *userData, aaudio_result_t error);
 
-	aaudio_stream_state_t streamState = AAudioStream_getState(stream);
-	if (streamState == AAUDIO_STREAM_STATE_DISCONNECTED) {
-		ms_warning("[AAudio] Player stream has disconnected");
-		//TODO restart
-	}
-}
-
-static void android_snd_write_preprocess(MSFilter *obj) {
-	AAudioOutputContext *octx = (AAudioOutputContext*)obj->data;
-
+static void aaudio_player_init(AAudioOutputContext *octx) {
 	AAudioStreamBuilder *builder;
 	aaudio_result_t result = AAudio_createStreamBuilder(&builder);
 	if (result != AAUDIO_OK && !builder) {
@@ -486,16 +481,7 @@ static void android_snd_write_preprocess(MSFilter *obj) {
 	AAudioStreamBuilder_delete(builder);
 }
 
-static void android_snd_write_process(MSFilter *obj) {
-	AAudioOutputContext *octx = (AAudioOutputContext*)obj->data;
-	ms_mutex_lock(&octx->mutex);
-	ms_flow_controlled_bufferizer_put_from_queue(&octx->buffer, obj->inputs[0]);
-	ms_mutex_unlock(&octx->mutex);
-}
-
-static void android_snd_write_postprocess(MSFilter *obj) {
-	AAudioOutputContext *octx = (AAudioOutputContext*)obj->data;
-
+static void aaudio_player_close(AAudioOutputContext *octx) {
 	aaudio_result_t result = AAudioStream_requestStop(octx->stream);
 	if (result != AAUDIO_OK) {
 		ms_error("[AAudio] Player stream stop failed: %i", result);
@@ -509,6 +495,35 @@ static void android_snd_write_postprocess(MSFilter *obj) {
 	} else {
 		ms_message("[AAudio] Player stream closed");
 	}
+}
+
+static void aaudio_player_callback_error(AAudioStream *stream, void *userData, aaudio_result_t error) {
+	AAudioOutputContext *octx = (AAudioOutputContext *)userData;
+	ms_error("[AAudio] aaudio_player_callback_error has result: %i", error);
+
+	aaudio_stream_state_t streamState = AAudioStream_getState(stream);
+	if (streamState == AAUDIO_STREAM_STATE_DISCONNECTED) {
+		ms_warning("[AAudio] Player stream has disconnected");
+		aaudio_player_close(octx);
+		aaudio_player_init(octx);
+	}
+}
+
+static void android_snd_write_preprocess(MSFilter *obj) {
+	AAudioOutputContext *octx = (AAudioOutputContext*)obj->data;
+	aaudio_player_init(octx);
+}
+
+static void android_snd_write_process(MSFilter *obj) {
+	AAudioOutputContext *octx = (AAudioOutputContext*)obj->data;
+	ms_mutex_lock(&octx->mutex);
+	ms_flow_controlled_bufferizer_put_from_queue(&octx->buffer, obj->inputs[0]);
+	ms_mutex_unlock(&octx->mutex);
+}
+
+static void android_snd_write_postprocess(MSFilter *obj) {
+	AAudioOutputContext *octx = (AAudioOutputContext*)obj->data;
+	aaudio_player_close(octx);	
 }
 
 static MSFilterMethod android_snd_write_methods[] = {
