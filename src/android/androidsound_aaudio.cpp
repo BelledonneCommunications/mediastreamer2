@@ -65,7 +65,8 @@ struct AAudioContext {
 struct AAudioInputContext {
 	AAudioInputContext() {
 		qinit(&q);
-		ms_mutex_init(&mutex,NULL);
+		ms_mutex_init(&mutex, NULL);
+		ms_mutex_init(&stream_mutex, NULL);
 		mTickerSynchronizer = NULL;
 		mAvSkew = 0;
 	}
@@ -73,6 +74,7 @@ struct AAudioInputContext {
 	~AAudioInputContext() {
 		flushq(&q,0);
 		ms_mutex_destroy(&mutex);
+		ms_mutex_destroy(&stream_mutex);
 	}
 	
 	void setContext(AAudioContext *context) {
@@ -81,6 +83,7 @@ struct AAudioInputContext {
 	
 	AAudioContext *aaudio_context;
 	AAudioStream *stream;
+	ms_mutex_t stream_mutex;
 
 	queue_t q;
 	ms_mutex_t mutex;
@@ -95,12 +98,14 @@ struct AAudioOutputContext {
 	AAudioOutputContext(MSFilter *f) {
 		mFilter = f;
 		ms_flow_controlled_bufferizer_init(&buffer, f, DeviceFavoriteSampleRate, 1);
-		ms_mutex_init(&mutex,NULL);
+		ms_mutex_init(&mutex, NULL);
+		ms_mutex_init(&stream_mutex, NULL);
 	}
 
 	~AAudioOutputContext() {
 		ms_flow_controlled_bufferizer_uninit(&buffer);
 		ms_mutex_destroy(&mutex);
+		ms_mutex_destroy(&stream_mutex);
 	}
 	
 	void setContext(AAudioContext *context) {
@@ -113,6 +118,7 @@ struct AAudioOutputContext {
 
 	AAudioContext *aaudio_context;
 	AAudioStream *stream;
+	ms_mutex_t stream_mutex;
 
 	MSFilter *mFilter;
 	MSFlowControlledBufferizer buffer;
@@ -247,19 +253,24 @@ static void aaudio_recorder_init(AAudioInputContext *ictx) {
 }
 
 static void aaudio_recorder_close(AAudioInputContext *ictx) {
-	aaudio_result_t result = AAudioStream_requestStop(ictx->stream);
-	if (result != AAUDIO_OK) {
-		ms_error("[AAudio] Recorder stream stop failed: %i", result);
-	} else {
-		ms_message("[AAudio] Recorder stream stopped");
-	}
+	ms_mutex_lock(&ictx->stream_mutex);
+	if (ictx->stream) {
+		aaudio_result_t result = AAudioStream_requestStop(ictx->stream);
+		if (result != AAUDIO_OK) {
+			ms_error("[AAudio] Recorder stream stop failed: %i", result);
+		} else {
+			ms_message("[AAudio] Recorder stream stopped");
+		}
 
-	result = AAudioStream_close(ictx->stream);
-	if (result != AAUDIO_OK) {
-		ms_error("[AAudio] Recorder stream close failed: %i", result);
-	} else {
-		ms_message("[AAudio] Recorder stream closed");
+		result = AAudioStream_close(ictx->stream);
+		if (result != AAUDIO_OK) {
+			ms_error("[AAudio] Recorder stream close failed: %i", result);
+		} else {
+			ms_message("[AAudio] Recorder stream closed");
+		}
+		ictx->stream = NULL;
 	}
+	ms_mutex_unlock(&ictx->stream_mutex);
 }
 
 static void aaudio_recorder_callback_error(AAudioStream *stream, void *userData, aaudio_result_t error) {
@@ -269,8 +280,13 @@ static void aaudio_recorder_callback_error(AAudioStream *stream, void *userData,
 	aaudio_stream_state_t streamState = AAudioStream_getState(stream);
 	if (streamState == AAUDIO_STREAM_STATE_DISCONNECTED) {
 		ms_warning("[AAudio] Recorder stream has disconnected");
-		aaudio_recorder_close(ictx);
-		aaudio_recorder_init(ictx);
+
+		ms_mutex_lock(&ictx->stream_mutex);
+		if (ictx->stream) {
+			AAudioStream_close(stream);
+			ictx->stream = NULL;
+		}
+		ms_mutex_unlock(&ictx->stream_mutex);
 	}
 }
 
@@ -284,6 +300,12 @@ static void android_snd_read_preprocess(MSFilter *obj) {
 static void android_snd_read_process(MSFilter *obj) {
 	AAudioInputContext *ictx = (AAudioInputContext*) obj->data;
 	mblk_t *m;
+
+	ms_mutex_lock(&ictx->stream_mutex);
+	if (!ictx->stream) {
+		aaudio_recorder_init(ictx);
+	}
+	ms_mutex_unlock(&ictx->stream_mutex);
 
 	ms_mutex_lock(&ictx->mutex);
 	while ((m = getq(&ictx->q)) != NULL) {
@@ -485,19 +507,24 @@ static void aaudio_player_init(AAudioOutputContext *octx) {
 }
 
 static void aaudio_player_close(AAudioOutputContext *octx) {
-	aaudio_result_t result = AAudioStream_requestStop(octx->stream);
-	if (result != AAUDIO_OK) {
-		ms_error("[AAudio] Player stream stop failed: %i", result);
-	} else {
-		ms_message("[AAudio] Player stream stopped");
-	}
+	ms_mutex_lock(&octx->stream_mutex);
+	if (octx->stream) {
+		aaudio_result_t result = AAudioStream_requestStop(octx->stream);
+		if (result != AAUDIO_OK) {
+			ms_error("[AAudio] Player stream stop failed: %i", result);
+		} else {
+			ms_message("[AAudio] Player stream stopped");
+		}
 
-	result = AAudioStream_close(octx->stream);
-	if (result != AAUDIO_OK) {
-		ms_error("[AAudio] Player stream close failed: %i", result);
-	} else {
-		ms_message("[AAudio] Player stream closed");
+		result = AAudioStream_close(octx->stream);
+		if (result != AAUDIO_OK) {
+			ms_error("[AAudio] Player stream close failed: %i", result);
+		} else {
+			ms_message("[AAudio] Player stream closed");
+		}
+		octx->stream = NULL;
 	}
+	ms_mutex_unlock(&octx->stream_mutex);
 }
 
 static void aaudio_player_callback_error(AAudioStream *stream, void *userData, aaudio_result_t error) {
@@ -507,8 +534,13 @@ static void aaudio_player_callback_error(AAudioStream *stream, void *userData, a
 	aaudio_stream_state_t streamState = AAudioStream_getState(stream);
 	if (streamState == AAUDIO_STREAM_STATE_DISCONNECTED) {
 		ms_warning("[AAudio] Player stream has disconnected");
-		aaudio_player_close(octx);
-		aaudio_player_init(octx);
+
+		ms_mutex_lock(&octx->stream_mutex);
+		if (octx->stream) {
+			AAudioStream_close(stream);
+			octx->stream = NULL;
+		}
+		ms_mutex_unlock(&octx->stream_mutex);
 	}
 }
 
@@ -519,6 +551,13 @@ static void android_snd_write_preprocess(MSFilter *obj) {
 
 static void android_snd_write_process(MSFilter *obj) {
 	AAudioOutputContext *octx = (AAudioOutputContext*)obj->data;
+
+	ms_mutex_lock(&octx->stream_mutex);
+	if (!octx->stream) {
+		aaudio_player_init(octx);
+	}
+	ms_mutex_unlock(&octx->stream_mutex);
+
 	ms_mutex_lock(&octx->mutex);
 	ms_flow_controlled_bufferizer_put_from_queue(&octx->buffer, obj->inputs[0]);
 	ms_mutex_unlock(&octx->mutex);
