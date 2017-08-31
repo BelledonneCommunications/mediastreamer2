@@ -148,7 +148,7 @@ int initAAudio() {
 static void android_snd_card_detect(MSSndCardManager *m) {
 	SoundDeviceDescription* d = NULL;
 	MSDevicesInfo *devices = NULL;
-	if (initAAudio() == 0) { // Try to dlopen libOpenSLES
+	if (initAAudio() == 0) {
 		devices = ms_factory_get_devices_info(m->factory);
 		d = ms_devices_info_get_sound_device_description(devices);
 		MSSndCard *card = android_snd_card_new(m);
@@ -179,6 +179,12 @@ static void android_snd_read_init(MSFilter *obj) {
 
 static aaudio_data_callback_result_t aaudio_recorder_callback(AAudioStream *stream, void *userData, void *audioData, int32_t numFrames) {
 	AAudioInputContext *ictx = (AAudioInputContext *)userData;
+
+	if (ictx->mTickerSynchronizer == NULL) {
+		MSFilter *obj = ictx->mFilter;
+		ictx->mTickerSynchronizer = ms_ticker_synchronizer_new();
+		ms_ticker_set_synchronizer(obj->ticker, ictx->mTickerSynchronizer);
+	}
 	ictx->read_samples += numFrames * ictx->samplesPerFrame;
 
 	if (numFrames <= 0) {
@@ -234,7 +240,10 @@ static void android_snd_read_preprocess(MSFilter *obj) {
 	result = AAudioStreamBuilder_openStream(builder, &(ictx->stream));
 	if (result != AAUDIO_OK && !ictx->stream) {
 		ms_error("[AAudio] Open stream for recorder failed: %i", result);
+	} else {
+		ms_message("[AAudio] Recorder stream opened");
 	}
+
 	int32_t framesPerBust = AAudioStream_getFramesPerBurst(ictx->stream);
 	// Set the buffer size to the burst size - this will give us the minimum possible latency
 	AAudioStream_setBufferSizeInFrames(ictx->stream, framesPerBust);
@@ -243,6 +252,8 @@ static void android_snd_read_preprocess(MSFilter *obj) {
 	result = AAudioStream_requestStart(ictx->stream);
 	if (result != AAUDIO_OK) {
 		ms_error("[AAudio] Start stream for recorder failed: %i", result);
+	} else {
+		ms_message("[AAudio] Recorder stream started");
 	}
 
 	AAudioStreamBuilder_delete(builder);
@@ -266,7 +277,18 @@ static void android_snd_read_postprocess(MSFilter *obj) {
 	AAudioInputContext *ictx = (AAudioInputContext*)obj->data;
 
 	aaudio_result_t result = AAudioStream_requestStop(ictx->stream);
+	if (result != AAUDIO_OK) {
+		ms_error("[AAudio] Recorder stream stop failed: %i", result);
+	} else {
+		ms_message("[AAudio] Recorder stream stopped");
+	}
+
 	result = AAudioStream_close(ictx->stream);
+	if (result != AAUDIO_OK) {
+		ms_error("[AAudio] Recorder stream close failed: %i", result);
+	} else {
+		ms_message("[AAudio] Recorder stream closed");
+	}
 
 	ms_ticker_set_synchronizer(obj->ticker, NULL);
 	ms_mutex_lock(&ictx->mutex);
@@ -399,8 +421,11 @@ static aaudio_data_callback_result_t aaudio_player_callback(AAudioStream *stream
 	ms_mutex_lock(&octx->mutex);
 	int ask = sizeof(int16_t) * numFrames * octx->samplesPerFrame;
 	int avail = ms_flow_controlled_bufferizer_get_avail(&octx->buffer);
+	int bytes = MIN(ask, avail);
 	
-	ms_flow_controlled_bufferizer_read(&octx->buffer, (uint8_t *)audioData, avail);
+	if (bytes > 0) {
+		ms_flow_controlled_bufferizer_read(&octx->buffer, (uint8_t *)audioData, bytes);
+	}
 	if (avail < ask) {
 		memset(static_cast<int16_t *>(audioData) + avail, 0, ask - avail);
 	}
@@ -443,6 +468,8 @@ static void android_snd_write_preprocess(MSFilter *obj) {
 	result = AAudioStreamBuilder_openStream(builder, &(octx->stream));
 	if (result != AAUDIO_OK && !octx->stream) {
 		ms_error("[AAudio] Open stream for player failed: %i", result);
+	} else {
+		ms_message("[AAudio] Player stream opened");
 	}
 	int32_t framesPerBust = AAudioStream_getFramesPerBurst(octx->stream);
 	// Set the buffer size to the burst size - this will give us the minimum possible latency
@@ -452,6 +479,8 @@ static void android_snd_write_preprocess(MSFilter *obj) {
 	result = AAudioStream_requestStart(octx->stream);
 	if (result != AAUDIO_OK) {
 		ms_error("[AAudio] Start stream for player failed: %i", result);
+	} else {
+		ms_message("[AAudio] Player stream started");
 	}
 	
 	AAudioStreamBuilder_delete(builder);
@@ -468,7 +497,18 @@ static void android_snd_write_postprocess(MSFilter *obj) {
 	AAudioOutputContext *octx = (AAudioOutputContext*)obj->data;
 
 	aaudio_result_t result = AAudioStream_requestStop(octx->stream);
+	if (result != AAUDIO_OK) {
+		ms_error("[AAudio] Player stream stop failed: %i", result);
+	} else {
+		ms_message("[AAudio] Player stream stopped");
+	}
+
 	result = AAudioStream_close(octx->stream);
+	if (result != AAUDIO_OK) {
+		ms_error("[AAudio] Player stream close failed: %i", result);
+	} else {
+		ms_message("[AAudio] Player stream closed");
+	}
 }
 
 static MSFilterMethod android_snd_write_methods[] = {
