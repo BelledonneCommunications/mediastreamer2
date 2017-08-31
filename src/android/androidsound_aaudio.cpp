@@ -204,16 +204,7 @@ static aaudio_data_callback_result_t aaudio_recorder_callback(AAudioStream *stre
 	return AAUDIO_CALLBACK_RESULT_CONTINUE;	
 }
 
-static void aaudio_recorder_callback_error(AAudioStream *stream, void *userData, aaudio_result_t error) {
-	//AAudioInputContext *ictx = (AAudioInputContext *)userData;
-	ms_error("[AAudio] aaudio_recorder_callback_error has result: %i", error);
-
-	aaudio_stream_state_t streamState = AAudioStream_getState(stream);
-	if (streamState == AAUDIO_STREAM_STATE_DISCONNECTED) {
-		ms_warning("[AAudio] Recorder stream has disconnected");
-		//TODO restart
-	}
-}
+static void aaudio_recorder_callback_error(AAudioStream *stream, void *userData, aaudio_result_t error);
 
 static void aaudio_recorder_init(AAudioInputContext *ictx) {
 	AAudioStreamBuilder *builder;
@@ -255,6 +246,34 @@ static void aaudio_recorder_init(AAudioInputContext *ictx) {
 	AAudioStreamBuilder_delete(builder);
 }
 
+static void aaudio_recorder_close(AAudioInputContext *ictx) {
+	aaudio_result_t result = AAudioStream_requestStop(ictx->stream);
+	if (result != AAUDIO_OK) {
+		ms_error("[AAudio] Recorder stream stop failed: %i", result);
+	} else {
+		ms_message("[AAudio] Recorder stream stopped");
+	}
+
+	result = AAudioStream_close(ictx->stream);
+	if (result != AAUDIO_OK) {
+		ms_error("[AAudio] Recorder stream close failed: %i", result);
+	} else {
+		ms_message("[AAudio] Recorder stream closed");
+	}
+}
+
+static void aaudio_recorder_callback_error(AAudioStream *stream, void *userData, aaudio_result_t error) {
+	AAudioInputContext *ictx = (AAudioInputContext *)userData;
+	ms_error("[AAudio] aaudio_recorder_callback_error has result: %i", error);
+
+	aaudio_stream_state_t streamState = AAudioStream_getState(stream);
+	if (streamState == AAUDIO_STREAM_STATE_DISCONNECTED) {
+		ms_warning("[AAudio] Recorder stream has disconnected");
+		aaudio_recorder_close(ictx);
+		aaudio_recorder_init(ictx);
+	}
+}
+
 static void android_snd_read_preprocess(MSFilter *obj) {
 	AAudioInputContext *ictx = (AAudioInputContext*) obj->data;
 	ictx->mFilter = obj;
@@ -276,25 +295,9 @@ static void android_snd_read_process(MSFilter *obj) {
 	}
 }
 
-static void aaudio_recorder_stop(AAudioInputContext *ictx) {
-	aaudio_result_t result = AAudioStream_requestStop(ictx->stream);
-	if (result != AAUDIO_OK) {
-		ms_error("[AAudio] Recorder stream stop failed: %i", result);
-	} else {
-		ms_message("[AAudio] Recorder stream stopped");
-	}
-
-	result = AAudioStream_close(ictx->stream);
-	if (result != AAUDIO_OK) {
-		ms_error("[AAudio] Recorder stream close failed: %i", result);
-	} else {
-		ms_message("[AAudio] Recorder stream closed");
-	}
-}
-
 static void android_snd_read_postprocess(MSFilter *obj) {
 	AAudioInputContext *ictx = (AAudioInputContext*)obj->data;
-	aaudio_recorder_stop(ictx);	
+	aaudio_recorder_close(ictx);	
 
 	ms_ticker_set_synchronizer(obj->ticker, NULL);
 	ms_mutex_lock(&ictx->mutex);
