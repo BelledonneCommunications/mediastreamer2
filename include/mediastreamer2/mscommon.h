@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <ortp/port.h>
 #include <ortp/str_utils.h>
 #include <ortp/payloadtype.h>
+#include <ortp/logging.h>
 #include <time.h>
 #if defined(__APPLE__)
 #include "TargetConditionals.h"
