@@ -33,12 +33,14 @@ static const int default_dtmf_duration_ms=100; /*in milliseconds*/
 
 struct SenderData {
 	RtpSession *session;
+	queue_t smoothing_sendq; /*this queue is used to spread the sending of big amounts of data over several ticks, in order to avoid packet drops at router*/
 	uint32_t tsoff;
 	uint32_t last_ts;
 	int64_t last_sent_time;
 	int64_t last_rtp_stun_sent_time;
 	int64_t last_rtcp_stun_sent_time;
 	uint32_t skip_until;
+	size_t max_bytes_per_tick;
 	int rate;
 	int dtmf_duration;
 	int dtmf_ts_step;
@@ -103,7 +105,7 @@ static void sender_init(MSFilter * f)
 #ifndef MS2_WINDOWS_UNIVERSAL
 	tmp = getenv("MS2_RTP_FIXED_DELAY");
 #endif
-	
+	qinit(&d->smoothing_sendq);
 	d->session = NULL;
 	d->tsoff = 0;
 	d->skip_until = 0;
@@ -130,7 +132,7 @@ static void sender_init(MSFilter * f)
 static void sender_uninit(MSFilter * f)
 {
 	SenderData *d = (SenderData *) f->data;
-
+	flushq(&d->smoothing_sendq, FLUSHALL);
 	ms_free(d);
 }
 
@@ -239,6 +241,26 @@ static int sender_get_ch(MSFilter *f, void *arg) {
 	}
 	*(int *)arg = pt->channels;
 	return 0;
+}
+
+static void sender_preprocess(MSFilter *f){
+	SenderData *d = (SenderData *) f->data;
+	int max_bytes_per_tick;
+	
+	if (d->session){
+		PayloadType *pt = rtp_profile_get_payload(rtp_session_get_profile(d->session), rtp_session_get_send_payload_type(d->session));
+		int num_ticks_per_secs = 1000 / f->ticker->interval;
+		
+		d->max_bytes_per_tick = 0; /*0: no limit*/
+		
+		if (!pt || pt->type != PAYLOAD_VIDEO) return; /*we apply the smoothing only for video payload types*/
+		
+		max_bytes_per_tick = rtp_session_get_target_upload_bandwidth(d->session) / (8 * num_ticks_per_secs);
+		if (max_bytes_per_tick > 0){
+			d->max_bytes_per_tick = max_bytes_per_tick;
+			ms_message("MSRtpSend: setting max_bytes_per_tick to %i", max_bytes_per_tick);
+		}
+	}
 }
 
 /* the goal of that function is to return a absolute timestamp closest to real time, with respect of given packet_ts, which is a relative to an undefined origin*/
@@ -410,6 +432,22 @@ static void process_cn(MSFilter *f, SenderData *d, uint32_t timestamp, mblk_t *i
 	}
 }
 
+static void _sender_send_packets(SenderData *d, bool_t force){
+	size_t bytes = 0;
+	mblk_t *m;
+	
+	while( (m = getq(&d->smoothing_sendq)) != NULL){
+		bytes += msgdsize(m);
+		rtp_session_sendm_with_ts(d->session, m, mblk_get_timestamp_info(m));
+		if (d->max_bytes_per_tick != 0 && !force && bytes > d->max_bytes_per_tick){
+			if (!qempty(&d->smoothing_sendq)){
+				ms_message("MSRtpSend: delayed sending, [%i] packets remaning.", d->smoothing_sendq.q_mcount);
+			}
+			break;
+		}
+	}
+}
+
 static void _sender_process(MSFilter * f)
 {
 	SenderData *d = (SenderData *) f->data;
@@ -426,8 +464,13 @@ static void _sender_process(MSFilter * f)
 	}
 
 	ms_filter_lock(f);
-	im = ms_queue_get(f->inputs[0]);
-	do {
+	
+	if (!ms_queue_empty(f->inputs[0])){
+		/*if we have new packets to send, we must unsure first that packets delayed on the smoothing_sendq are sent immediately*/
+		_sender_send_packets(d, TRUE);
+	}
+	
+	while ((im = ms_queue_get(f->inputs[0])) != NULL){
 		mblk_t *header;
 
 		timestamp = get_cur_timestamp(f, im);
@@ -451,7 +494,8 @@ static void _sender_process(MSFilter * f)
 				rtp_set_markbit(header, mblk_get_marker_info(im));
 				header->b_cont = im;
 				mblk_meta_copy(im, header);
-				rtp_session_sendm_with_ts(s, header, timestamp);
+				mblk_set_timestamp_info(header, timestamp); /*set to remember the timestamp when calling rtp_session_sendm_with_ts()*/
+				putq(&d->smoothing_sendq, header);
 			} else if (d->mute==TRUE && d->skip == FALSE) {
 				process_cn(f, d, timestamp, im);
 				freemsg(im);
@@ -464,7 +508,8 @@ static void _sender_process(MSFilter * f)
 			// Send STUN packet as RTP keep alive even if there is no input
 			check_stun_sending(f);
 		}
-	}while ((im = ms_queue_get(f->inputs[0])) != NULL);
+	}
+	_sender_send_packets(d, FALSE); /*send the packets up to the limit max_bytes_per_tick*/
 
 	if (d->last_sent_time == -1) {
 		check_stun_sending(f);
@@ -542,7 +587,7 @@ MSFilterDesc ms_rtp_send_desc = {
 	1,
 	0,
 	sender_init,
-	NULL,
+	sender_preprocess,
 	sender_process,
 	NULL,
 	sender_uninit,
@@ -560,6 +605,7 @@ MSFilterDesc ms_rtp_send_desc = {
 	.ninputs = 1,
 	.noutputs = 0,
 	.init = sender_init,
+	.preprocess = sender_preprocess,
 	.process = sender_process,
 	.uninit = sender_uninit,
 	.methods = sender_methods,
