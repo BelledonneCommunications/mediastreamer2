@@ -256,6 +256,7 @@ static void sender_preprocess(MSFilter *f){
 		if (!pt || pt->type != PAYLOAD_VIDEO) return; /*we apply the smoothing only for video payload types*/
 		
 		max_bytes_per_tick = rtp_session_get_target_upload_bandwidth(d->session) / (8 * num_ticks_per_secs);
+		max_bytes_per_tick = max_bytes_per_tick * 2; /*arbitrary allow twice the average bitrate as peak*/
 		if (max_bytes_per_tick > 0){
 			d->max_bytes_per_tick = max_bytes_per_tick;
 			ms_message("MSRtpSend: setting max_bytes_per_tick to %i", max_bytes_per_tick);
@@ -437,12 +438,18 @@ static void _sender_send_packets(SenderData *d, bool_t force){
 	mblk_t *m;
 	
 	while( (m = getq(&d->smoothing_sendq)) != NULL){
-		bytes += msgdsize(m);
-		rtp_session_sendm_with_ts(d->session, m, mblk_get_timestamp_info(m));
+		mblk_t *header = rtp_session_create_packet(d->session, 12, NULL, 0);
+		rtp_set_markbit(header, mblk_get_marker_info(m));
+		mblk_meta_copy(m, header);
+		header->b_cont = m;
+
+		bytes += msgdsize(header) + 8 + 20; /*for ip-udp overhead*/
+		rtp_session_sendm_with_ts(d->session, header, mblk_get_timestamp_info(m));
 		if (d->max_bytes_per_tick != 0 && !force && bytes > d->max_bytes_per_tick){
+			/*
 			if (!qempty(&d->smoothing_sendq)){
 				ms_message("MSRtpSend: delayed sending, [%i] packets remaning.", d->smoothing_sendq.q_mcount);
-			}
+			}*/
 			break;
 		}
 	}
@@ -471,7 +478,6 @@ static void _sender_process(MSFilter * f)
 	}
 	
 	while ((im = ms_queue_get(f->inputs[0])) != NULL){
-		mblk_t *header;
 
 		timestamp = get_cur_timestamp(f, im);
 		
@@ -490,12 +496,8 @@ static void _sender_process(MSFilter * f)
 		}
 		if (im){
 			if (d->skip == FALSE && d->mute==FALSE){
-				header = rtp_session_create_packet(s, 12, NULL, 0);
-				rtp_set_markbit(header, mblk_get_marker_info(im));
-				header->b_cont = im;
-				mblk_meta_copy(im, header);
-				mblk_set_timestamp_info(header, timestamp); /*set to remember the timestamp when calling rtp_session_sendm_with_ts()*/
-				putq(&d->smoothing_sendq, header);
+				mblk_set_timestamp_info(im, timestamp); /*set to remember the timestamp when calling rtp_session_sendm_with_ts()*/
+				putq(&d->smoothing_sendq, im);
 			} else if (d->mute==TRUE && d->skip == FALSE) {
 				process_cn(f, d, timestamp, im);
 				freemsg(im);
