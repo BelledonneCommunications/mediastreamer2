@@ -243,23 +243,22 @@ static int sender_get_ch(MSFilter *f, void *arg) {
 	return 0;
 }
 
-static void sender_preprocess(MSFilter *f){
-	SenderData *d = (SenderData *) f->data;
-	int max_bytes_per_tick;
+static void update_max_bytes_per_tick(MSFilter *f, SenderData *d){
+	size_t max_bytes_per_tick = 0;
 	
 	if (d->session){
 		PayloadType *pt = rtp_profile_get_payload(rtp_session_get_profile(d->session), rtp_session_get_send_payload_type(d->session));
 		int num_ticks_per_secs = 1000 / f->ticker->interval;
 		
-		d->max_bytes_per_tick = 0; /*0: no limit*/
+		if (pt && pt->type == PAYLOAD_VIDEO){
+			/*we apply the smoothing only for video payload types*/
 		
-		if (!pt || pt->type != PAYLOAD_VIDEO) return; /*we apply the smoothing only for video payload types*/
-		
-		max_bytes_per_tick = rtp_session_get_target_upload_bandwidth(d->session) / (8 * num_ticks_per_secs);
-		max_bytes_per_tick = max_bytes_per_tick * 2; /*arbitrary allow twice the average bitrate as peak*/
-		if (max_bytes_per_tick > 0){
-			d->max_bytes_per_tick = max_bytes_per_tick;
-			ms_message("MSRtpSend: setting max_bytes_per_tick to %i", max_bytes_per_tick);
+			max_bytes_per_tick = rtp_session_get_target_upload_bandwidth(d->session) / (8 * num_ticks_per_secs);
+			max_bytes_per_tick = max_bytes_per_tick * 2; /*arbitrary allow twice the average bitrate as peak*/
+			if (max_bytes_per_tick != d->max_bytes_per_tick){
+				ms_message("MSRtpSend: setting max_bytes_per_tick to %i", (int)max_bytes_per_tick);
+				d->max_bytes_per_tick = max_bytes_per_tick;
+			}
 		}
 	}
 }
@@ -436,6 +435,7 @@ static void process_cn(MSFilter *f, SenderData *d, uint32_t timestamp, mblk_t *i
 static void _sender_send_packets(SenderData *d, bool_t force){
 	size_t bytes = 0;
 	mblk_t *m;
+	int count = 0;
 	
 	while( (m = getq(&d->smoothing_sendq)) != NULL){
 		mblk_t *header = rtp_session_create_packet(d->session, 12, NULL, 0);
@@ -445,6 +445,7 @@ static void _sender_send_packets(SenderData *d, bool_t force){
 
 		bytes += msgdsize(header) + 8 + 20; /*for ip-udp overhead*/
 		rtp_session_sendm_with_ts(d->session, header, mblk_get_timestamp_info(m));
+		count++;
 		if (d->max_bytes_per_tick != 0 && !force && bytes > d->max_bytes_per_tick){
 			/*
 			if (!qempty(&d->smoothing_sendq)){
@@ -452,6 +453,9 @@ static void _sender_send_packets(SenderData *d, bool_t force){
 			}*/
 			break;
 		}
+	}
+	if (force && count > 0){
+		ms_message("MSRtpSend: forced to send [%i] packets due to two frames colliding.", count);
 	}
 }
 
@@ -472,6 +476,8 @@ static void _sender_process(MSFilter * f)
 
 	ms_filter_lock(f);
 	
+	update_max_bytes_per_tick(f, d);
+
 	if (!ms_queue_empty(f->inputs[0])){
 		/*if we have new packets to send, we must unsure first that packets delayed on the smoothing_sendq are sent immediately*/
 		_sender_send_packets(d, TRUE);
@@ -589,7 +595,7 @@ MSFilterDesc ms_rtp_send_desc = {
 	1,
 	0,
 	sender_init,
-	sender_preprocess,
+	NULL,
 	sender_process,
 	NULL,
 	sender_uninit,
@@ -607,7 +613,6 @@ MSFilterDesc ms_rtp_send_desc = {
 	.ninputs = 1,
 	.noutputs = 0,
 	.init = sender_init,
-	.preprocess = sender_preprocess,
 	.process = sender_process,
 	.uninit = sender_uninit,
 	.methods = sender_methods,
