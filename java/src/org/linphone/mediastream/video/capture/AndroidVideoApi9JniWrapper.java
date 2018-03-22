@@ -75,6 +75,11 @@ public class AndroidVideoApi9JniWrapper {
 		params.setPreviewSize(width, height);
 		int[] chosenFps = findClosestEnclosingFpsRange(fps*1000, params.getSupportedPreviewFpsRange());
 		params.setPreviewFpsRange(chosenFps[0], chosenFps[1]);
+
+		if(camera.getParameters().getSupportedFocusModes().contains(Parameters.FOCUS_MODE_CONTINUOUS_VIDEO)) {
+            params.setFocusMode(Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
+        }
+
 		camera.setParameters(params);
 
 		int bufferSize = (width * height * ImageFormat.getBitsPerPixel(params.getPreviewFormat())) / 8;
