@@ -19,185 +19,185 @@ msgstr ""
 
 #: ../src/alaw.c:144 ../src/alaw.c:162
 msgid "ITU-G.711 alaw encoder"
-msgstr ""
+msgstr "ITU-G.711 alawエンコーダー"
 
 #: ../src/alaw.c:194 ../src/alaw.c:211
 msgid "ITU-G.711 alaw decoder"
-msgstr ""
+msgstr "ITU-G.711 alawデコーダー"
 
 #: ../src/alsa.c:1014
 msgid "Alsa sound source"
-msgstr ""
+msgstr "Alsa音声ソース"
 
 #: ../src/alsa.c:1117
 msgid "Alsa sound output"
-msgstr ""
+msgstr "Alsa音声出力"
 
 #: ../src/aqsnd.c:1020
 msgid "Sound capture filter for MacOS X Audio Queue Service"
-msgstr ""
+msgstr "MacOS X Audio Queue Service用音声録音フィルター"
 
 #: ../src/aqsnd.c:1044
 msgid "Sound playback filter for MacOS X Audio Queue Service"
-msgstr ""
+msgstr "MacOS X Audio Queue Service用音声再生フィルター"
 
 #: ../src/dtmfgen.c:302 ../src/dtmfgen.c:321
 msgid "DTMF generator"
-msgstr ""
+msgstr "DTMFジェネレータ"
 
 #: ../src/gsm.c:120 ../src/gsm.c:138
 msgid "The GSM full-rate codec"
-msgstr ""
+msgstr "GSMフルレートコーデック"
 
 #: ../src/gsm.c:187 ../src/gsm.c:205
 msgid "The GSM codec"
-msgstr ""
+msgstr "GSMコーデック"
 
 #: ../src/macsnd.c:630
 msgid "Sound capture filter for MacOS X Audio Unit"
-msgstr ""
+msgstr "MacOS X Audio Unit用音声録音フィルター"
 
 #: ../src/macsnd.c:645
 msgid "Sound playback filter for MacOS X Audio Unit"
-msgstr ""
+msgstr "MacOS X Audio Unit用音声再生フィルター"
 
 #: ../src/msconf.c:784 ../src/msconf.c:802
 msgid "A filter to make conferencing"
-msgstr ""
+msgstr "電話会議作成用フィルタ"
 
 #: ../src/msfileplayer.c:315 ../src/msfileplayer.c:333
 msgid "Raw files and wav reader"
-msgstr ""
+msgstr "RAWファイルとWAVリーダー"
 
 #: ../src/msfilerec.c:174 ../src/msfilerec.c:192 ../src/msfilerec_win.c:216
 #: ../src/msfilerec_win.c:234
 msgid "Wav file recorder"
-msgstr ""
+msgstr "WAVファイルレコーダー"
 
 #: ../src/msjoin.c:47 ../src/msjoin.c:65
 msgid "A filter that send several inputs to one output."
-msgstr ""
+msgstr "1つの出力に複数の入力を送信するフィルタ"
 
 #: ../src/msresample.c:181 ../src/msresample.c:199
 msgid "Audio resampler"
-msgstr ""
+msgstr "オーディオリサンプラー"
 
 #: ../src/msrtp.c:377 ../src/msrtp.c:396
 msgid "RTP output filter"
-msgstr ""
+msgstr "RTP出力フィルター"
 
 #: ../src/msrtp.c:517 ../src/msrtp.c:535
 msgid "RTP input filter"
-msgstr ""
+msgstr "RTP入力フィルター"
 
 #: ../src/msspeex.c:421 ../src/msspeex.c:439 ../src/msspeex.c:616
 #: ../src/msspeex.c:635
 msgid "The free and wonderful speex codec"
-msgstr ""
+msgstr "無料で素晴らしいspeexコーデック"
 
 #: ../src/msvolume.c:527 ../src/msvolume.c:542
 msgid "A filter that controls and measure sound volume"
-msgstr ""
+msgstr "音量を制御して測定するフィルタ"
 
 #: ../src/msv4l.c:1012
 msgid "A video4linux compatible source filter to stream pictures."
-msgstr ""
+msgstr "画像をストリーミングするためのvideo4linux互換のソースフィルタ"
 
 #: ../src/msv4l2.c:588
 msgid "A filter to grab pictures from Video4Linux2-powered cameras"
-msgstr ""
+msgstr "Video4Linux2を搭載したカメラから画像を取得するフィルタ"
 
 #: ../src/nowebcam.c:1854
 msgid "A filter that outputs a static image."
-msgstr ""
+msgstr "静止画像を出力するフィルタ"
 
 #: ../src/pixconv.c:129 ../src/pixconv.c:147
 msgid "A pixel format converter"
-msgstr ""
+msgstr "ピクセルフォーマットコンバータ"
 
 #: ../src/sizeconv.c:202
 msgid "A video size converter"
-msgstr ""
+msgstr "ビデオサイズコンバータ"
 
 #: ../src/sizeconv.c:220
 msgid "a small video size converter"
-msgstr ""
+msgstr "小さなビデオサイズコンバータ"
 
 #: ../src/speexec.c:474 ../src/speexec.c:492
 msgid "Echo canceller using speex library"
-msgstr ""
+msgstr "speexライブラリを使用したエコーキャンセラ"
 
 #: ../src/tee.c:81 ../src/tee.c:99
 msgid "A filter that reads from input and copy to its multiple outputs."
-msgstr ""
+msgstr "入力から読み込んで複数の出力にコピーするフィルタ。"
 
 #: ../src/theora.c:376
 msgid "The theora video encoder from xiph.org"
-msgstr ""
+msgstr "xiph.org提供のtheoraビデオエンコーダ"
 
 #: ../src/theora.c:394
 msgid "The open-source and royalty-free 'theora' video codec from xiph.org"
-msgstr ""
+msgstr "xiph.org提供のオープンソースでロイヤリティフリーの'theora'ビデオコーデック"
 
 #: ../src/theora.c:562 ../src/theora.c:580
 msgid "The theora video decoder from xiph.org"
-msgstr ""
+msgstr "xiph.org提供のtheoraビデオデコーダ"
 
 #: ../src/ulaw.c:147 ../src/ulaw.c:165
 msgid "ITU-G.711 ulaw encoder"
-msgstr ""
+msgstr "ITU-G.711 ulawエンコーダー"
 
 #: ../src/ulaw.c:197 ../src/ulaw.c:215
 msgid "ITU-G.711 ulaw decoder"
-msgstr ""
+msgstr "ITU-G.711 ulawデコーダー"
 
 #: ../src/videodec.c:713 ../src/videodec.c:729 ../src/videodec.c:812
 #: ../src/videodec.c:828
 msgid "A H.263 decoder using ffmpeg library"
-msgstr ""
+msgstr "ffmpegライブラリを使用したH.263デコーダ"
 
 #: ../src/videodec.c:746
 msgid "A MPEG4 decoder using ffmpeg library"
-msgstr ""
+msgstr "ffmpegライブラリを使用したMPEG4デコーダ"
 
 #: ../src/videodec.c:762
 msgid "A RTP/JPEG decoder using ffmpeg library"
-msgstr ""
+msgstr "ffmpegライブラリを使用したRTP/JPEGデコーダ"
 
 #: ../src/videodec.c:778
 msgid "A MJPEG decoder using ffmpeg library"
-msgstr ""
+msgstr "ffmpegライブラリを使用したMJPEGデコーダ"
 
 #: ../src/videodec.c:794
 msgid "A snow decoder using ffmpeg library"
-msgstr ""
+msgstr "ffmpegライブラリを使用したsnowデコーダ"
 
 #: ../src/videoenc.c:904 ../src/videoenc.c:986
 msgid "A video H.263 encoder using ffmpeg library."
-msgstr ""
+msgstr "ffmpegライブラリを使用したH.263ビデオデコーダ"
 
 #: ../src/videoenc.c:920
 msgid ""
 "A video H.263 encoder using ffmpeg library. It is compliant with old RFC2190 "
 "spec."
-msgstr ""
+msgstr "ffmpegライブラリを使用したH.263ビデオデコーダ。それは古いRFC2190仕様に準拠しています。"
 
 #: ../src/videoenc.c:936 ../src/videoenc.c:1018
 msgid "A video MPEG4 encoder using ffmpeg library."
-msgstr ""
+msgstr "ffmpegライブラリを使用したMPEG4ビデオエンコーダ"
 
 #: ../src/videoenc.c:952
 msgid "A video snow encoder using ffmpeg library."
-msgstr ""
+msgstr "ffmpegライブラリを使用したsnowビデオエンコーダ"
 
 #: ../src/videoenc.c:968
 msgid "A RTP/MJPEG encoder using ffmpeg library."
-msgstr ""
+msgstr "ffmpegライブラリを使用したRTP/MJPEGエンコーダ"
 
 #: ../src/videoenc.c:1002
 msgid ""
 "A video H.263 encoder using ffmpeg library, compliant with old RFC2190 spec."
-msgstr ""
+msgstr "ffmpegライブラリを使用したH.263ビデオデコーダ。それは古いRFC2190仕様に準拠しています。"
 
 #: ../src/videoenc.c:1034
 msgid ""
@@ -206,91 +206,91 @@ msgid ""
 "codec. It is implemented within the ffmpeg project.\n"
 "However it is under development, quite unstable and compatibility with other "
 "versions cannot be guaranteed."
-msgstr ""
+msgstr "snowコーデックはロイヤリティフリーでオープンソースです。\nこれは、最も有望なビデオコーデックの1つになる革新的な技術を使用しています。ffmpegプロジェクト内で実装されています。\nしかし、それは開発中で、かなり不安定で、他のバージョンとの互換性は保証できません。"
 
 #: ../src/videoenc.c:1054
 msgid "A MJPEG encoder using ffmpeg library."
-msgstr ""
+msgstr "ffmpegライブラリを使用するMJPEGエンコーダ"
 
 #: ../src/videoout.c:1028
 msgid "A SDL-based video display"
-msgstr ""
+msgstr "SDLベースのビデオディスプレイ"
 
 #: ../src/wincevideods.c:969 ../src/wincevideods.c:987 ../src/winvideo.c:596
 #: ../src/winvideo.c:614 ../src/winvideods.c:1385 ../src/winvideods.c:1403
 msgid "A video4windows compatible source filter to stream pictures."
-msgstr ""
+msgstr "ピクチャをストリームするvideo4windows互換のソースフィルタ"
 
 #: ../src/winvideo2.c:436 ../src/winvideo2.c:454
 msgid "A video for windows (vfw.h) based source filter to grab pictures."
-msgstr ""
+msgstr "画像を取得するためのWindowsベースのソースフィルタ用ビデオ(vfw.h)"
 
 #: ../src/ice.c:1349 ../src/ice.c:1367
 msgid "ICE filter"
-msgstr ""
+msgstr "ICEフィルタ"
 
 #: ../src/void.c:35 ../src/void.c:52
 msgid "A filter that trashes its input (useful for terminating some graphs)."
-msgstr ""
+msgstr "入力を切り捨てるフィルタ(いくつかのグラフを終了するのに便利です)"
 
 #: ../src/equalizer.c:338 ../src/equalizer.c:356
 msgid "Parametric sound equalizer."
-msgstr ""
+msgstr "パラメトリックな音声イコライザー"
 
 #: ../src/msdscap-mingw.cc:1039
 msgid "A webcam grabber based on directshow."
-msgstr ""
+msgstr "DirectShowに基づいたウェブカメラグラバー"
 
 #: ../src/drawdib-display.c:552 ../src/drawdib-display.c:570
 msgid "A video display based on windows DrawDib api"
-msgstr ""
+msgstr "Windowsに基づくビデオディスプレイDrawDib API"
 
 #: ../src/audiomixer.c:296 ../src/audiomixer.c:315
 msgid "A filter that mixes down 16 bit sample audio streams"
-msgstr ""
+msgstr "16bitサンプルオーディオストリームをミックスダウンするフィルタ"
 
 #: ../src/chanadapt.c:110 ../src/chanadapt.c:128
 msgid "A filter that converts from mono to stereo and vice versa."
-msgstr ""
+msgstr "モノラルからステレオに、またその逆に変換するフィルタ"
 
 #: ../src/itc.c:98 ../src/itc.c:116 ../src/itc.c:198 ../src/itc.c:216
 msgid "Inter ticker communication filter."
-msgstr ""
+msgstr "内部クロック通信フィルタ"
 
 #: ../src/extdisplay.c:64 ../src/extdisplay.c:81
 msgid "A display filter sending the buffers to draw to the upper layer"
-msgstr ""
+msgstr "上位層に描画するためのバッファを送る表示フィルタ"
 
 #: ../src/msiounit.c:634
 msgid "Sound capture filter for MacOS X Audio Unit Service"
-msgstr ""
+msgstr "MacOS X Audio Unitサービス用音声録音フィルタ"
 
 #: ../src/msiounit.c:648
 msgid "Sound playback filter for MacOS X Audio Unit Service"
-msgstr ""
+msgstr "MacOS X Audio Unitサービス用音声再生フィルタ"
 
 #: ../src/x11video.c:529
 msgid "A video display using X11+Xv"
-msgstr ""
+msgstr "X11+Xvを使ったビデオディスプレイ"
 
 #. .id=
 #. .name=
 #. .text=
 #: ../src/msandroid.cpp:516
 msgid "Sound capture filter for Android"
-msgstr ""
+msgstr "Android用音声録音フィルタ"
 
 #. .id=
 #. .name=
 #. .text=
 #: ../src/msandroid.cpp:826
 msgid "Sound playback filter for Android"
-msgstr ""
+msgstr "Android用音声再生フィルタ"
 
 #: ../src/msandroidvideo.cpp:367
 msgid "A filter that captures Android video."
-msgstr ""
+msgstr "Androidビデオを録画するフィルタ"
 
 #: ../src/vp8.c:350 ../src/vp8.c:366
 msgid "A video VP8 encoder using libvpx library."
-msgstr ""
+msgstr "libvpxライブラリを使ったVP8ビデオエンコーダ"
