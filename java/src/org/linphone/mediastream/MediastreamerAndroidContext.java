@@ -71,7 +71,7 @@ public class MediastreamerAndroidContext {
 		{
 			AudioManager audiomanager = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
 			//setSpeakerphoneOn for special device to enable choose the audio input source
-			if(factory.getDeviceFlags()==DEVICE_USE_ANDROID_CAMCORDER) {
+			if(factory.getDeviceFlags() & DEVICE_USE_ANDROID_CAMCORDER) {
 				audiomanager.setSpeakerphoneOn(true);
 			}
 
