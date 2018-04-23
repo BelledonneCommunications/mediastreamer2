@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <mediastreamer2/msfactory.h>
 #include <mediastreamer2/devices.h>
 
+extern "C" {
 static const char* GetStringUTFChars(JNIEnv* env, jstring string) {
 	const char *cstring = string ? env->GetStringUTFChars(string, NULL) : NULL;
 	return cstring;
@@ -42,5 +43,10 @@ JNIEXPORT void JNICALL Java_org_linphone_mediastream_Factory_setDeviceInfo(JNIEn
 
     ReleaseStringUTFChars(env, jmanufacturer, manufacturer);
     ReleaseStringUTFChars(env, jmodel, model);
-    ReleaseStringUTFChars(env, jplatform, platform);
+		ReleaseStringUTFChars(env, jplatform, platform);
+}
+
+JNIEXPORT jint JNICALL Java_org_linphone_mediastream_Factory_getDeviceFlags(JNIEnv* env, jobject obj, jlong factoryPtr) {
+		return ms_devices_info_get_sound_device_description(((MSFactory *) factoryPtr)->devices_info)->flags;
+}
 }
