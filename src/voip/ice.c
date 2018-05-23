@@ -1269,11 +1269,11 @@ static int ice_send_message_to_socket(RtpTransport * rtptp, char* buf, size_t le
 	mblk_t *m = rtp_session_create_packet_raw((const uint8_t *)buf, len);
 	int err;
 	struct addrinfo *v6ai = NULL;
-	
+
 	memcpy(&m->net_addr, from, fromlen);
 	m->net_addrlen = fromlen;
 	if ((rtptp->session->rtp.gs.sockfamily == AF_INET6) && (to->sa_family == AF_INET)) {
-		
+
 		char to_addr_str[64];
 		int to_port = 0;
 		memset(to_addr_str, 0, sizeof(to_addr_str));
@@ -2396,7 +2396,7 @@ static bool_t ice_handle_received_turn_allocate_success_response(IceCheckList *c
 						candidate = ice_add_local_candidate(cl, "srflx", ms_stun_family_to_af(srflx_addr.family), srflx_addr_str, srflx_port, componentID, candidate);
 						ms_stun_address_to_printable_ip_address(&srflx_addr, srflx_addr_str, sizeof(srflx_addr_str));
 						ms_message("ice: Add candidate obtained by STUN/TURN: %s:srflx", srflx_addr_str);
-						
+
 						if (cl->session->turn_enabled) {
 							request->turn_context->stats.nb_successful_allocate++;
 							ice_schedule_turn_allocation_refresh(cl, componentID, ms_stun_message_get_lifetime(msg));
@@ -2706,7 +2706,7 @@ void ice_handle_stun_packet(IceCheckList *cl, RtpSession *rtp_session, const Ort
 				ms_warning("ice: Recv unknown STUN success response: %s <-- %s [%s]", recv_addr_str, source_addr_str, tr_id_str);
 				break;
 		}
-		
+
 	} else if (ms_stun_message_is_error_response(msg)) {
 		ice_set_transaction_response_time(cl, &tr_id, evt_data->ts);
 		ms_message("ice: Recv error response: %s <-- %s [%s]", recv_addr_str, source_addr_str, tr_id_str);
@@ -2912,7 +2912,7 @@ void ice_add_losing_pair(IceCheckList *cl, uint16_t componentID, int local_famil
 	elem = bctbx_list_find_custom(cl->local_candidates, (bctbx_compare_func)ice_find_candidate_from_transport_address, &taddr);
 	if (elem == NULL) {
 		/* Workaround to detect if the local candidate that has not been found has been added by the proxy server.
-		   If that is the case, add it to the local candidates now. */
+			 If that is the case, add it to the local candidates now. */
 		elem = bctbx_list_find_custom(cl->remote_candidates, (bctbx_compare_func)ice_find_candidate_from_ip_address, local_addr);
 		if (elem != NULL) {
 			tc.componentID = componentID;
@@ -3451,7 +3451,7 @@ static void ice_conclude_waiting_frozen_and_inprogress_pairs(const IceValidCandi
 		bctbx_list_t *elem;
 		ice_remove_waiting_and_frozen_pairs_from_list(&cl->check_list, valid_pair->valid->local->componentID);
 		ice_remove_waiting_and_frozen_pairs_from_list(&cl->triggered_checks_queue, valid_pair->valid->local->componentID);
-		
+
 		for (elem = cl->check_list ; elem != NULL; elem = elem->next){
 			IceCandidatePair *pair = (IceCandidatePair*) elem->data;
 			if ((pair->state == ICP_InProgress) && (pair->local->componentID == valid_pair->valid->local->componentID)
@@ -3774,7 +3774,18 @@ static int ice_find_gathering_stun_server_request(const IceStunServerRequest *re
 static void ice_remove_gathering_stun_server_requests(IceCheckList *cl) {
 	bctbx_list_t *elem = cl->stun_server_requests;
 	while (elem != NULL) {
+		/* FIXME: Temporary workaround for -Wcast-function-type. */
+		#if __GNUC__ >= 8
+			_Pragma("GCC diagnostic push")
+			_Pragma("GCC diagnostic ignored \"-Wcast-function-type\"")
+		#endif // if __GNUC__ >= 8
+
 		elem = bctbx_list_find_custom(cl->stun_server_requests, (bctbx_compare_func)ice_find_gathering_stun_server_request, NULL);
+
+		#if __GNUC__ >= 8
+			_Pragma("GCC diagnostic pop")
+		#endif // if __GNUC__ >= 8
+
 		if (elem != NULL) {
 			IceStunServerRequest *request = (IceStunServerRequest *)elem->data;
 			ice_stun_server_request_free(request);
@@ -3893,7 +3904,18 @@ void ice_check_list_process(IceCheckList *cl, RtpSession *rtp_session)
 
 	/* Send STUN/TURN server requests (to gather candidates, create/refresh TURN permissions, refresh TURN allocations or bind TURN channels). */
 	bctbx_list_for_each2(cl->stun_server_requests, (void (*)(void*,void*))ice_send_stun_server_requests, cl);
+
+	/* FIXME: Temporary workaround for -Wcast-function-type. */
+	#if __GNUC__ >= 8
+		_Pragma("GCC diagnostic push")
+		_Pragma("GCC diagnostic ignored \"-Wcast-function-type\"")
+	#endif // if __GNUC__ >= 8
+
 	cl->stun_server_requests = bctbx_list_remove_custom(cl->stun_server_requests, (bctbx_compare_func)ice_compare_stun_server_requests_to_remove, NULL);
+
+	#if __GNUC__ >= 8
+		_Pragma("GCC diagnostic pop")
+	#endif // if __GNUC__ >= 8
 
 	/* Send event if needed. */
 	if ((cl->session->send_event == TRUE) && (ice_compare_time(curtime, cl->session->event_time) >= 0)) {
