@@ -138,7 +138,7 @@ bool_t ms_media_recorder_open(MSMediaRecorder *obj, const char *filepath) {
     _create_sources(obj);
     _set_pin_fmt(obj);
 	_create_encoders(obj);
-    //ms_filter_add_notify_callback(obj->recorder, _recorder_callback, obj, TRUE);
+    ms_filter_add_notify_callback(obj->recorder, _recorder_callback, obj, TRUE);
 	if(!_link_all(obj)) {
 		ms_error("Cannot open %s. Could not build playing graph", filepath);
 		_destroy_graph(obj);
@@ -279,13 +279,15 @@ static void _create_sources(MSMediaRecorder *obj) {
 }
 
 static void _set_pin_fmt(MSMediaRecorder *obj) {
-    MSPinFormat audio_pin;
+    int nchannels, sample_rate;
     switch(obj->format) {
         case MS_FILE_FORMAT_WAVE:
-            ms_filter_call_method(obj->audio_source, MS_FILTER_GET_OUTPUT_FMT, &audio_pin);
-            obj->audio_pin_fmt = audio_pin;
+            ms_filter_call_method(obj->audio_source, MS_FILTER_GET_SAMPLE_RATE, &sample_rate);
+            ms_filter_call_method(obj->audio_source, MS_FILTER_GET_NCHANNELS, &nchannels);
+            ms_filter_call_method(obj->recorder, MS_FILTER_SET_SAMPLE_RATE, &sample_rate);
+            ms_filter_call_method(obj->recorder, MS_FILTER_SET_NCHANNELS, &nchannels);
             obj->audio_pin_fmt.pin = 0;
-            obj->audio_pin_fmt.fmt = ms_factory_get_audio_format(obj->factory, "pcm", 16000, 2, NULL);
+            obj->audio_pin_fmt.fmt = ms_factory_get_audio_format(obj->factory, "pcm", sample_rate, nchannels, NULL);
             break;
         case MS_FILE_FORMAT_MATROSKA:
             if(obj->snd_card) {
