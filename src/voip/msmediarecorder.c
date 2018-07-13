@@ -259,7 +259,6 @@ static void _create_sources(MSMediaRecorder *obj) {
                 obj->video_source = ms_web_cam_create_reader(obj->web_cam);
                 if(obj->video_source) {
                     if(obj->window_id) ms_filter_call_method(obj->video_source, MS_VIDEO_DISPLAY_SET_NATIVE_WINDOW_ID, &obj->window_id);
-                    ms_filter_call_method(obj->video_source, MS_FILTER_SET_VIDEO_SIZE, &MS_VIDEO_SIZE_VGA);
                 } else {
                     ms_error("Could not create video source: %s", obj->web_cam->name);
                 }
