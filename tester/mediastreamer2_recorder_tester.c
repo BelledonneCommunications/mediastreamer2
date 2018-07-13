@@ -118,8 +118,8 @@ static void record_mkv_h264(void) {
 }
 
 static test_t tests[] = {
-	//TEST_NO_TAG("Record .wav"                        , record_wav),
-    //TEST_NO_TAG("Record .mkv vp8"                    , record_mkv_vp8),
+	TEST_NO_TAG("Record .wav"                        , record_wav),
+    TEST_NO_TAG("Record .mkv vp8"                    , record_mkv_vp8),
     TEST_NO_TAG("Record .mkv h264"                   , record_mkv_h264),
 };
 
