@@ -100,19 +100,19 @@ static void record_file(const char *filepath, RecorderTestFlags flags) {
 }
 
 static void record_wav(void) {
-    char* file = bc_tester_res("test_record_wav.wav");
+    char* file = bc_tester_res("records/test_record_wav.wav");
     RecorderTestFlags flags = ms_media_recorder_matroska_supported() ? RECORDER_TEST_NONE : RECORDER_TEST_UNSUPPORTED_FORMAT;
     record_file(file, flags);
 }
 
 static void record_mkv_vp8(void) {
-    char* file = bc_tester_res("test_record_mkv_vp8.mkv");
+    char* file = bc_tester_res("records/test_record_mkv_vp8.mkv");
     RecorderTestFlags flags = ms_media_recorder_matroska_supported() ? RECORDER_TEST_NONE : RECORDER_TEST_UNSUPPORTED_FORMAT;
     record_file(file, flags);
 }
 
 static void record_mkv_h264(void) {
-    char* file = bc_tester_res("test_record_mkv_h264.mkv");
+    char* file = bc_tester_res("records/test_record_mkv_h264.mkv");
     RecorderTestFlags flags = ms_media_recorder_matroska_supported() ? RECORDER_TEST_NONE : RECORDER_TEST_UNSUPPORTED_FORMAT;
     record_file(file, flags | RECORDER_TEST_H264);
 }

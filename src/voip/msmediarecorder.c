@@ -59,8 +59,6 @@ static void _destroy_graph(MSMediaRecorder *obj);
 static bool_t _link_all(MSMediaRecorder *obj);
 static void _unlink_all(MSMediaRecorder *obj);
 
-static void _recorder_callback(void *ud, MSFilter *f, unsigned int id, void *arg);
-
 const char *get_filename_ext(const char *filename) {
     const char *dot = strrchr(filename, '.');
     if(!dot || dot == filename) return "";
@@ -138,7 +136,6 @@ bool_t ms_media_recorder_open(MSMediaRecorder *obj, const char *filepath) {
     _create_sources(obj);
     _set_pin_fmt(obj);
 	_create_encoders(obj);
-    ms_filter_add_notify_callback(obj->recorder, _recorder_callback, obj, TRUE);
 	if(!_link_all(obj)) {
 		ms_error("Cannot open %s. Could not build playing graph", filepath);
 		_destroy_graph(obj);
@@ -153,7 +150,6 @@ bool_t ms_media_recorder_open(MSMediaRecorder *obj, const char *filepath) {
 void ms_media_recorder_close(MSMediaRecorder *obj) {
 	if(obj->is_open) {
 		ms_ticker_detach(obj->ticker, obj->recorder);
-        ms_filter_remove_notify_callback(obj->recorder, _recorder_callback, obj);
 		ms_filter_call_method_noarg(obj->recorder, MS_RECORDER_CLOSE);
 		_unlink_all(obj);
 		_destroy_graph(obj);
@@ -295,11 +291,9 @@ static void _set_pin_fmt(MSMediaRecorder *obj) {
             }
             if(obj->web_cam) {
                 obj->video_pin_fmt.pin = 1;
-                MSVideoSize video_size;
-                int video_fps;
-                ms_filter_call_method(obj->video_source, MS_FILTER_GET_VIDEO_SIZE, &video_size);
-                ms_filter_call_method(obj->video_source, MS_FILTER_GET_FPS, &video_fps);
-                obj->video_pin_fmt.fmt = ms_factory_get_video_format(obj->factory, obj->video_codec, video_size, video_fps, NULL);
+                MSVideoSize video_size = MS_VIDEO_SIZE_VGA;
+                float fps = 30;
+                obj->video_pin_fmt.fmt = ms_factory_get_video_format(obj->factory, obj->video_codec, video_size, fps, NULL);
             }
             break;
         default:
@@ -360,10 +354,4 @@ static void _unlink_all(MSMediaRecorder *obj) {
         if(obj->video_encoder) ms_connection_helper_unlink(&helper, obj->video_encoder, 0, 0);
         ms_connection_helper_unlink(&helper, obj->recorder, obj->video_pin_fmt.pin, -1);
     }
-}
-
-static void _recorder_callback(void *ud, MSFilter *f, unsigned int id, void *arg) {
-    MSMediaRecorder *obj = (MSMediaRecorder *)ud;
-    ms_message("On passe ici\n");
-    ms_filter_call_method_noarg(obj->video_encoder, MS_VIDEO_ENCODER_REQ_VFU);
 }
