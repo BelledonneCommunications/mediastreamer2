@@ -198,6 +198,15 @@ MSFileFormat ms_media_recorder_get_file_format(const MSMediaRecorder *obj) {
 	return obj->format;
 }
 
+void ms_media_recorder_remove_file(MSMediaRecorder *obj, const char *filepath) {
+    ms_message("Removing %s.", filepath);
+    if(access(filepath, F_OK | W_OK) == 0) {
+        remove(filepath);
+    } else {
+        ms_warning("No existing file at %s, doing nothing.", filepath);
+    }
+}
+
 static void _create_encoders(MSMediaRecorder *obj) {
     // In short : if wave: no encoder. If mkv, "opus" for audio, "vp8" or "h264"
     int source_sample_rate, sample_rate, source_nchannels, nchannels;

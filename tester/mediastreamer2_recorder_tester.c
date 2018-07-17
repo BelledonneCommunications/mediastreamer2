@@ -95,7 +95,7 @@ static void record_file(const char *filepath, RecorderTestFlags flags) {
     
 	ms_media_recorder_close(file_recorder);
 	BC_ASSERT_EQUAL(ms_media_recorder_get_state(file_recorder), MSRecorderClosed, int, "%d");
-
+    //ms_media_recorder_remove_file(file_recorder, filepath);
 	ms_media_recorder_free(file_recorder);
 }
 
