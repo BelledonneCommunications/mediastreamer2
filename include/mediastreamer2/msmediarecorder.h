@@ -111,13 +111,6 @@ MS2_PUBLIC void ms_media_recorder_pause(MSMediaRecorder *obj);
 MS2_PUBLIC MSRecorderState ms_media_recorder_get_state(MSMediaRecorder *obj);
 
 /**
- * Get the duration of the opened media
- * @param obj The recorder
- * @return The duration in milliseconds. -1 if failure
- */
-MS2_PUBLIC int ms_media_recorder_get_duration(MSMediaRecorder *obj);
-
-/**
  * Check whether Matroska format is supported by the recorder
  * @return TRUE if supported
  */
@@ -129,6 +122,13 @@ MS2_PUBLIC bool_t ms_media_recorder_matroska_supported(void);
  * @return Format of the file. UNKNOWN_FORMAT when no file is opened
  */
 MS2_PUBLIC MSFileFormat ms_media_recorder_get_file_format(const MSMediaRecorder *obj);
+    
+/**
+ * Removes the file at provided path if it exists.
+ * @param obj Recorder
+ * @param filepath Path of the file to remove.
+ */
+MS2_PUBLIC void ms_media_recorder_remove_file(MSMediaRecorder *obj, const char *filepath);
 
 #ifdef __cplusplus
 }
