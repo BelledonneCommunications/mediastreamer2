@@ -29,7 +29,7 @@
 struct _MSMediaRecorder {
 	MSFactory *factory;
 	MSFilter *recorder;
-    
+
     //Audio filters
     MSFilter *audio_source;
     MSFilter *resampler;
@@ -38,7 +38,7 @@ struct _MSMediaRecorder {
     MSFilter *video_source;
 	MSFilter *video_encoder;
     MSFilter *video_sink;
-    
+
 	MSPinFormat audio_pin_fmt;
 	MSPinFormat video_pin_fmt;
 	MSTicker *ticker;
@@ -49,7 +49,7 @@ struct _MSMediaRecorder {
 	MSWebCam *web_cam;
 	char *video_display;
 	void *window_id;
-    char *video_codec;
+  char *video_codec;
 };
 
 static void _create_encoders(MSMediaRecorder *obj);
@@ -66,12 +66,12 @@ const char *get_filename_ext(const char *filename) {
 }
 
 
-MSMediaRecorder *ms_media_recorder_new(MSFactory* factory, MSSndCard *snd_card, MSWebCam *web_cam, const char *video_display_name, void *window_id, MSFileFormat format, char *video_codec) {
+MSMediaRecorder *ms_media_recorder_new(MSFactory* factory, MSSndCard *snd_card, MSWebCam *web_cam, const char *video_display_name, void *window_id, MSFileFormat format, const char *video_codec) {
 	MSMediaRecorder *obj = (MSMediaRecorder *)ms_new0(MSMediaRecorder, 1);
 	obj->ticker = ms_ticker_new();
 	ms_ticker_set_name(obj->ticker, "Recorder");
 	obj->snd_card = snd_card;
-    obj->web_cam = web_cam;
+  obj->web_cam = web_cam;
 	if(video_display_name != NULL && strlen(video_display_name) > 0) {
 		obj->video_display = ms_strdup(video_display_name);
 		obj->window_id = window_id;
@@ -79,7 +79,7 @@ MSMediaRecorder *ms_media_recorder_new(MSFactory* factory, MSSndCard *snd_card, 
 	obj->factory = factory;
     obj->format = format;
     if (video_codec != NULL) {
-        obj->video_codec = video_codec;
+        obj->video_codec = ms_strdup(video_codec);
     }
 	return obj;
 }
@@ -88,6 +88,7 @@ void ms_media_recorder_free(MSMediaRecorder *obj) {
 	ms_media_recorder_close(obj);
 	ms_ticker_destroy(obj->ticker);
 	ms_free_if_not_null(obj->video_display);
+	ms_free_if_not_null(obj->video_codec);
 	ms_free(obj);
 }
 
@@ -98,7 +99,7 @@ void * ms_media_recorder_get_window_id(const MSMediaRecorder *obj) {
 bool_t ms_media_recorder_open(MSMediaRecorder *obj, const char *filepath) {
     const char *file_ext = get_filename_ext(filepath);
     if (!((strcmp(file_ext, "wav") == 0 && obj->format == MS_FILE_FORMAT_WAVE) || ((strcmp(file_ext, "mkv") == 0 && obj->format == MS_FILE_FORMAT_MATROSKA)))) {
-        ms_error("file format and file extension do not match");
+        ms_error("file format and file extension do not match, was expecting %s and got %s for filename: %s", (obj->format == MS_FILE_FORMAT_WAVE ? "wav" : "mkv"), file_ext, filepath);
         return FALSE;
     }
 	char *tmp;
@@ -224,7 +225,7 @@ static void _create_encoders(MSMediaRecorder *obj) {
                     nchannels = obj->audio_pin_fmt.fmt->nchannels;
                     ms_filter_call_method(obj->audio_encoder, MS_FILTER_SET_SAMPLE_RATE, &sample_rate);
                     ms_filter_call_method(obj->audio_encoder, MS_FILTER_SET_NCHANNELS, &nchannels);
-                    
+
                     ms_filter_call_method(obj->audio_source, MS_FILTER_GET_SAMPLE_RATE, &source_sample_rate);
                     ms_filter_call_method(obj->audio_source, MS_FILTER_GET_NCHANNELS, &source_nchannels);
                     if (source_sample_rate != sample_rate || source_nchannels != nchannels) {
@@ -271,7 +272,7 @@ static void _create_sources(MSMediaRecorder *obj) {
         case MS_FILE_FORMAT_WAVE:
             if(obj->snd_card) {
                 if((obj->audio_source = ms_snd_card_create_reader(obj->snd_card))) {
-                    
+
                 } else {
                     ms_error("Could not create audio source. Soundcard=%s", obj->snd_card->name);
                 }
@@ -331,7 +332,7 @@ static bool_t _link_all(MSMediaRecorder *obj) {
 		ms_error("Could not link graph. There is neither audio nor video source");
 		return FALSE;
 	}
-    
+
 	if(obj->audio_pin_fmt.fmt && obj->audio_source) {
 		ms_connection_helper_start(&helper);
 		ms_connection_helper_link(&helper, obj->audio_source, -1, 0);
