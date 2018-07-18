@@ -24,6 +24,7 @@
 #include <mediastreamer2/msinterfaces.h>
 #include <mediastreamer2/msvideo.h>
 #include <mediastreamer2/mswebcam.h>
+#include <mediastreamer2/msmediaplayer.h>
 
 /**
  * Media file recorder
@@ -37,12 +38,6 @@ typedef struct _MSMediaRecorder MSMediaRecorder;
 
  /**
  * End of Callbacks definitions */
-
-typedef enum {
-	MS_FILE_FORMAT_UNKNOWN,
-	MS_FILE_FORMAT_WAVE,
-	MS_FILE_FORMAT_MATROSKA
-} MSFileFormat;
 
 
 #ifdef __cplusplus
@@ -60,7 +55,7 @@ extern "C"{
  * @param video_codec Video codec if MKV file (h264 or vp8)
  * @return A pointer on the created MSMediaRecorder
  */
-MS2_PUBLIC MSMediaRecorder *ms_media_recorder_new(MSFactory *factory, MSSndCard *snd_card, MSWebCam *web_cam, const char *video_display_name, void *window_id, MSFileFormat format, char *video_codec);
+MS2_PUBLIC MSMediaRecorder *ms_media_recorder_new(MSFactory *factory, MSSndCard *snd_card, MSWebCam *web_cam, const char *video_display_name, void *window_id, MSFileFormat format, const char *video_codec);
 
 /**
  * Free a media Recorder
@@ -122,7 +117,7 @@ MS2_PUBLIC bool_t ms_media_recorder_matroska_supported(void);
  * @return Format of the file. UNKNOWN_FORMAT when no file is opened
  */
 MS2_PUBLIC MSFileFormat ms_media_recorder_get_file_format(const MSMediaRecorder *obj);
-    
+
 /**
  * Removes the file at provided path if it exists.
  * @param obj Recorder
