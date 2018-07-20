@@ -36,7 +36,7 @@ struct _MSMediaRecorder {
 	MSFilter *audio_encoder;
     //Video filters
     MSFilter *video_source;
-	MSFilter *video_encoder;
+		MSFilter *video_encoder;
     MSFilter *video_sink;
 
 	MSPinFormat audio_pin_fmt;
@@ -58,6 +58,7 @@ static void _set_pin_fmt(MSMediaRecorder *obj);
 static void _destroy_graph(MSMediaRecorder *obj);
 static bool_t _link_all(MSMediaRecorder *obj);
 static void _unlink_all(MSMediaRecorder *obj);
+static void _recorder_callback(void *ud, MSFilter *f, unsigned int id, void *arg);
 
 const char *get_filename_ext(const char *filename) {
     const char *dot = strrchr(filename, '.');
@@ -150,8 +151,10 @@ bool_t ms_media_recorder_open(MSMediaRecorder *obj, const char *filepath) {
 
 void ms_media_recorder_close(MSMediaRecorder *obj) {
 	if(obj->is_open) {
-		ms_ticker_detach(obj->ticker, obj->recorder);
+		if (obj->video_encoder)
+			ms_filter_remove_notify_callback(obj->recorder, _recorder_callback, obj);
 		ms_filter_call_method_noarg(obj->recorder, MS_RECORDER_CLOSE);
+		ms_ticker_detach(obj->ticker, obj->recorder);
 		_unlink_all(obj);
 		_destroy_graph(obj);
 		obj->is_open = FALSE;
@@ -244,6 +247,7 @@ static void _create_encoders(MSMediaRecorder *obj) {
                     ms_error("Could not create video encoder for %s", obj->video_codec);
                     obj->video_pin_fmt.fmt = NULL;
                 } else {
+										ms_filter_add_notify_callback(obj->recorder, _recorder_callback, obj, TRUE);
                     float fps = 30;
                     ms_filter_call_method(obj->video_source, MS_FILTER_SET_FPS, &fps);
                     ms_filter_call_method(obj->video_encoder, MS_FILTER_SET_FPS, &fps);
@@ -364,4 +368,9 @@ static void _unlink_all(MSMediaRecorder *obj) {
         if(obj->video_encoder) ms_connection_helper_unlink(&helper, obj->video_encoder, 0, 0);
         ms_connection_helper_unlink(&helper, obj->recorder, obj->video_pin_fmt.pin, -1);
     }
+}
+
+static void _recorder_callback(void *ud, MSFilter *f, unsigned int id, void *arg) {
+    MSMediaRecorder *obj = (MSMediaRecorder *)ud;
+    ms_filter_call_method_noarg(obj->video_encoder, MS_VIDEO_ENCODER_REQ_VFU);
 }
