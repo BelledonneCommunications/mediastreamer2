@@ -739,7 +739,6 @@ static bool_t h264_dec_init_decoder(VTH264DecCtx *ctx) {
 
 static void h264_dec_uninit_decoder(VTH264DecCtx *ctx) {
 	vth264dec_message("destroying decoder");
-	VTDecompressionSessionInvalidate(ctx->session);
 	CFRelease(ctx->session);
 	CFRelease(ctx->format_desc);
 	ctx->session = NULL;
