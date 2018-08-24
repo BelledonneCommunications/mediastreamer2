@@ -479,6 +479,10 @@ void ms_ticker_set_time_func(MSTicker *ticker, MSTickerTimeFunc func, void *user
 	ms_message("ms_ticker_set_time_func: ticker's time method updated.");
 }
 
+uint64_t ms_ticker_get_time(MSTicker *ticker) {
+	return ticker->time;
+}
+
 void ms_ticker_set_tick_func(MSTicker *ticker, MSTickerTickFunc func, void *user_data){
 	if (func==NULL) {
 		func=wait_next_tick;

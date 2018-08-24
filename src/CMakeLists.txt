@@ -304,6 +304,11 @@ if(ENABLE_VIDEO)
 			android/android_mediacodec.cpp
 			android/android-display-bad.cpp
 			android/androidvideo.cpp
+			android/androidvideo_abstract.h
+			android/androidvideo_camera.cpp
+			android/androidvideo_camera.h
+			android/androidvideo_camera2.cpp
+			android/androidvideo_camera2.h
 		)
 	endif()
 	if (ENABLE_QNX)

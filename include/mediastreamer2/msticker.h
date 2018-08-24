@@ -143,7 +143,7 @@ MS2_PUBLIC MSTicker *ms_ticker_new(void);
  * Returns: MSTicker * if successfull, NULL otherwise.
  */
 MS2_PUBLIC MSTicker *ms_ticker_new_with_params(const MSTickerParams *params);
-	
+
 /**
  * Set a name to the ticker (used for logging)
 **/
@@ -153,7 +153,7 @@ MS2_PUBLIC void ms_ticker_set_name(MSTicker *ticker, const char *name);
  * Deprecated: Set priority to the ticker
 **/
 MS2_PUBLIC void ms_ticker_set_priority(MSTicker *ticker, MSTickerPrio prio);
-	
+
 /**
  * Attach a chain of filters to a ticker.
  * The processing chain will be executed until ms_ticker_detach
@@ -201,7 +201,7 @@ MS2_PUBLIC void ms_ticker_destroy(MSTicker *ticker);
 
 /**
  * Override MSTicker's time function.
- * This can be used to control the ticker from an external time provider, for example the 
+ * This can be used to control the ticker from an external time provider, for example the
  * clock of a sound card.
  * WARNING: this must not be used in conjunction with ms_ticker_set_tick_func().
  *
@@ -221,6 +221,13 @@ MS2_PUBLIC void ms_ticker_set_time_func(MSTicker *ticker, MSTickerTimeFunc func,
  * @param user_data Any pointer to user private data.
  */
 MS2_PUBLIC void ms_ticker_set_tick_func(MSTicker *ticker, MSTickerTickFunc func, void *user_data);
+
+/**
+ * Get the time of the ticker.
+ *
+ * @param ticker  A #MSTicker object.
+ */
+MS2_PUBLIC uint64_t ms_ticker_get_time(MSTicker *ticker);
 
 /**
  * Print on stdout all filters of a ticker. (INTERNAL: DO NOT USE)
