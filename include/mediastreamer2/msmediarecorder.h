@@ -76,7 +76,7 @@ MS2_PUBLIC void * ms_media_recorder_get_window_id(const MSMediaRecorder *obj);
  * @param filepath Path of the file to write to
  * @return TRUE if the file could be created
  */
-MS2_PUBLIC bool_t ms_media_recorder_open(MSMediaRecorder *obj, const char *filepath);
+MS2_PUBLIC bool_t ms_media_recorder_open(MSMediaRecorder *obj, const char *filepath, int device_orientation);
 
 /**
  * Close a media file
