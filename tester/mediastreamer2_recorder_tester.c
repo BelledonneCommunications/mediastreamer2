@@ -50,7 +50,7 @@ static void record_file(const char *filepath, RecorderTestFlags flags) {
 	MSMediaRecorder *file_recorder = NULL;
 	MSSndCard *snd_card = ms_snd_card_manager_get_default_capture_card(ms_factory_get_snd_card_manager(_factory));
 	MSWebCam *web_cam = ms_web_cam_manager_get_default_cam(ms_factory_get_web_cam_manager(_factory));
-	const char *display_name = video_stream_get_default_video_renderer();
+	const char *display_name = ms_factory_get_default_video_renderer(_factory);
 
 	BC_ASSERT_PTR_NOT_NULL(snd_card);
 	BC_ASSERT_PTR_NOT_NULL(web_cam);
@@ -74,7 +74,7 @@ static void record_file(const char *filepath, RecorderTestFlags flags) {
 
 	BC_ASSERT_EQUAL(ms_media_recorder_get_state(file_recorder), MSRecorderClosed, int, "%d");
 
-	succeed = ms_media_recorder_open(file_recorder, filepath);
+	succeed = ms_media_recorder_open(file_recorder, filepath, 0);
 	if(flags & RECORDER_TEST_UNSUPPORTED_FORMAT) {
 		BC_ASSERT_FALSE(succeed);
 		BC_ASSERT_EQUAL(ms_media_recorder_get_state(file_recorder), MSRecorderClosed, int, "%d");
@@ -92,7 +92,7 @@ static void record_file(const char *filepath, RecorderTestFlags flags) {
 	BC_ASSERT_EQUAL(ms_media_recorder_get_state(file_recorder), MSRecorderRunning, int, "%d");
 
     sleep(5);
-    
+
 	ms_media_recorder_close(file_recorder);
 	BC_ASSERT_EQUAL(ms_media_recorder_get_state(file_recorder), MSRecorderClosed, int, "%d");
     //ms_media_recorder_remove_file(file_recorder, filepath);

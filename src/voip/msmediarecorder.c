@@ -50,9 +50,10 @@ struct _MSMediaRecorder {
 	char *video_display;
 	void *window_id;
   char *video_codec;
+	int device_orientation;
 };
 
-static void _create_encoders(MSMediaRecorder *obj);
+static void _create_encoders(MSMediaRecorder *obj, int device_orientation);
 static void _create_sources(MSMediaRecorder *obj);
 static void _set_pin_fmt(MSMediaRecorder *obj);
 static void _destroy_graph(MSMediaRecorder *obj);
@@ -97,7 +98,7 @@ void * ms_media_recorder_get_window_id(const MSMediaRecorder *obj) {
 	return obj->window_id;
 }
 
-bool_t ms_media_recorder_open(MSMediaRecorder *obj, const char *filepath) {
+bool_t ms_media_recorder_open(MSMediaRecorder *obj, const char *filepath, int device_orientation) {
     const char *file_ext = get_filename_ext(filepath);
     if (!((strcmp(file_ext, "wav") == 0 && obj->format == MS_FILE_FORMAT_WAVE) || ((strcmp(file_ext, "mkv") == 0 && obj->format == MS_FILE_FORMAT_MATROSKA)))) {
         ms_error("file format and file extension do not match, was expecting %s and got %s for filename: %s", (obj->format == MS_FILE_FORMAT_WAVE ? "wav" : "mkv"), file_ext, filepath);
@@ -137,7 +138,7 @@ bool_t ms_media_recorder_open(MSMediaRecorder *obj, const char *filepath) {
 	ms_free(tmp);
     _create_sources(obj);
     _set_pin_fmt(obj);
-	_create_encoders(obj);
+	_create_encoders(obj, device_orientation);
 	if(!_link_all(obj)) {
 		ms_error("Cannot open %s. Could not build playing graph", filepath);
 		_destroy_graph(obj);
@@ -211,7 +212,7 @@ void ms_media_recorder_remove_file(MSMediaRecorder *obj, const char *filepath) {
     }
 }
 
-static void _create_encoders(MSMediaRecorder *obj) {
+static void _create_encoders(MSMediaRecorder *obj, int device_orientation) {
     // In short : if wave: no encoder. If mkv, "opus" for audio, "vp8" or "h264"
     int source_sample_rate, sample_rate, source_nchannels, nchannels;
     switch(obj->format) {
@@ -247,12 +248,15 @@ static void _create_encoders(MSMediaRecorder *obj) {
                     ms_error("Could not create video encoder for %s", obj->video_codec);
                     obj->video_pin_fmt.fmt = NULL;
                 } else {
+										if (ms_filter_has_method(obj->video_source, MS_VIDEO_CAPTURE_SET_DEVICE_ORIENTATION))
+												ms_filter_call_method(obj->video_source, MS_VIDEO_CAPTURE_SET_DEVICE_ORIENTATION, &device_orientation);
 										ms_filter_add_notify_callback(obj->recorder, _recorder_callback, obj, TRUE);
                     float fps = 30;
                     ms_filter_call_method(obj->video_source, MS_FILTER_SET_FPS, &fps);
                     ms_filter_call_method(obj->video_encoder, MS_FILTER_SET_FPS, &fps);
                     MSVideoSize video_size = MS_VIDEO_SIZE_VGA;
                     ms_filter_call_method(obj->video_source, MS_FILTER_SET_VIDEO_SIZE, &video_size);
+                    ms_filter_call_method(obj->video_source, MS_FILTER_GET_VIDEO_SIZE, &video_size);
                     ms_filter_call_method(obj->video_encoder, MS_FILTER_SET_VIDEO_SIZE, &video_size);
                 }
             }
@@ -273,6 +277,7 @@ static void _create_sources(MSMediaRecorder *obj) {
                     ms_error("Could not create video source: %s", obj->web_cam->name);
                 }
             }
+            break;
         case MS_FILE_FORMAT_WAVE:
             if(obj->snd_card) {
                 if((obj->audio_source = ms_snd_card_create_reader(obj->snd_card))) {
