@@ -9,6 +9,8 @@
 #include <mmreg.h>
 #endif
 
+#include "fd_portab.h" // keep this include at the last of the inclusion sequence!
+
 //TODO: check if mkv is available. If not, we just do wav files. Check if video is available. if not, we just do sound files (wav or mvk).
 // Check given file extension. If not wav nor mkv, do nothing. Make those things work together.
 

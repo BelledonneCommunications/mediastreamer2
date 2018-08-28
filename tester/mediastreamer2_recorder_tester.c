@@ -91,7 +91,7 @@ static void record_file(const char *filepath, RecorderTestFlags flags) {
 	BC_ASSERT_TRUE(succeed);
 	BC_ASSERT_EQUAL(ms_media_recorder_get_state(file_recorder), MSRecorderRunning, int, "%d");
 
-    sleep(5);
+    ms_sleep(5);
 
 	ms_media_recorder_close(file_recorder);
 	BC_ASSERT_EQUAL(ms_media_recorder_get_state(file_recorder), MSRecorderClosed, int, "%d");
