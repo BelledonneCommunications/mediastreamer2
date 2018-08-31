@@ -34,7 +34,8 @@
 
 namespace AndroidVideo {
 
-const int UNDEFINED_ROTATION = -1;
+static const int UNDEFINED_ROTATION = -1;
+static const char* AndroidWrapperPath = "org/linphone/mediastream/video/capture/AndroidVideoJniWrapper";
 
 struct AndroidWebcamConfig {
 	int id;
@@ -51,6 +52,11 @@ protected:
 
 	jobject mAndroidCamera;
 	jobject mPreviewWindow;
+	jmethodID mMethodActivateAutoFocus;
+	jmethodID mMethodSelectNearestResolutionAvailable;
+	jmethodID mMethodSetPreviewDisplaySurface;
+	jmethodID mMethodStartRecording;
+	jmethodID mMethodStopRecording;
 	jclass mHelperClass;
 	JNIEnv *mJavaEnv;
 
@@ -71,6 +77,8 @@ public:
 		ms_mutex_init(&mMutex, nullptr);
 		mJavaEnv = ms_get_jni_env();
 		mAllocator = ms_yuv_buf_allocator_new();
+		mHelperClass = getHelperClassGlobalRef(mJavaEnv);
+		this->initJNIMethod();
 		snprintf(mFpsContext, sizeof(mFpsContext), "Captured mean fps=%%f");
 		f->data = this;
 	};
@@ -83,6 +91,27 @@ public:
 		ms_yuv_buf_allocator_free(mAllocator);
 		ms_mutex_destroy(&mMutex);
 	};
+
+	// Static methods
+	static jclass getHelperClassGlobalRef(JNIEnv *env) {
+		ms_message("getHelperClassGlobalRef (env: %p)", env);
+		const char* className = AndroidWrapperPath;
+
+		jclass c = env->FindClass(className);
+		if (c == 0) {
+			ms_error("Could not load class '%s'", className);
+			return nullptr;
+		} else {
+			jclass globalRef = reinterpret_cast<jclass>(env->NewGlobalRef(c));
+			env->DeleteLocalRef(c);
+			return globalRef;
+		}
+	}
+
+	// Setters∕Getters
+	void setWebcam(MSWebCam *webcam) {
+		this->mWebcam = webcam;
+	}
 
 	// Filter methods
 	virtual void videoCaptureInit() = 0;
@@ -106,7 +135,7 @@ public:
 	};
 
 	virtual int videoCaptureSetVsize(void *arg) {
-		lock();
+		this->lock();
 
 		this->mRequestedSize = *(MSVideoSize*)arg;
 
@@ -117,13 +146,11 @@ public:
 			this->mRequestedSize.width = tmp;
 		}
 
-		jmethodID method = this->mJavaEnv->GetStaticMethodID(this->mHelperClass,"selectNearestResolutionAvailable", "(III)[I");
-
 		// find neareast hw-available resolution (using jni call);
-		jobject resArray = this->mJavaEnv->CallStaticObjectMethod(this->mHelperClass, method, ((AndroidWebcamConfig*)this->mWebcam->data)->id, this->mRequestedSize.width, this->mRequestedSize.height);
+		jobject resArray = this->mJavaEnv->CallStaticObjectMethod(this->mHelperClass, this->mMethodSelectNearestResolutionAvailable, ((AndroidWebcamConfig*)this->mWebcam->data)->id, this->mRequestedSize.width, this->mRequestedSize.height);
 
 		if (!resArray) {
-			ms_mutex_unlock(&this->mMutex);
+			this->unlock();
 			ms_error("Failed to retrieve camera '%d' supported resolutions\n", ((AndroidWebcamConfig*)this->mWebcam->data)->id);
 			return -1;
 		}
@@ -183,7 +210,7 @@ public:
 			this->mRotationSavedDuringVSize = this->mRotation;
 		}
 
-		unlock();
+		this->unlock();
 		return 0;
 	};
 
@@ -193,22 +220,19 @@ public:
 	};
 
 	virtual int videoCaptureGetPixFmt(void *arg) {
-		*(MSPixFmt*)arg=MS_YUV420P;
+		*(MSPixFmt*)arg = MS_YUV420P;
 		return 0;
 	};
 
 	virtual int videoSetNativePreviewWindow(void *arg) {
-		lock();
+		this->lock();
 
 		jobject w = (jobject)*((unsigned long*)arg);
 
 		if (w == this->mPreviewWindow) {
-			unlock();
-
+			this->unlock();
 			return 0;
 		}
-
-		jmethodID method = this->mJavaEnv->GetStaticMethodID(this->mHelperClass,"setPreviewDisplaySurface", "(Ljava/lang/Object;Ljava/lang/Object;)V");
 
 		if (this->mAndroidCamera) {
 			if (this->mPreviewWindow == 0) {
@@ -216,50 +240,45 @@ public:
 			} else {
 				ms_message("Preview capture window changed (oldwin: %p newwin: %p rotation:%d)\n", this->mPreviewWindow, w, this->mRotation);
 
-				this->mJavaEnv->CallStaticVoidMethod(this->mHelperClass,
-							this->mJavaEnv->GetStaticMethodID(this->mHelperClass,"stopRecording", "(Ljava/lang/Object;)V"),
-							this->mAndroidCamera);
+				this->mJavaEnv->CallStaticVoidMethod(this->mHelperClass, this->mMethodStopRecording, this->mAndroidCamera);
 				this->mJavaEnv->DeleteGlobalRef(this->mAndroidCamera);
-				/*this->mAndroidCamera = this->mJavaEnv->NewGlobalRef(
+				this->mAndroidCamera = this->mJavaEnv->NewGlobalRef(
 				this->mJavaEnv->CallStaticObjectMethod(this->mHelperClass,
-							this->mJavaEnv->GetStaticMethodID(this->mHelperClass,"startRecording", "(IIIIIJ)Ljava/lang/Object;"),
+							this->mMethodStartRecording,
 							((AndroidWebcamConfig*)this->mWebcam->data)->id,
 							this->mHwCapableSize.width,
 							this->mHwCapableSize.height,
 							(jint)30,
 							(this->mRotation != UNDEFINED_ROTATION) ? this->mRotation:0,
-							(jlong)&this));*/ // TODO
+							(jlong)this));
 			}
 			// if previewWindow AND camera are valid => set preview window
-			if (w && this->mAndroidCamera)
-				this->mJavaEnv->CallStaticVoidMethod(this->mHelperClass, method, this->mAndroidCamera, w);
+			if (w && this->mAndroidCamera) {
+				this->mJavaEnv->CallStaticVoidMethod(this->mHelperClass, this->mMethodSetPreviewDisplaySurface, this->mAndroidCamera, w);
+			}
 		} else {
 			ms_message("Preview capture window set but camera not created yet; remembering it for later use\n");
 		}
 		this->mPreviewWindow = w;
 
-		unlock();
+		this->unlock();
 
 		return 0;
 	};
 
 	virtual int videoGetNativePreviewWindow(void *arg) {
 		*((unsigned long *)arg) = (unsigned long)this->mPreviewWindow;
-
 		return 0;
 	};
 
 	virtual int videoSetDeviceRotation(void *arg) {
-		this->mRotation=*((int*)arg);
+		this->mRotation = *((int*)arg);
 		ms_message("%s : %d\n", __FUNCTION__, this->mRotation);
-
 		return 0;
 	};
 
 	virtual int videoCaptureSetAutofocus(void *arg) {
-		jmethodID method = this->mJavaEnv->GetStaticMethodID(this->mHelperClass,"activateAutoFocus", "(Ljava/lang/Object;)V");
-		this->mJavaEnv->CallStaticObjectMethod(this->mHelperClass, method, this->mAndroidCamera);
-
+		this->mJavaEnv->CallStaticObjectMethod(this->mHelperClass, this->mMethodActivateAutoFocus, this->mAndroidCamera);
 		return 0;
 	};
 
@@ -308,6 +327,16 @@ protected:
 
 		*yoff = this->mHwCapableSize.width * halfDiffH + halfDiffW;
 		*cbcroff = this->mHwCapableSize.width * halfDiffH * 0.5 + halfDiffW;
+	};
+
+	virtual void initJNIMethod() {
+		if (this->mJavaEnv && this->mHelperClass) {
+			this->mMethodActivateAutoFocus = this->mJavaEnv->GetStaticMethodID(this->mHelperClass, "activateAutoFocus", "(Ljava/lang/Object;)V");
+			this->mMethodSelectNearestResolutionAvailable = this->mJavaEnv->GetStaticMethodID(this->mHelperClass, "selectNearestResolutionAvailable", "(III)[I");
+			this->mMethodSetPreviewDisplaySurface = this->mJavaEnv->GetStaticMethodID(this->mHelperClass, "setPreviewDisplaySurface", "(Ljava/lang/Object;Ljava/lang/Object;)V");
+			this->mMethodStartRecording = this->mJavaEnv->GetStaticMethodID(this->mHelperClass, "startRecording", "(IIIIIJ)Ljava/lang/Object;");
+			this->mMethodStopRecording = this->mJavaEnv->GetStaticMethodID(this->mHelperClass, "stopRecording", "(Ljava/lang/Object;)V");
+		}
 	};
 };
 

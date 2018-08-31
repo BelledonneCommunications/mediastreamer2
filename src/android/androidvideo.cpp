@@ -31,7 +31,6 @@
 #include "androidvideo_camera2.h"
 #include "mediastreamer2/msfilter.h"
 #include "mediastreamer2/msjava.h"
-#include "mediastreamer2/msticker.h"
 #include "mediastreamer2/msvideo.h"
 #include "mediastreamer2/mswebcam.h"
 
@@ -40,16 +39,12 @@
 
 static int android_sdk_version = 5;
 
-static const char* AndroidApi9WrapperPath = "org/linphone/mediastream/video/capture/AndroidVideoApi9JniWrapper";
-static const char* AndroidApi8WrapperPath = "org/linphone/mediastream/video/capture/AndroidVideoApi8JniWrapper";
-static const char* AndroidApi5WrapperPath = "org/linphone/mediastream/video/capture/AndroidVideoApi5JniWrapper";
-static const char* VersionPath 			  = "org/linphone/mediastream/Version";
+static const char* VersionPath = "org/linphone/mediastream/Version";
 
-/************************ Private helper methods       ************************/
+/************************ Private helper methods ************************/
 static AndroidVideo::AndroidVideoAbstract* getAndroidVideoCamera(JNIEnv *env, MSFilter *f);
-static jclass getHelperClassGlobalRef(JNIEnv *env);
 
-/************************ MS2 filter methods           ************************/
+/************************ MS2 filter methods ************************/
 static int video_capture_set_fps(MSFilter *f, void *arg) {
 	return ((AndroidVideo::AndroidVideoAbstract*)f->data)->videoCaptureSetFps(arg);
 }
@@ -86,48 +81,16 @@ static int video_set_device_rotation(MSFilter* f, void* arg) {
 	return ((AndroidVideo::AndroidVideoAbstract*)f->data)->videoSetDeviceRotation(arg);
 }
 
-void video_capture_preprocess(MSFilter *f){
+void video_capture_preprocess(MSFilter *f) {
 	((AndroidVideo::AndroidVideoAbstract*)f->data)->videoCapturePreprocess();
 }
 
-static void video_capture_process(MSFilter *f){
-	AndroidReaderContext* d = getContext(f);
-
-	ms_mutex_lock(&d->mutex);
-
-	// If frame not ready, return
-	if (d->frame == 0) {
-		ms_mutex_unlock(&d->mutex);
-		return;
-	}
-
-	ms_video_update_average_fps(&d->averageFps, f->ticker->time);
-
-	ms_queue_put(f->outputs[0],d->frame);
-	d->frame = 0;
-	ms_mutex_unlock(&d->mutex);
+static void video_capture_process(MSFilter *f) {
+	((AndroidVideo::AndroidVideoAbstract*)f->data)->videoCaptureProcess();
 }
 
 static void video_capture_postprocess(MSFilter *f){
-	ms_message("Postprocessing of Android VIDEO capture filter");
-	AndroidReaderContext* d = getContext(f);
-	JNIEnv *env = ms_get_jni_env();
-
-	ms_mutex_lock(&d->mutex);
-
-	if (d->androidCamera) {
-		jmethodID method = env->GetStaticMethodID(d->helperClass,"stopRecording", "(Ljava/lang/Object;)V");
-
-		env->CallStaticVoidMethod(d->helperClass, method, d->androidCamera);
-		env->DeleteGlobalRef(d->androidCamera);
-	}
-	d->androidCamera = 0;
-	d->previewWindow = 0;
-	if (d->frame){
-		freemsg(d->frame);
-		d->frame=NULL;
-	}
-	ms_mutex_unlock(&d->mutex);
+	((AndroidVideo::AndroidVideoAbstract*)f->data)->videoCapturePostprocess();
 }
 
 static void video_capture_init(MSFilter *f) {
@@ -140,6 +103,7 @@ static void video_capture_uninit(MSFilter *f) {
 	ms_message("Uninit of Android VIDEO capture filter");
 	AndroidVideo::AndroidVideoAbstract *androidCamera = (AndroidVideo::AndroidVideoAbstract*)f->data;
 	delete androidCamera;
+	f->data = nullptr;
 }
 
 static MSFilterMethod video_capture_methods[]={
@@ -160,7 +124,7 @@ MSFilterDesc ms_video_capture_desc={
 		"MSAndroidVideoCapture",
 		N_("A filter that captures Android video."),
 		MS_FILTER_OTHER,
-		NULL,
+		nullptr,
 		0,
 		1,
 		video_capture_init,
@@ -173,35 +137,35 @@ MSFilterDesc ms_video_capture_desc={
 
 MS_FILTER_DESC_EXPORT(ms_video_capture_desc)
 
-/* Webcam methods */
-/*static void video_capture_detect(MSWebCamManager *obj);
-static void video_capture_cam_init(MSWebCam *cam){
+/************************ Webcam methods ************************/
+static void video_capture_detect(MSWebCamManager *obj);
+static void video_capture_cam_init(MSWebCam *cam) {
 	ms_message("Android VIDEO capture filter cam init");
 }
 
-static MSFilter *video_capture_create_reader(MSWebCam *obj){
+static MSFilter *video_capture_create_reader(MSWebCam *obj) {
 	ms_message("Instanciating Android VIDEO capture MS filter");
 
 	MSFilter* lFilter = ms_factory_create_filter_from_desc(ms_web_cam_get_factory(obj), &ms_video_capture_desc);
-	getContext(lFilter)->webcam = obj;
+	((AndroidVideo::AndroidVideoAbstract*)lFilter->data)->setWebcam(obj);
 
 	return lFilter;
 }
 
-MSWebCamDesc ms_android_video_capture_desc={
+MSWebCamDesc ms_android_video_capture_desc = {
 		"AndroidVideoCapture",
 		&video_capture_detect,
 		&video_capture_cam_init,
 		&video_capture_create_reader,
-		NULL
+		nullptr
 };
 
-static void video_capture_detect(MSWebCamManager *obj){
+static void video_capture_detect(MSWebCamManager *obj) {
 	ms_message("Detecting Android VIDEO cards");
 	JNIEnv *env = ms_get_jni_env();
-	jclass helperClass = getHelperClassGlobalRef(env);
+	jclass helperClass = AndroidVideo::AndroidVideoAbstract::getHelperClassGlobalRef(env);
 
-	if (helperClass==NULL) return;
+	if (helperClass == nullptr) return;
 
 	// create 3 int arrays - assuming 2 webcams at most
 	jintArray indexes = (jintArray)env->NewIntArray(2);
@@ -215,7 +179,7 @@ static void video_capture_detect(MSWebCamManager *obj){
 	ms_message("%d cards detected", count);
 	for(int i=0; i<count; i++) {
 		MSWebCam *cam = ms_web_cam_new(&ms_android_video_capture_desc);
-		AndroidWebcamConfig* c = new AndroidWebcamConfig();
+		AndroidVideo::AndroidWebcamConfig* c = new AndroidVideo::AndroidWebcamConfig();
 		env->GetIntArrayRegion(indexes, i, 1, &c->id);
 		env->GetIntArrayRegion(frontFacing, i, 1, &c->frontFacing);
 		env->GetIntArrayRegion(orientation, i, 1, &c->orientation);
@@ -224,7 +188,7 @@ static void video_capture_detect(MSWebCamManager *obj){
 		char* idstring = (char*) ms_malloc(15);
 		snprintf(idstring, 15, "Android%d", c->id);
 		cam->id = idstring;
-		ms_web_cam_manager_add_cam(obj,cam);
+		ms_web_cam_manager_add_cam(obj, cam);
 		ms_message("camera created: id=%d frontFacing=%d orientation=%d [msid:%s]\n", c->id, c->frontFacing, c->orientation, idstring);
 	}
 	env->DeleteLocalRef(indexes);
@@ -233,14 +197,14 @@ static void video_capture_detect(MSWebCamManager *obj){
 
 	env->DeleteGlobalRef(helperClass);
 	ms_message("Detection of Android VIDEO cards done");
-}*/
+}
 
 /************************ JNI methods ************************/
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-JNIEXPORT void JNICALL Java_org_linphone_mediastream_video_capture_AndroidVideoApi5JniWrapper_putImage(JNIEnv* env,
+JNIEXPORT void JNICALL Java_org_linphone_mediastream_video_capture_AndroidVideoJniWrapper_putImage(JNIEnv* env,
 		jclass thiz, jlong nativePtr, jbyteArray frame) {
 	AndroidVideo::AndroidVideoAbstract* androidVideo = (AndroidVideo::AndroidVideoAbstract*)nativePtr;
 	androidVideo->putImage(frame);
@@ -250,6 +214,7 @@ JNIEXPORT void JNICALL Java_org_linphone_mediastream_video_capture_AndroidVideoA
 }
 #endif
 
+/************************ Helper methods ************************/
 static AndroidVideo::AndroidVideoAbstract* getAndroidVideoCamera(JNIEnv *env, MSFilter *f) {
 	jclass version = env->FindClass(VersionPath);
 	jmethodID method = env->GetStaticMethodID(version,"sdk", "()I");
@@ -263,34 +228,4 @@ static AndroidVideo::AndroidVideoAbstract* getAndroidVideoCamera(JNIEnv *env, MS
 	//} else {
 	//	return new AndroidVideo::AndroidVideoCamera2(f);
 	//}
-}
-
-static jclass getHelperClassGlobalRef(JNIEnv *env) {
-	ms_message("getHelperClassGlobalRef (env: %p)", env);
-	const char* className;
-	// FindClass only returns local references.
-
-	// Find the current Android SDK version
-	jclass version = env->FindClass(VersionPath);
-	jmethodID method = env->GetStaticMethodID(version,"sdk", "()I");
-	android_sdk_version = env->CallStaticIntMethod(version, method);
-	ms_message("Android SDK version found is %i", android_sdk_version);
-	env->DeleteLocalRef(version);
-
-	if (android_sdk_version >= 9) {
-		className = AndroidApi9WrapperPath;
-	} else if (android_sdk_version >= 8) {
-		className = AndroidApi8WrapperPath;
-	} else {
-		className = AndroidApi5WrapperPath;
-	}
-	jclass c = env->FindClass(className);
-	if (c == 0) {
-		ms_error("Could not load class '%s' (%d)", className, android_sdk_version);
-		return NULL;
-	} else {
-		jclass globalRef = reinterpret_cast<jclass>(env->NewGlobalRef(c));
-		env->DeleteLocalRef(c);
-		return globalRef;
-	}
 }

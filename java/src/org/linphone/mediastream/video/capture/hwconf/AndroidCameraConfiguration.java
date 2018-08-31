@@ -35,7 +35,7 @@ public class AndroidCameraConfiguration {
 		initCamerasCache();
 		return camerasCache;
 	}
-	
+
 	public static boolean hasSeveralCameras() {
 		initCamerasCache();
 		return camerasCache.length > 1;
@@ -44,28 +44,26 @@ public class AndroidCameraConfiguration {
 	public static boolean hasFrontCamera() {
 		initCamerasCache();
 		for (AndroidCamera cam:  camerasCache) {
-			if (cam.frontFacing) 
+			if (cam.frontFacing)
 				return true;
 		}
 		return false;
 	}
-	
+
 	private static AndroidCameraConfiguration.AndroidCamera[] camerasCache;
-	
+
 	private static void initCamerasCache() {
 		// cache already filled and valid ?
 		if (camerasCache != null && camerasCache.length!=0)
 			return;
-		
+
 		try {
-			if (Version.sdk() < 9) {
-				camerasCache = AndroidCameraConfiguration.probeCamerasSDK5();
+			if (Version.sdk() >= 21) {
+				camerasCache = AndroidCameraConfiguration.probeCamerasSDK21();
+			} else if (Version.sdk() >= 9) {
+				camerasCache = AndroidCameraConfiguration.probeCamerasSDK9();
 			} else {
-				if (Version.sdk() >= 21) {
-					camerasCache = AndroidCameraConfiguration.probeCamerasSDK21();
-				} else {
-					camerasCache = AndroidCameraConfiguration.probeCamerasSDK9();
-				}
+				camerasCache = AndroidCameraConfiguration.probeCamerasSDK5();
 			}
 		} catch (Exception exc) {
 			Log.e("Error: cannot retrieve cameras information (busy ?)", exc);
@@ -73,11 +71,11 @@ public class AndroidCameraConfiguration {
 			camerasCache = new AndroidCamera[0];
 		}
 	}
-	
+
 	static AndroidCamera[] probeCamerasSDK5() {
 		return AndroidCameraConfigurationReader5.probeCameras();
 	}
-	
+
 	static  AndroidCamera[] probeCamerasSDK9() {
 		return AndroidCameraConfigurationReader9.probeCameras();
 	}

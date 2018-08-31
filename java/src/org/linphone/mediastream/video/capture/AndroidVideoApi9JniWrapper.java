@@ -1,6 +1,6 @@
 /*
 AndroidVideoApi9JniWrapper.java
-Copyright (C) 2010  Belledonne Communications, Grenoble, France
+Copyright (C) 2010-2018  Belledonne Communications, Grenoble, France
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -57,7 +57,7 @@ public class AndroidVideoApi9JniWrapper {
 		try {
 		Camera camera = Camera.open(cameraId);
 		Parameters params = camera.getParameters();
-		
+
 
 		for (String focusMode : params.getSupportedFocusModes()) {
 			if (focusMode.equalsIgnoreCase(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO)) {
@@ -66,7 +66,7 @@ public class AndroidVideoApi9JniWrapper {
 				break;
 			}
 		}
-		
+
 		if (params.isVideoStabilizationSupported()) {
 			Log.d("Video stabilization is supported, let's use it");
 			params.setVideoStabilization(true);
@@ -95,7 +95,7 @@ public class AndroidVideoApi9JniWrapper {
 					bufferSize += bufferSize / 20;
 					camera.addCallbackBuffer(new byte[bufferSize]);
 				} else if (AndroidVideoApi5JniWrapper.isRecording) {
-					AndroidVideoApi5JniWrapper.putImage(nativePtr, data);
+					AndroidVideoJniWrapper.putImage(nativePtr, data);
 					camera.addCallbackBuffer(data);
 				}
 			}

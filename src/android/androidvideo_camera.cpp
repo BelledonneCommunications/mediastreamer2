@@ -25,37 +25,9 @@
 #include "androidvideo_camera.h"
 
 namespace AndroidVideo {
-	void AndroidVideoCamera::AndroidVideoCamera(MSFilter *f) : AndroidVideoAbstract(f) {
-		//TODO Changer ça pour une classe générique
-		/*ms_message("getHelperClassGlobalRef (env: %p)", env);
-		const char* className;
-		// FindClass only returns local references.
-
-		// Find the current Android SDK version
-		jclass version = env->FindClass(VersionPath);
-		jmethodID method = env->GetStaticMethodID(version,"sdk", "()I");
-		android_sdk_version = env->CallStaticIntMethod(version, method);
-		ms_message("Android SDK version found is %i", android_sdk_version);
-		env->DeleteLocalRef(version);
-
-		if (android_sdk_version >= 9) {
-			className = AndroidApi9WrapperPath;
-		} else if (android_sdk_version >= 8) {
-			className = AndroidApi8WrapperPath;
-		} else {
-			className = AndroidApi5WrapperPath;
-		}
-		jclass c = env->FindClass(className);
-		if (c == 0) {
-			ms_error("Could not load class '%s' (%d)", className, android_sdk_version);
-			return NULL;
-		} else {
-			jclass globalRef = reinterpret_cast<jclass>(env->NewGlobalRef(c));
-			env->DeleteLocalRef(c);
-			return globalRef;
-		}
-
-		this->mHelperClass = getHelperClassGlobalRef(env);*/
+	AndroidVideoCamera::AndroidVideoCamera(MSFilter *f) : AndroidVideoAbstract(f) {
+		this->mJavaEnv = ms_get_jni_env();
+		this->mHelperClass = getHelperClassGlobalRef(this->mJavaEnv);
 	}
 
 	void AndroidVideoCamera::videoCaptureInit() {
@@ -69,21 +41,19 @@ namespace AndroidVideo {
 		ms_video_init_framerate_controller(&this->mFpsControl, this->mFps);
 		ms_video_init_average_fps(&this->mAverageFps, this->mFpsContext);
 
-		jmethodID method = this->mJavaEnv->GetStaticMethodID(this->mHelperClass,"startRecording", "(IIIIIJ)Ljava/lang/Object;");
-
 		ms_message("Starting Android camera '%d' (rotation:%d)", ((AndroidWebcamConfig*)this->mWebcam->data)->id, this->mRotation);
-		jobject cam = this->mJavaEnv->CallStaticObjectMethod(this->mHelperClass, method,
+		jobject cam = this->mJavaEnv->CallStaticObjectMethod(this->mHelperClass,
+				this->mMethodStartRecording,
 				((AndroidWebcamConfig*)this->mWebcam->data)->id,
 				this->mHwCapableSize.width,
 				this->mHwCapableSize.height,
 				(jint)30,
 				this->mRotationSavedDuringVSize,
-				(jlong)this); // TODO check JNI
+				(jlong)this);
 		this->mAndroidCamera = this->mJavaEnv->NewGlobalRef(cam);
 
 		if (this->mPreviewWindow) {
-			method = this->mJavaEnv->GetStaticMethodID(this->mHelperClass,"setPreviewDisplaySurface", "(Ljava/lang/Object;Ljava/lang/Object;)V");
-			this->mJavaEnv->CallStaticVoidMethod(this->mHelperClass, method, this->mAndroidCamera, this->mPreviewWindow);
+			this->mJavaEnv->CallStaticVoidMethod(this->mHelperClass, this->mMethodSetPreviewDisplaySurface, this->mAndroidCamera, this->mPreviewWindow);
 		}
 
 		ms_message("Preprocessing of Android VIDEO capture filter done");
@@ -92,15 +62,44 @@ namespace AndroidVideo {
 	}
 
 	void AndroidVideoCamera::videoCaptureProcess() {
+		this->lock();
 
+		// If frame not ready, return
+		if (this->mFrame == nullptr) {
+			this->unlock();
+			return;
+		}
+
+		ms_video_update_average_fps(&this->mAverageFps, this->mFilter->ticker->time);
+
+		ms_queue_put(this->mFilter->outputs[0], this->mFrame);
+		this->mFrame = nullptr;
+
+		this->unlock();
 	}
 
 	void AndroidVideoCamera::videoCapturePostprocess() {
+		this->lock();
 
+		ms_message("Postprocessing of Android VIDEO capture filter");
+
+		if (this->mAndroidCamera) {
+			this->mJavaEnv->CallStaticVoidMethod(this->mHelperClass, this->mMethodStopRecording, this->mAndroidCamera);
+			this->mJavaEnv->DeleteGlobalRef(this->mAndroidCamera);
+		}
+
+		this->mAndroidCamera = 0;
+		this->mPreviewWindow = 0;
+
+		if (this->mFrame){
+			freemsg(this->mFrame);
+			this->mFrame = nullptr;
+		}
+
+		this->unlock();
 	}
 
 	void AndroidVideoCamera::videoCaptureUninit() {
-
 	}
 
 	void AndroidVideoCamera::putImage(jbyteArray frame) {

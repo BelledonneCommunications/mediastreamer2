@@ -1,6 +1,6 @@
 /*
 AndroidVideoApi5JniWrapper.java
-Copyright (C) 2010  Belledonne Communications, Grenoble, France
+Copyright (C) 2010-2018  Belledonne Communications, Grenoble, France
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -39,8 +39,6 @@ import android.view.TextureView;
  */
 public class AndroidVideoApi5JniWrapper {
 	public static boolean isRecording = false;
-
-	public static native void putImage(long nativePtr, byte[] buffer);
 
 	static public int detectCameras(int[] indexes, int[] frontFacing, int[] orientation) {
 		Log.d("detectCameras\n");
@@ -96,7 +94,7 @@ public class AndroidVideoApi5JniWrapper {
 			public void onPreviewFrame(byte[] data, Camera camera) {
 				if (isRecording) {
 					// forward image data to JNI
-					putImage(nativePtr, data);
+					AndroidVideoJniWrapper.putImage(nativePtr, data);
 				}
 			}
 		});

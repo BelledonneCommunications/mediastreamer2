@@ -34,11 +34,11 @@ import android.hardware.Camera.Size;
 class AndroidCameraConfigurationReader5  {
 	static public AndroidCamera[] probeCameras() {
 		List<AndroidCamera> cam = new ArrayList<AndroidCamera>(1);
-		
+
 		Camera camera = Camera.open();
 		List<Size> r = camera.getParameters().getSupportedPreviewSizes();
 		camera.release();
-		
+
 		// Defaults
 		if (Hacks.isGalaxySOrTab()) {
 			Log.d( "Hack Galaxy S : has one or more cameras");
@@ -58,10 +58,10 @@ class AndroidCameraConfigurationReader5  {
 				cam.add(new AndroidCamera(1, true, 90, r));
 			}
 		}
-		
+
 		AndroidCamera[] result = new AndroidCamera[cam.size()];
 		result = cam.toArray(result);
 		return result;
-		
+
 	}
 }

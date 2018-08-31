@@ -65,7 +65,7 @@ rpm:
 rpm-novideo:
 	$(MAKE) dist
 # <https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=206841>
-	TAR_OPTIONS=--wildcards rpmbuild -ta --clean --rmsource --rmspec --without video $(PACKAGE)-$(VERSION).tar.gz 
+	TAR_OPTIONS=--wildcards rpmbuild -ta --clean --rmsource --rmspec --without video $(PACKAGE)-$(VERSION).tar.gz
 
 
 # `make package'
@@ -129,6 +129,7 @@ java/src/org/linphone/mediastream/video/AndroidVideoWindowImpl.java \
 java/src/org/linphone/mediastream/video/capture/AndroidVideoApi5JniWrapper.java \
 java/src/org/linphone/mediastream/video/capture/AndroidVideoApi8JniWrapper.java \
 java/src/org/linphone/mediastream/video/capture/AndroidVideoApi9JniWrapper.java \
+java/src/org/linphone/mediastream/video/capture/AndroidVideoJniWrapper.java \
 java/src/org/linphone/mediastream/video/capture/hwconf/AndroidCameraConfiguration.java \
 java/src/org/linphone/mediastream/video/capture/hwconf/AndroidCameraConfigurationReader5.java \
 java/src/org/linphone/mediastream/video/capture/hwconf/AndroidCameraConfigurationReader9.java \
