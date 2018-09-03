@@ -110,7 +110,7 @@ AC_DEFUN([MS_CHECK_VIDEO],[
 			if test x$avcodec_found = xno ; then
 			   AC_MSG_WARN([Could not find libavcodec (from ffmpeg) headers and library.])
 			else
-			   FFMPEG_LIBS="$FFMPEG_LIBS -lavutil"
+			   FFMPEG_LIBS="$FFMPEG_LIBS -lavutil -ldrm"
 			fi
 			
 			
