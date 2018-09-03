@@ -27,16 +27,33 @@
 
 #include "androidvideo_abstract.h"
 
+#include <camera/NdkCameraManager.h>
+#include <camera/NdkCameraDevice.h>
+
 namespace AndroidVideo {
 class AndroidVideoCamera2 : public AndroidVideoAbstract {
+	private:
+	ACameraManager *mCameraManager;
+	ACameraDevice *mCameraDevice;
+
 	public:
 		AndroidVideoCamera2(MSFilter *f);
+		~AndroidVideoCamera2();
 
+		// Filter methods
 		void videoCaptureInit();
 		void videoCapturePreprocess();
 		void videoCaptureProcess();
 		void videoCapturePostprocess();
 		void videoCaptureUninit();
+
+		// Callbacks
+		void cameraDeviceStateCallback(void* context, ACameraDevice* device, int error);
+
+		// Other methods
+		int videoCaptureSetVsize(void *arg);
+		int videoSetNativePreviewWindow(void *arg);
+		int videoCaptureSetAutofocus(void *arg);
 
 		void putImage(jbyteArray frame);
 	private:

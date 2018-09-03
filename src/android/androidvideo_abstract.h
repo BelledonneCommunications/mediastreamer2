@@ -32,11 +32,17 @@
 #include "mediastreamer2/msvideo.h"
 #include "mediastreamer2/mswebcam.h"
 
+//#ifdef API_ANDROID >= 24
+#include <camera/NdkCameraManager.h>
+#include <camera/NdkCameraDevice.h>
+//#endif
+
+extern MSWebCamDesc ms_android_video_capture_desc;
+
 namespace AndroidVideo {
 
 static const int UNDEFINED_ROTATION = -1;
 static const char* AndroidWrapperPath = "org/linphone/mediastream/video/capture/AndroidVideoJniWrapper";
-
 struct AndroidWebcamConfig {
 	int id;
 	int frontFacing;
@@ -52,11 +58,6 @@ protected:
 
 	jobject mAndroidCamera;
 	jobject mPreviewWindow;
-	jmethodID mMethodActivateAutoFocus;
-	jmethodID mMethodSelectNearestResolutionAvailable;
-	jmethodID mMethodSetPreviewDisplaySurface;
-	jmethodID mMethodStartRecording;
-	jmethodID mMethodStopRecording;
 	jclass mHelperClass;
 	JNIEnv *mJavaEnv;
 
@@ -73,20 +74,25 @@ protected:
 public:
 	AndroidVideoAbstract(MSFilter *f) : mRotation(UNDEFINED_ROTATION), mRotationSavedDuringVSize(UNDEFINED_ROTATION), mFps(5),
 										mAndroidCamera(0), mPreviewWindow(0), mFrame(nullptr), mFilter(f), mWebcam(nullptr) {
-		ms_message("Creating AndroidVideoAbstract for Android VIDEO capture filter");
+		ms_debug("Creating AndroidVideoAbstract for Android VIDEO capture filter");
 		ms_mutex_init(&mMutex, nullptr);
 		mJavaEnv = ms_get_jni_env();
 		mAllocator = ms_yuv_buf_allocator_new();
-		mHelperClass = getHelperClassGlobalRef(mJavaEnv);
-		this->initJNIMethod();
+		if (!mHelperClass) {
+			mHelperClass = getHelperClassGlobalRef(mJavaEnv);
+		}
+
 		snprintf(mFpsContext, sizeof(mFpsContext), "Captured mean fps=%%f");
 		f->data = this;
 	};
 
 	virtual ~AndroidVideoAbstract() {
-		ms_message("Deleting AndroidVideoAbstract");
-		if (mFrame != nullptr) {
+		ms_debug("Deleting AndroidVideoAbstract");
+		if (mFrame) {
 			freeb(mFrame);
+		}
+		if (mHelperClass && mJavaEnv) {
+			mJavaEnv->DeleteGlobalRef(mHelperClass);
 		}
 		ms_yuv_buf_allocator_free(mAllocator);
 		ms_mutex_destroy(&mMutex);
@@ -94,7 +100,7 @@ public:
 
 	// Static methods
 	static jclass getHelperClassGlobalRef(JNIEnv *env) {
-		ms_message("getHelperClassGlobalRef (env: %p)", env);
+		ms_debug("getHelperClassGlobalRef (env: %p)", env);
 		const char* className = AndroidWrapperPath;
 
 		jclass c = env->FindClass(className);
@@ -106,6 +112,124 @@ public:
 			env->DeleteLocalRef(c);
 			return globalRef;
 		}
+	}
+
+	/**
+	 * Camera detect function for deprecated API Camera
+	 */
+	static void cameraDetect(MSWebCamManager *obj) {
+		ms_message("CameraDetect: Detecting Android VIDEO cards");
+		JNIEnv *env = ms_get_jni_env();
+		jclass helperClass = getHelperClassGlobalRef(env);
+
+		if (helperClass == nullptr) return;
+
+		// create 3 int arrays - assuming 2 webcams at most
+		jintArray indexes = (jintArray)env->NewIntArray(2);
+		jintArray frontFacing = (jintArray)env->NewIntArray(2);
+		jintArray orientation = (jintArray)env->NewIntArray(2);
+
+		jmethodID method = env->GetStaticMethodID(helperClass,"detectCameras", "([I[I[I)I");
+
+		int count = env->CallStaticIntMethod(helperClass, method, indexes, frontFacing, orientation);
+
+		ms_message("%d cards detected", count);
+		for(int i=0; i<count; i++) {
+			MSWebCam *cam = ms_web_cam_new(&ms_android_video_capture_desc);
+			AndroidVideo::AndroidWebcamConfig* c = new AndroidVideo::AndroidWebcamConfig();
+			env->GetIntArrayRegion(indexes, i, 1, &c->id);
+			env->GetIntArrayRegion(frontFacing, i, 1, &c->frontFacing);
+			env->GetIntArrayRegion(orientation, i, 1, &c->orientation);
+			cam->data = c;
+			cam->name = ms_strdup("Android video name");
+			char* idstring = (char*) ms_malloc(15);
+			snprintf(idstring, 15, "Android%d", c->id);
+			cam->id = idstring;
+			ms_web_cam_manager_add_cam(obj, cam);
+			ms_message("CameraDetect: camera created: id=%d frontFacing=%d orientation=%d [msid:%s]\n",
+				c->id, c->frontFacing, c->orientation, idstring);
+		}
+		env->DeleteLocalRef(indexes);
+		env->DeleteLocalRef(frontFacing);
+		env->DeleteLocalRef(orientation);
+
+		env->DeleteGlobalRef(helperClass);
+		ms_message("CameraDetect: Detection of Android VIDEO cards done");
+	}
+
+	/**
+	 * Camera detect function for API Camera2
+	 */
+	static void camera2Detect(MSWebCamManager *obj) {
+		//#ifdef API_ANDROID >= 24
+		ms_message("Camera2Detect: Detecting Android VIDEO cards");
+		ACameraIdList *cameraIds = nullptr;
+		ACameraManager *cameraManager = ACameraManager_create();
+		ACameraManager_getCameraIdList(cameraManager, &cameraIds);
+
+		for (int i = 0 ; i < cameraIds->numCameras ; ++i) {
+			ACameraMetadata* metadataObj;
+			ACameraManager_getCameraCharacteristics(cameraManager, cameraIds->cameraIds[i], &metadataObj);
+
+			ACameraMetadata_const_entry lensInfo = { 0 };
+			ACameraMetadata_const_entry orientationInfo = { 0 };
+			ACameraMetadata_getConstEntry(metadataObj, ACAMERA_LENS_FACING, &lensInfo);
+			ACameraMetadata_getConstEntry(metadataObj, ACAMERA_SENSOR_ORIENTATION, &orientationInfo);
+
+			auto facing = static_cast<acamera_metadata_enum_android_lens_facing_t>(lensInfo.data.u8[0]);
+			int32_t orientation = orientationInfo.data.i32[0];
+
+			MSWebCam *cam = ms_web_cam_new(&ms_android_video_capture_desc);
+			AndroidVideo::AndroidWebcamConfig* conf = new AndroidVideo::AndroidWebcamConfig();
+			conf->id = i;
+			conf->frontFacing = (facing == ACAMERA_LENS_FACING_FRONT);
+			conf->orientation = orientation;
+			cam->data = conf;
+			cam->name = ms_strdup("Android video name");
+			char* idstring = (char*) ms_malloc(15);
+			snprintf(idstring, 15, "Android%d", conf->id);
+			cam->id = idstring;
+			ms_web_cam_manager_add_cam(obj, cam);
+			ms_message("Camera2Detect: camera created: id=%d frontFacing=%d orientation=%d [msid:%s]\n",
+				conf->id, conf->frontFacing, conf->orientation, idstring);
+		}
+		ACameraManager_deleteCameraIdList(cameraIds);
+		ACameraManager_delete(cameraManager);
+		ms_message("Camera2Detect: Detection of Android VIDEO cards done");
+		//#else
+		//ms_error("Camera2Detect: API Camera2 not available on this device.");
+		//#endif
+	}
+
+	static bool apiCamera2Available() {
+		//#ifdef API_ANDROID >= 24
+		ACameraIdList *cameraIds = nullptr;
+		ACameraManager *cameraManager = ACameraManager_create();
+		ACameraManager_getCameraIdList(cameraManager, &cameraIds);
+
+		for (int i = 0 ; i < cameraIds->numCameras ; ++i) {
+			ACameraMetadata* metadataObj;
+			ACameraManager_getCameraCharacteristics(cameraManager, cameraIds->cameraIds[i], &metadataObj);
+			ACameraMetadata_const_entry infoHardware = { 0 };
+			ACameraMetadata_getConstEntry(metadataObj, ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL, &infoHardware);
+
+			auto level = static_cast<acamera_metadata_enum_android_info_supported_hardware_level_t>(infoHardware.data.u8[0]);
+
+			// Return directly if one camera is not compatible
+			if (level != ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL_FULL &&
+				level != ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL_3) {
+				ACameraManager_deleteCameraIdList(cameraIds);
+				ACameraManager_delete(cameraManager);
+				return false;
+			}
+		}
+
+		ACameraManager_deleteCameraIdList(cameraIds);
+		ACameraManager_delete(cameraManager);
+		return true;
+		//#else
+		//return false;
+		//#endif
 	}
 
 	// Setters∕Getters
@@ -121,8 +245,9 @@ public:
 	virtual void videoCaptureUninit() = 0;
 
 	// Other methods
+
 	virtual int videoCaptureSetFps(void *arg) {
-		this->mFps = *((float*)arg);
+		this->mFps = *static_cast<float*>(arg);
 		snprintf(this->mFpsContext, sizeof(this->mFpsContext), "Captured mean fps=%%f, expected=%f", this->mFps);
 		ms_video_init_framerate_controller(&this->mFpsControl, this->mFps);
 		ms_video_init_average_fps(&this->mAverageFps, this->mFpsContext);
@@ -130,157 +255,34 @@ public:
 	};
 
 	virtual int videoCaptureGetFps(void *arg) {
-		*((float*)arg) = ms_average_fps_get(&this->mAverageFps);
-		return 0;
-	};
-
-	virtual int videoCaptureSetVsize(void *arg) {
-		this->lock();
-
-		this->mRequestedSize = *(MSVideoSize*)arg;
-
-		// always request landscape mode, orientation is handled later
-		if (this->mRequestedSize.height > this->mRequestedSize.width) {
-			int tmp = this->mRequestedSize.height;
-			this->mRequestedSize.height = this->mRequestedSize.width;
-			this->mRequestedSize.width = tmp;
-		}
-
-		// find neareast hw-available resolution (using jni call);
-		jobject resArray = this->mJavaEnv->CallStaticObjectMethod(this->mHelperClass, this->mMethodSelectNearestResolutionAvailable, ((AndroidWebcamConfig*)this->mWebcam->data)->id, this->mRequestedSize.width, this->mRequestedSize.height);
-
-		if (!resArray) {
-			this->unlock();
-			ms_error("Failed to retrieve camera '%d' supported resolutions\n", ((AndroidWebcamConfig*)this->mWebcam->data)->id);
-			return -1;
-		}
-
-		// handle result :
-		//   - 0 : width
-		//   - 1 : height
-		//   - 2 : useDownscaling
-		jint res[3];
-		this->mJavaEnv->GetIntArrayRegion((jintArray)resArray, 0, 3, res);
-		ms_message("Camera selected resolution is: %dx%d (requested: %dx%d) with downscaling?%d\n", res[0], res[1], this->mRequestedSize.width, this->mRequestedSize.height, res[2]);
-		this->mHwCapableSize.width =  res[0];
-		this->mHwCapableSize.height = res[1];
-		this->mUseDownscaling = res[2];
-
-		int rqSize = this->mRequestedSize.width * this->mRequestedSize.height;
-		int hwSize = this->mHwCapableSize.width * this->mHwCapableSize.height;
-		double downscale = this->mUseDownscaling ? 0.5 : 1;
-
-		// if hw supplies a smaller resolution, modify requested size accordingly
-		if ((hwSize * downscale * downscale) < rqSize) {
-			ms_message("Camera cannot produce requested resolution %dx%d, will supply smaller one: %dx%d\n",
-				this->mRequestedSize.width, this->mRequestedSize.height, (int) (res[0] * downscale), (int) (res[1]*downscale));
-			this->mUsedSize.width = (int) (this->mHwCapableSize.width * downscale);
-			this->mUsedSize.height = (int) (this->mHwCapableSize.height * downscale);
-		} else if ((hwSize * downscale * downscale) > rqSize) {
-			ms_message("Camera cannot produce requested resolution %dx%d, will capture a bigger one (%dx%d) and crop it to match encoder requested resolution\n",
-				this->mRequestedSize.width, this->mRequestedSize.height, (int)(res[0] * downscale), (int)(res[1] * downscale));
-			this->mUsedSize.width = this->mRequestedSize.width;
-			this->mUsedSize.height = this->mRequestedSize.height;
-		} else {
-			this->mUsedSize.width = this->mRequestedSize.width;
-			this->mUsedSize.height = this->mRequestedSize.height;
-		}
-
-		// is phone held |_ to cam orientation ?
-		if (this->mRotation == UNDEFINED_ROTATION || computeImageRotationCorrection() % 180 != 0) {
-			if (this->mRotation == UNDEFINED_ROTATION) {
-				ms_error("To produce a correct image, Mediastreamer MUST be aware of device's orientation BEFORE calling 'configure_video_source'\n");
-				ms_warning("Capture filter do not know yet about device's orientation.\n"
-					"Current assumption: device is held perpendicular to its webcam (ie: portrait mode for a phone)\n");
-				this->mRotationSavedDuringVSize = 0;
-			} else {
-				this->mRotationSavedDuringVSize = this->mRotation;
-			}
-			bool camIsLandscape = this->mHwCapableSize.width > this->mHwCapableSize.height;
-			bool useIsLandscape = this->mUsedSize.width > this->mUsedSize.height;
-
-			// if both are landscape or both portrait, swap
-			if (camIsLandscape == useIsLandscape) {
-				int t = this->mUsedSize.width;
-				this->mUsedSize.width = this->mUsedSize.height;
-				this->mUsedSize.height = t;
-				ms_message("Swapped resolution width and height to : %dx%d\n", this->mUsedSize.width, this->mUsedSize.height);
-			}
-		} else {
-			this->mRotationSavedDuringVSize = this->mRotation;
-		}
-
-		this->unlock();
+		*static_cast<float*>(arg) = ms_average_fps_get(&this->mAverageFps);
 		return 0;
 	};
 
 	virtual int videoCaptureGetVsize(void *arg) {
-		*(MSVideoSize*)arg = this->mUsedSize;
+		*static_cast<MSVideoSize*>(arg) = this->mUsedSize;
 		return 0;
 	};
 
 	virtual int videoCaptureGetPixFmt(void *arg) {
-		*(MSPixFmt*)arg = MS_YUV420P;
-		return 0;
-	};
-
-	virtual int videoSetNativePreviewWindow(void *arg) {
-		this->lock();
-
-		jobject w = (jobject)*((unsigned long*)arg);
-
-		if (w == this->mPreviewWindow) {
-			this->unlock();
-			return 0;
-		}
-
-		if (this->mAndroidCamera) {
-			if (this->mPreviewWindow == 0) {
-				ms_message("Preview capture window set for the 1st time (win: %p rotation:%d)\n", w, this->mRotation);
-			} else {
-				ms_message("Preview capture window changed (oldwin: %p newwin: %p rotation:%d)\n", this->mPreviewWindow, w, this->mRotation);
-
-				this->mJavaEnv->CallStaticVoidMethod(this->mHelperClass, this->mMethodStopRecording, this->mAndroidCamera);
-				this->mJavaEnv->DeleteGlobalRef(this->mAndroidCamera);
-				this->mAndroidCamera = this->mJavaEnv->NewGlobalRef(
-				this->mJavaEnv->CallStaticObjectMethod(this->mHelperClass,
-							this->mMethodStartRecording,
-							((AndroidWebcamConfig*)this->mWebcam->data)->id,
-							this->mHwCapableSize.width,
-							this->mHwCapableSize.height,
-							(jint)30,
-							(this->mRotation != UNDEFINED_ROTATION) ? this->mRotation:0,
-							(jlong)this));
-			}
-			// if previewWindow AND camera are valid => set preview window
-			if (w && this->mAndroidCamera) {
-				this->mJavaEnv->CallStaticVoidMethod(this->mHelperClass, this->mMethodSetPreviewDisplaySurface, this->mAndroidCamera, w);
-			}
-		} else {
-			ms_message("Preview capture window set but camera not created yet; remembering it for later use\n");
-		}
-		this->mPreviewWindow = w;
-
-		this->unlock();
-
+		*static_cast<MSPixFmt*>(arg) = MS_YUV420P;
 		return 0;
 	};
 
 	virtual int videoGetNativePreviewWindow(void *arg) {
-		*((unsigned long *)arg) = (unsigned long)this->mPreviewWindow;
+		*static_cast<unsigned long *>(arg) = (unsigned long)this->mPreviewWindow;
 		return 0;
 	};
 
 	virtual int videoSetDeviceRotation(void *arg) {
-		this->mRotation = *((int*)arg);
+		this->mRotation = *static_cast<int*>(arg);
 		ms_message("%s : %d\n", __FUNCTION__, this->mRotation);
 		return 0;
 	};
 
-	virtual int videoCaptureSetAutofocus(void *arg) {
-		this->mJavaEnv->CallStaticObjectMethod(this->mHelperClass, this->mMethodActivateAutoFocus, this->mAndroidCamera);
-		return 0;
-	};
+	virtual int videoCaptureSetVsize(void *arg) = 0;
+	virtual int videoSetNativePreviewWindow(void *arg) = 0;
+	virtual int videoCaptureSetAutofocus(void *arg) = 0;
 
 	// JNI
 	virtual void putImage(jbyteArray frame) = 0;
@@ -289,11 +291,11 @@ protected:
 	AndroidVideoAbstract(const AndroidVideoAbstract&) = delete;
 	AndroidVideoAbstract() = delete;
 
-	void lock() {
+	virtual void lock() {
 		ms_mutex_lock(&this->mMutex);
 	};
 
-	void unlock() {
+	virtual void unlock() {
 		ms_mutex_unlock(&this->mMutex);
 	};
 
@@ -329,15 +331,61 @@ protected:
 		*cbcroff = this->mHwCapableSize.width * halfDiffH * 0.5 + halfDiffW;
 	};
 
-	virtual void initJNIMethod() {
-		if (this->mJavaEnv && this->mHelperClass) {
-			this->mMethodActivateAutoFocus = this->mJavaEnv->GetStaticMethodID(this->mHelperClass, "activateAutoFocus", "(Ljava/lang/Object;)V");
-			this->mMethodSelectNearestResolutionAvailable = this->mJavaEnv->GetStaticMethodID(this->mHelperClass, "selectNearestResolutionAvailable", "(III)[I");
-			this->mMethodSetPreviewDisplaySurface = this->mJavaEnv->GetStaticMethodID(this->mHelperClass, "setPreviewDisplaySurface", "(Ljava/lang/Object;Ljava/lang/Object;)V");
-			this->mMethodStartRecording = this->mJavaEnv->GetStaticMethodID(this->mHelperClass, "startRecording", "(IIIIIJ)Ljava/lang/Object;");
-			this->mMethodStopRecording = this->mJavaEnv->GetStaticMethodID(this->mHelperClass, "stopRecording", "(Ljava/lang/Object;)V");
+	void setVsizeHelper() {
+		// always request landscape mode, orientation is handled later
+		if (this->mRequestedSize.height > this->mRequestedSize.width) {
+			int tmp = this->mRequestedSize.height;
+			this->mRequestedSize.height = this->mRequestedSize.width;
+			this->mRequestedSize.width = tmp;
 		}
-	};
+
+		int rqSize = this->mRequestedSize.width * this->mRequestedSize.height;
+		int hwSize = this->mHwCapableSize.width * this->mHwCapableSize.height;
+		double downscale = this->mUseDownscaling ? 0.5 : 1;
+
+		// if hw supplies a smaller resolution, modify requested size accordingly
+		if ((hwSize * downscale * downscale) < rqSize) {
+			ms_message("Camera cannot produce requested resolution %dx%d, will supply smaller one: %dx%d\n",
+				this->mRequestedSize.width, this->mRequestedSize.height, (int)(this->mHwCapableSize.width * downscale),
+				(int)(this->mHwCapableSize.height * downscale));
+			this->mUsedSize.width = (int) (this->mHwCapableSize.width * downscale);
+			this->mUsedSize.height = (int) (this->mHwCapableSize.height * downscale);
+		} else if ((hwSize * downscale * downscale) > rqSize) {
+			ms_message("Camera cannot produce requested resolution %dx%d, will capture a bigger one (%dx%d) and crop it to match encoder requested resolution\n",
+				this->mRequestedSize.width, this->mRequestedSize.height, (int)(this->mHwCapableSize.width * downscale),
+				(int)(this->mHwCapableSize.height * downscale));
+			this->mUsedSize.width = this->mRequestedSize.width;
+			this->mUsedSize.height = this->mRequestedSize.height;
+		} else {
+			this->mUsedSize.width = this->mRequestedSize.width;
+			this->mUsedSize.height = this->mRequestedSize.height;
+		}
+
+		// is phone held |_ to cam orientation ?
+		if (this->mRotation == UNDEFINED_ROTATION || computeImageRotationCorrection() % 180 != 0) {
+			if (this->mRotation == UNDEFINED_ROTATION) {
+				ms_error("To produce a correct image, Mediastreamer MUST be aware of device's orientation BEFORE calling 'configure_video_source'\n");
+				ms_warning("Capture filter do not know yet about device's orientation.\n"
+					"Current assumption: device is held perpendicular to its webcam (ie: portrait mode for a phone)\n");
+				this->mRotationSavedDuringVSize = 0;
+			} else {
+				this->mRotationSavedDuringVSize = this->mRotation;
+			}
+			bool camIsLandscape = this->mHwCapableSize.width > this->mHwCapableSize.height;
+			bool useIsLandscape = this->mUsedSize.width > this->mUsedSize.height;
+
+			// if both are landscape or both portrait, swap
+			if (camIsLandscape == useIsLandscape) {
+				int t = this->mUsedSize.width;
+				this->mUsedSize.width = this->mUsedSize.height;
+				this->mUsedSize.height = t;
+				ms_message("Swapped resolution width and height to : %dx%d\n", this->mUsedSize.width, this->mUsedSize.height);
+			}
+		} else {
+			this->mRotationSavedDuringVSize = this->mRotation;
+		}
+	}
+
 };
 
 }

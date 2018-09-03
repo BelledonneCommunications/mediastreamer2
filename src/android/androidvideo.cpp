@@ -3,13 +3,8 @@
  *
  *  mediastreamer2 library - modular sound and video processing and streaming
  *  This is the video capture filter for Android.
- *  It uses one of the JNI wrappers to access Android video capture API.
- *  See:
- *    org.linphone.mediastream.video.capture.AndroidVideoApi9JniWrapper
- *    org.linphone.mediastream.video.capture.AndroidVideoApi8JniWrapper
- *    org.linphone.mediastream.video.capture.AndroidVideoApi5JniWrapper
  *
- *  Copyright (C) 2010 - 2018  Belledonne Communications, Grenoble, France
+ *  Copyright (C) 2010-2018  Belledonne Communications, Grenoble, France
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -37,12 +32,31 @@
 #include <jni.h>
 #include <math.h>
 
-static int android_sdk_version = 5;
-
 static const char* VersionPath = "org/linphone/mediastream/Version";
 
 /************************ Private helper methods ************************/
 static AndroidVideo::AndroidVideoAbstract* getAndroidVideoCamera(JNIEnv *env, MSFilter *f);
+
+/************************ Helper methods ************************/
+static int getAndroidSdkVersion(JNIEnv *env) {
+	jclass version = env->FindClass(VersionPath);
+	jmethodID method = env->GetStaticMethodID(version, "sdk", "()I");
+	int android_sdk_version = env->CallStaticIntMethod(version, method);
+	ms_message("AndroidVideo: Android SDK version found is %i", android_sdk_version);
+	env->DeleteLocalRef(version);
+	return android_sdk_version;
+}
+
+static AndroidVideo::AndroidVideoAbstract* getAndroidVideoCamera(JNIEnv *env, MSFilter *f) {
+	//int android_sdk_version = getAndroidSdkVersion(env);
+
+	// Android API equal or sup 24 and API Camera2 is available we use this API
+	/*if (android_sdk_version >= 24 && AndroidVideo::AndroidVideoAbstract::apiCamera2Available()) {
+		return new AndroidVideo::AndroidVideoCamera2(f);
+	} else {*/
+		return new AndroidVideo::AndroidVideoCamera(f);
+	//}
+}
 
 /************************ MS2 filter methods ************************/
 static int video_capture_set_fps(MSFilter *f, void *arg) {
@@ -95,13 +109,14 @@ static void video_capture_postprocess(MSFilter *f){
 
 static void video_capture_init(MSFilter *f) {
 	AndroidVideo::AndroidVideoAbstract *androidCamera = getAndroidVideoCamera(ms_get_jni_env(), f);
-	ms_message("Init of Android VIDEO capture filter (%p)", androidCamera);
+	ms_message("AndroidVideo: Init of Android VIDEO capture filter (%p)", androidCamera);
 	androidCamera->videoCaptureInit();
 }
 
 static void video_capture_uninit(MSFilter *f) {
-	ms_message("Uninit of Android VIDEO capture filter");
+	ms_message("AndroidVideo: Uninit of Android VIDEO capture filter");
 	AndroidVideo::AndroidVideoAbstract *androidCamera = (AndroidVideo::AndroidVideoAbstract*)f->data;
+	androidCamera->videoCaptureUninit();
 	delete androidCamera;
 	f->data = nullptr;
 }
@@ -138,18 +153,25 @@ MSFilterDesc ms_video_capture_desc={
 MS_FILTER_DESC_EXPORT(ms_video_capture_desc)
 
 /************************ Webcam methods ************************/
-static void video_capture_detect(MSWebCamManager *obj);
 static void video_capture_cam_init(MSWebCam *cam) {
-	ms_message("Android VIDEO capture filter cam init");
+	ms_message("AndroidVideo: Android VIDEO capture filter cam init");
 }
 
 static MSFilter *video_capture_create_reader(MSWebCam *obj) {
-	ms_message("Instanciating Android VIDEO capture MS filter");
+	ms_message("AndroidVideo: Instanciating Android VIDEO capture MS filter");
 
 	MSFilter* lFilter = ms_factory_create_filter_from_desc(ms_web_cam_get_factory(obj), &ms_video_capture_desc);
 	((AndroidVideo::AndroidVideoAbstract*)lFilter->data)->setWebcam(obj);
 
 	return lFilter;
+}
+
+static void video_capture_detect(MSWebCamManager *obj) {
+	if (getAndroidSdkVersion(ms_get_jni_env()) >= 24) {
+		AndroidVideo::AndroidVideoAbstract::camera2Detect(obj);
+	} else {
+		AndroidVideo::AndroidVideoAbstract::cameraDetect(obj);
+	}
 }
 
 MSWebCamDesc ms_android_video_capture_desc = {
@@ -160,72 +182,11 @@ MSWebCamDesc ms_android_video_capture_desc = {
 		nullptr
 };
 
-static void video_capture_detect(MSWebCamManager *obj) {
-	ms_message("Detecting Android VIDEO cards");
-	JNIEnv *env = ms_get_jni_env();
-	jclass helperClass = AndroidVideo::AndroidVideoAbstract::getHelperClassGlobalRef(env);
-
-	if (helperClass == nullptr) return;
-
-	// create 3 int arrays - assuming 2 webcams at most
-	jintArray indexes = (jintArray)env->NewIntArray(2);
-	jintArray frontFacing = (jintArray)env->NewIntArray(2);
-	jintArray orientation = (jintArray)env->NewIntArray(2);
-
-	jmethodID method = env->GetStaticMethodID(helperClass,"detectCameras", "([I[I[I)I");
-
-	int count = env->CallStaticIntMethod(helperClass, method, indexes, frontFacing, orientation);
-
-	ms_message("%d cards detected", count);
-	for(int i=0; i<count; i++) {
-		MSWebCam *cam = ms_web_cam_new(&ms_android_video_capture_desc);
-		AndroidVideo::AndroidWebcamConfig* c = new AndroidVideo::AndroidWebcamConfig();
-		env->GetIntArrayRegion(indexes, i, 1, &c->id);
-		env->GetIntArrayRegion(frontFacing, i, 1, &c->frontFacing);
-		env->GetIntArrayRegion(orientation, i, 1, &c->orientation);
-		cam->data = c;
-		cam->name = ms_strdup("Android video name");
-		char* idstring = (char*) ms_malloc(15);
-		snprintf(idstring, 15, "Android%d", c->id);
-		cam->id = idstring;
-		ms_web_cam_manager_add_cam(obj, cam);
-		ms_message("camera created: id=%d frontFacing=%d orientation=%d [msid:%s]\n", c->id, c->frontFacing, c->orientation, idstring);
-	}
-	env->DeleteLocalRef(indexes);
-	env->DeleteLocalRef(frontFacing);
-	env->DeleteLocalRef(orientation);
-
-	env->DeleteGlobalRef(helperClass);
-	ms_message("Detection of Android VIDEO cards done");
-}
-
 /************************ JNI methods ************************/
-#ifdef __cplusplus
 extern "C" {
-#endif
-
-JNIEXPORT void JNICALL Java_org_linphone_mediastream_video_capture_AndroidVideoJniWrapper_putImage(JNIEnv* env,
-		jclass thiz, jlong nativePtr, jbyteArray frame) {
-	AndroidVideo::AndroidVideoAbstract* androidVideo = (AndroidVideo::AndroidVideoAbstract*)nativePtr;
-	androidVideo->putImage(frame);
-}
-
-#ifdef __cplusplus
-}
-#endif
-
-/************************ Helper methods ************************/
-static AndroidVideo::AndroidVideoAbstract* getAndroidVideoCamera(JNIEnv *env, MSFilter *f) {
-	jclass version = env->FindClass(VersionPath);
-	jmethodID method = env->GetStaticMethodID(version,"sdk", "()I");
-	android_sdk_version = env->CallStaticIntMethod(version, method);
-	ms_message("Android SDK version found is %i", android_sdk_version);
-	env->DeleteLocalRef(version);
-
-	// Android API less than 21 we use deprecated API camera
-	//if (android_sdk_version < 21) {
-		return new AndroidVideo::AndroidVideoCamera(f);
-	//} else {
-	//	return new AndroidVideo::AndroidVideoCamera2(f);
-	//}
+	JNIEXPORT void JNICALL Java_org_linphone_mediastream_video_capture_AndroidVideoJniWrapper_putImage(JNIEnv* env,
+			jclass thiz, jlong nativePtr, jbyteArray frame) {
+		AndroidVideo::AndroidVideoAbstract* androidVideo = (AndroidVideo::AndroidVideoAbstract*)nativePtr;
+		androidVideo->putImage(frame);
+	}
 }
