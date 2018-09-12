@@ -48,63 +48,63 @@ static int getAndroidSdkVersion(JNIEnv *env) {
 }
 
 static AndroidVideo::AndroidVideoAbstract* getAndroidVideoCamera(JNIEnv *env, MSFilter *f) {
-	//int android_sdk_version = getAndroidSdkVersion(env);
+	int android_sdk_version = getAndroidSdkVersion(env);
 
 	// Android API equal or sup 24 and API Camera2 is available we use this API
-	/*if (android_sdk_version >= 24 && AndroidVideo::AndroidVideoAbstract::apiCamera2Available()) {
+	if (android_sdk_version >= 24 && AndroidVideo::AndroidVideoAbstract::apiCamera2Available()) {
 		return new AndroidVideo::AndroidVideoCamera2(f);
-	} else {*/
+	} else {
 		return new AndroidVideo::AndroidVideoCamera(f);
-	//}
+	}
 }
 
 /************************ MS2 filter methods ************************/
 static int video_capture_set_fps(MSFilter *f, void *arg) {
-	return ((AndroidVideo::AndroidVideoAbstract*)f->data)->videoCaptureSetFps(arg);
+	return static_cast<AndroidVideo::AndroidVideoAbstract*>(f->data)->videoCaptureSetFps(arg);
 }
 
 static int video_capture_set_autofocus(MSFilter *f, void* arg) {
-	return ((AndroidVideo::AndroidVideoAbstract*)f->data)->videoCaptureSetAutofocus(arg);
+	return static_cast<AndroidVideo::AndroidVideoAbstract*>(f->data)->videoCaptureSetAutofocus(arg);
 }
 
 static int video_capture_get_fps(MSFilter *f, void *arg) {
-	return ((AndroidVideo::AndroidVideoAbstract*)f->data)->videoCaptureGetFps(arg);
+	return static_cast<AndroidVideo::AndroidVideoAbstract*>(f->data)->videoCaptureGetFps(arg);
 }
 
 static int video_capture_set_vsize(MSFilter *f, void* arg) {
-	return ((AndroidVideo::AndroidVideoAbstract*)f->data)->videoCaptureSetVsize(arg);
+	return static_cast<AndroidVideo::AndroidVideoAbstract*>(f->data)->videoCaptureSetVsize(arg);
 }
 
 static int video_capture_get_vsize(MSFilter *f, void* arg){
-	return ((AndroidVideo::AndroidVideoAbstract*)f->data)->videoCaptureGetVsize(arg);
+	return static_cast<AndroidVideo::AndroidVideoAbstract*>(f->data)->videoCaptureGetVsize(arg);
 }
 
 static int video_capture_get_pix_fmt(MSFilter *f, void *arg){
-	return ((AndroidVideo::AndroidVideoAbstract*)f->data)->videoCaptureGetPixFmt(arg);
+	return static_cast<AndroidVideo::AndroidVideoAbstract*>(f->data)->videoCaptureGetPixFmt(arg);
 }
 
 static int video_set_native_preview_window(MSFilter *f, void *arg) {
-	return ((AndroidVideo::AndroidVideoAbstract*)f->data)->videoSetNativePreviewWindow(arg);
+	return static_cast<AndroidVideo::AndroidVideoAbstract*>(f->data)->videoSetNativePreviewWindow(arg);
 }
 
 static int video_get_native_preview_window(MSFilter *f, void *arg) {
-	return ((AndroidVideo::AndroidVideoAbstract*)f->data)->videoGetNativePreviewWindow(arg);
+	return static_cast<AndroidVideo::AndroidVideoAbstract*>(f->data)->videoGetNativePreviewWindow(arg);
 }
 
 static int video_set_device_rotation(MSFilter* f, void* arg) {
-	return ((AndroidVideo::AndroidVideoAbstract*)f->data)->videoSetDeviceRotation(arg);
+	return static_cast<AndroidVideo::AndroidVideoAbstract*>(f->data)->videoSetDeviceRotation(arg);
 }
 
 void video_capture_preprocess(MSFilter *f) {
-	((AndroidVideo::AndroidVideoAbstract*)f->data)->videoCapturePreprocess();
+	static_cast<AndroidVideo::AndroidVideoAbstract*>(f->data)->videoCapturePreprocess();
 }
 
 static void video_capture_process(MSFilter *f) {
-	((AndroidVideo::AndroidVideoAbstract*)f->data)->videoCaptureProcess();
+	static_cast<AndroidVideo::AndroidVideoAbstract*>(f->data)->videoCaptureProcess();
 }
 
 static void video_capture_postprocess(MSFilter *f){
-	((AndroidVideo::AndroidVideoAbstract*)f->data)->videoCapturePostprocess();
+	static_cast<AndroidVideo::AndroidVideoAbstract*>(f->data)->videoCapturePostprocess();
 }
 
 static void video_capture_init(MSFilter *f) {
@@ -115,7 +115,7 @@ static void video_capture_init(MSFilter *f) {
 
 static void video_capture_uninit(MSFilter *f) {
 	ms_message("AndroidVideo: Uninit of Android VIDEO capture filter");
-	AndroidVideo::AndroidVideoAbstract *androidCamera = (AndroidVideo::AndroidVideoAbstract*)f->data;
+	AndroidVideo::AndroidVideoAbstract *androidCamera = static_cast<AndroidVideo::AndroidVideoAbstract*>(f->data);
 	androidCamera->videoCaptureUninit();
 	delete androidCamera;
 	f->data = nullptr;
@@ -161,7 +161,7 @@ static MSFilter *video_capture_create_reader(MSWebCam *obj) {
 	ms_message("AndroidVideo: Instanciating Android VIDEO capture MS filter");
 
 	MSFilter* lFilter = ms_factory_create_filter_from_desc(ms_web_cam_get_factory(obj), &ms_video_capture_desc);
-	((AndroidVideo::AndroidVideoAbstract*)lFilter->data)->setWebcam(obj);
+	static_cast<AndroidVideo::AndroidVideoAbstract*>(lFilter->data)->setWebcam(obj);
 
 	return lFilter;
 }
@@ -186,7 +186,7 @@ MSWebCamDesc ms_android_video_capture_desc = {
 extern "C" {
 	JNIEXPORT void JNICALL Java_org_linphone_mediastream_video_capture_AndroidVideoJniWrapper_putImage(JNIEnv* env,
 			jclass thiz, jlong nativePtr, jbyteArray frame) {
-		AndroidVideo::AndroidVideoAbstract* androidVideo = (AndroidVideo::AndroidVideoAbstract*)nativePtr;
+		AndroidVideo::AndroidVideoAbstract* androidVideo = reinterpret_cast<AndroidVideo::AndroidVideoAbstract*>(nativePtr);
 		androidVideo->putImage(frame);
 	}
 }

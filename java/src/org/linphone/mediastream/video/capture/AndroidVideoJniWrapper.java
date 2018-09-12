@@ -30,9 +30,7 @@ public class AndroidVideoJniWrapper {
 	}
 
 	public static int detectCameras(int[] indexes, int[] frontFacing, int[] orientation) {
-		if (Version.sdk() >= 21) {
-			return AndroidVideoApi21JniWrapper.detectCameras(indexes, frontFacing, orientation);
-		} else if (Version.sdk() >= 9) {
+		if (Version.sdk() >= 9) {
 			return AndroidVideoApi9JniWrapper.detectCameras(indexes, frontFacing, orientation);
 		} else if (Version.sdk() >= 8) {
 			return AndroidVideoApi8JniWrapper.detectCameras(indexes, frontFacing, orientation);
@@ -42,9 +40,7 @@ public class AndroidVideoJniWrapper {
 	}
 
 	public static int[] selectNearestResolutionAvailable(int cameraId, int requestedW, int requestedH) {
-		if (Version.sdk() >= 21) {
-			return AndroidVideoApi21JniWrapper.selectNearestResolutionAvailable(cameraId, requestedW, requestedH);
-		} else if (Version.sdk() >= 9) {
+		if (Version.sdk() >= 9) {
 			return AndroidVideoApi9JniWrapper.selectNearestResolutionAvailable(cameraId, requestedW, requestedH);
 		} else if (Version.sdk() >= 8) {
 			return AndroidVideoApi8JniWrapper.selectNearestResolutionAvailable(cameraId, requestedW, requestedH);
@@ -54,9 +50,7 @@ public class AndroidVideoJniWrapper {
 	}
 
 	public static Object startRecording(int cameraId, int width, int height, int fps, int rotation, final long nativePtr) {
-		if (Version.sdk() >= 21) {
-			return AndroidVideoApi21JniWrapper.startRecording(cameraId, width, height, fps, rotation, nativePtr);
-		} else if (Version.sdk() >= 9) {
+		if (Version.sdk() >= 9) {
 			return AndroidVideoApi9JniWrapper.startRecording(cameraId, width, height, fps, rotation, nativePtr);
 		} else if (Version.sdk() >= 8) {
 			return AndroidVideoApi8JniWrapper.startRecording(cameraId, width, height, fps, rotation, nativePtr);
@@ -66,9 +60,7 @@ public class AndroidVideoJniWrapper {
 	}
 
 	public static void stopRecording(Object cam) {
-		if (Version.sdk() >= 21) {
-			AndroidVideoApi21JniWrapper.stopRecording(cam);
-		} else if (Version.sdk() >= 9) {
+		if (Version.sdk() >= 9) {
 			AndroidVideoApi9JniWrapper.stopRecording(cam);
 		} else if (Version.sdk() >= 8) {
 			AndroidVideoApi8JniWrapper.stopRecording(cam);
@@ -78,9 +70,7 @@ public class AndroidVideoJniWrapper {
 	}
 
 	public static void setPreviewDisplaySurface(Object cam, Object surf) {
-		if (Version.sdk() >= 21) {
-			AndroidVideoApi21JniWrapper.setPreviewDisplaySurface(cam, surf);
-		} else if (Version.sdk() >= 9) {
+		if (Version.sdk() >= 9) {
 			AndroidVideoApi9JniWrapper.setPreviewDisplaySurface(cam, surf);
 		} else if (Version.sdk() >= 8) {
 			AndroidVideoApi8JniWrapper.setPreviewDisplaySurface(cam, surf);

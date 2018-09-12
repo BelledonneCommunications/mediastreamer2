@@ -47,6 +47,7 @@ struct AndroidWebcamConfig {
 	int id;
 	int frontFacing;
 	int orientation;
+	char idChar[64] = {0};
 };
 
 class AndroidVideoAbstract {
@@ -125,9 +126,9 @@ public:
 		if (helperClass == nullptr) return;
 
 		// create 3 int arrays - assuming 2 webcams at most
-		jintArray indexes = (jintArray)env->NewIntArray(2);
-		jintArray frontFacing = (jintArray)env->NewIntArray(2);
-		jintArray orientation = (jintArray)env->NewIntArray(2);
+		jintArray indexes = env->NewIntArray(2);
+		jintArray frontFacing = env->NewIntArray(2);
+		jintArray orientation = env->NewIntArray(2);
 
 		jmethodID method = env->GetStaticMethodID(helperClass,"detectCameras", "([I[I[I)I");
 
@@ -142,7 +143,7 @@ public:
 			env->GetIntArrayRegion(orientation, i, 1, &c->orientation);
 			cam->data = c;
 			cam->name = ms_strdup("Android video name");
-			char* idstring = (char*) ms_malloc(15);
+			char* idstring = static_cast<char*>(ms_malloc(15));
 			snprintf(idstring, 15, "Android%d", c->id);
 			cam->id = idstring;
 			ms_web_cam_manager_add_cam(obj, cam);
@@ -184,9 +185,10 @@ public:
 			conf->id = i;
 			conf->frontFacing = (facing == ACAMERA_LENS_FACING_FRONT);
 			conf->orientation = orientation;
+			strcpy(conf->idChar, cameraIds->cameraIds[i]);
 			cam->data = conf;
 			cam->name = ms_strdup("Android video name");
-			char* idstring = (char*) ms_malloc(15);
+			char* idstring = static_cast<char*>(ms_malloc(15));
 			snprintf(idstring, 15, "Android%d", conf->id);
 			cam->id = idstring;
 			ms_web_cam_manager_add_cam(obj, cam);
@@ -220,10 +222,11 @@ public:
 				level != ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL_3) {
 				ACameraManager_deleteCameraIdList(cameraIds);
 				ACameraManager_delete(cameraManager);
+				ms_message("AndroidVideo: Camera2 API level full not available for this device.");
 				return false;
 			}
 		}
-
+		ms_message("AndroidVideo: Camera2 API level full detected on this device.");
 		ACameraManager_deleteCameraIdList(cameraIds);
 		ACameraManager_delete(cameraManager);
 		return true;
@@ -302,14 +305,14 @@ protected:
 	// Tools
 	int computeImageRotationCorrection() {
 		int result;
-		AndroidWebcamConfig* conf = (AndroidWebcamConfig*)this->mWebcam->data;
+		AndroidWebcamConfig* conf = static_cast<AndroidWebcamConfig*>(this->mWebcam->data);
 
 		if (conf->frontFacing) {
-			ms_debug("%s: %d + %d\n", __FUNCTION__, ((AndroidWebcamConfig*)this->mWebcam->data)->orientation, this->mRotation);
-			result = ((AndroidWebcamConfig*)this->mWebcam->data)->orientation +  this->mRotation;
+			ms_debug("%s: %d + %d\n", __FUNCTION__, static_cast<AndroidWebcamConfig*>(this->mWebcam->data)->orientation, this->mRotation);
+			result = static_cast<AndroidWebcamConfig*>(this->mWebcam->data)->orientation +  this->mRotation;
 		} else {
-			ms_debug("%s: %d - %d\n", __FUNCTION__, ((AndroidWebcamConfig*)this->mWebcam->data)->orientation,  this->mRotation);
-			result = ((AndroidWebcamConfig*)this->mWebcam->data)->orientation -  this->mRotation;
+			ms_debug("%s: %d - %d\n", __FUNCTION__, static_cast<AndroidWebcamConfig*>(this->mWebcam->data)->orientation,  this->mRotation);
+			result = static_cast<AndroidWebcamConfig*>(this->mWebcam->data)->orientation -  this->mRotation;
 		}
 		while(result < 0)
 			result += 360;

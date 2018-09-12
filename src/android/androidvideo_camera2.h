@@ -27,14 +27,45 @@
 
 #include "androidvideo_abstract.h"
 
+#include <iostream>
+#include <typeinfo>
+
 #include <camera/NdkCameraManager.h>
 #include <camera/NdkCameraDevice.h>
+#include <media/NdkImageReader.h>
+
 
 namespace AndroidVideo {
 class AndroidVideoCamera2 : public AndroidVideoAbstract {
 	private:
+	// Camera
 	ACameraManager *mCameraManager;
+	ACameraCaptureSession *mCameraSession;
 	ACameraDevice *mCameraDevice;
+
+	// Window
+	ANativeWindow *mWindows;
+	ACameraOutputTarget *mOutputTarget;
+
+	// Image Reader
+	AImageReader* mImageReader;
+
+	// Session
+	ACaptureSessionOutput *mSessionOutput;
+	ACaptureSessionOutputContainer *mSessionOutputContainer;
+	bool mSessionReady;
+	bool mSessionStop;
+	bool mSessionReset;
+
+	// Request
+	ACaptureRequest *mCaptureRequest;
+	bool mRequestRepeat;
+
+	// Callback
+	ACameraDevice_StateCallbacks mDeviceCallback;
+	ACameraCaptureSession_stateCallbacks mCaptureSessionCallback;
+	ACameraCaptureSession_captureCallbacks mCaptureCallbacks;
+	AImageReader_ImageListener mImageCallback;
 
 	public:
 		AndroidVideoCamera2(MSFilter *f);
@@ -48,7 +79,13 @@ class AndroidVideoCamera2 : public AndroidVideoAbstract {
 		void videoCaptureUninit();
 
 		// Callbacks
-		void cameraDeviceStateCallback(void* context, ACameraDevice* device, int error);
+		static void onDisconnected(void* context, ACameraDevice* device);
+		static void onError(void* context, ACameraDevice* device, int error);
+		static void onSessionActive(void* context, ACameraCaptureSession *session);
+		static void onSessionReady(void* context, ACameraCaptureSession *session);
+		static void onSessionClosed(void* context, ACameraCaptureSession *session);
+		static void onCaptureSequenceCompleted(void* context, ACameraCaptureSession* session, int sequenceId, int64_t frameNumber);
+		static void onImageAvailable(void* context, AImageReader* reader);
 
 		// Other methods
 		int videoCaptureSetVsize(void *arg);
@@ -59,6 +96,26 @@ class AndroidVideoCamera2 : public AndroidVideoAbstract {
 	private:
 		AndroidVideoCamera2(const AndroidVideoCamera2&) = delete;
 		AndroidVideoCamera2() = delete;
+
+		// Helper
+		void setImage();
+
+		void initCamera();
+		void uninitCamera();
+
+		void initWindow();
+		void uninitWindow();
+
+		void initSession();
+		void sessionReady();
+		void sessionClosed();
+		void uninitSession();
+
+		void initRequest();
+		void uninitRequest();
+
+		camera_status_t checkReturnCameraStatus(camera_status_t status);
+		media_status_t checkReturnMediaStatus(media_status_t status);
 };
 }
 

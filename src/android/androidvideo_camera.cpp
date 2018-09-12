@@ -53,9 +53,9 @@ namespace AndroidVideo {
 				static_cast<AndroidWebcamConfig*>(this->mWebcam->data)->id,
 				this->mHwCapableSize.width,
 				this->mHwCapableSize.height,
-				(jint)30,
+				static_cast<jint>(30),
 				this->mRotationSavedDuringVSize,
-				(jlong)this);
+				reinterpret_cast<jlong>(this));
 		this->mAndroidCamera = this->mJavaEnv->NewGlobalRef(cam);
 
 		if (this->mPreviewWindow) {
@@ -164,9 +164,9 @@ namespace AndroidVideo {
 					static_cast<AndroidWebcamConfig*>(this->mWebcam->data)->id,
 					this->mHwCapableSize.width,
 					this->mHwCapableSize.height,
-					(jint)30,
+					static_cast<jint>(30),
 					(this->mRotation != UNDEFINED_ROTATION) ? this->mRotation:0,
-					(jlong)this));
+					reinterpret_cast<jlong>(this)));
 			}
 			// if previewWindow AND camera are valid => set preview window
 			if (w && this->mAndroidCamera) {
@@ -219,8 +219,8 @@ namespace AndroidVideo {
 		int width = this->mHwCapableSize.width;
 		int height = this->mHwCapableSize.height;
 
-		uint8_t* y_src = (uint8_t*)(jinternal_buff + y_cropping_offset);
-		uint8_t* cbcr_src = (uint8_t*)(jinternal_buff + width * height + cbcr_cropping_offset);
+		uint8_t* y_src = reinterpret_cast<uint8_t*>(jinternal_buff + y_cropping_offset);
+		uint8_t* cbcr_src = reinterpret_cast<uint8_t*>(jinternal_buff + width * height + cbcr_cropping_offset);
 
 
 		/* Warning note: image_rotation_correction == 90 does not imply portrait mode !
@@ -228,15 +228,17 @@ namespace AndroidVideo {
 		It only implies one thing: image needs to rotated by that amount to be correctly
 		displayed.
 		*/
-		mblk_t* yuv_block = copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(this->mAllocator, y_src
-															, cbcr_src
-															, image_rotation_correction
-															, this->mUsedSize.width
-															, this->mUsedSize.height
-															, this->mHwCapableSize.width
-															, this->mHwCapableSize.width
-															, false
-															, this->mUseDownscaling);
+		mblk_t* yuv_block = copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(
+			this->mAllocator,
+			y_src,
+			cbcr_src,
+			image_rotation_correction,
+			this->mUsedSize.width,
+			this->mUsedSize.height,
+			this->mHwCapableSize.width,
+			this->mHwCapableSize.width,
+			false,
+			this->mUseDownscaling);
 		if (yuv_block) {
 			if (this->mFrame)
 				freemsg(this->mFrame);
