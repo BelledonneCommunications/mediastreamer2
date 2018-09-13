@@ -101,6 +101,13 @@ namespace AndroidVideo {
 		this->initWindow();
 		this->initSession();
 		this->initRequest();
+
+		// Check if there is a frame from other capture and delete it
+		if (this->mFrame) {
+			ms_free(this->mFrame);
+			this->mFrame = nullptr;
+		}
+
 		this->unlock();
 	}
 
@@ -111,6 +118,18 @@ namespace AndroidVideo {
 				this->mRequestRepeat = false;
 			}
 		}
+
+		// If frame not ready, return
+		if (this->mFrame == nullptr) {
+			this->unlock();
+			return;
+		}
+
+		ms_video_update_average_fps(&this->mAverageFps, this->mFilter->ticker->time);
+
+		ms_queue_put(this->mFilter->outputs[0], this->mFrame);
+		this->mFrame = nullptr;
+
 		this->unlock();
 	}
 
@@ -142,6 +161,8 @@ namespace AndroidVideo {
 		vector<int> hardwareCapabilitiesWidth;
 
 		this->lock();
+
+		this->mRequestedSize = *static_cast<MSVideoSize*>(arg);
 
 		/************** Get Hardware capabilities **************/
 		if (!this->mWebcam || !this->mWebcam ||
@@ -181,8 +202,6 @@ namespace AndroidVideo {
 
 		this->mHwCapableSize.height = hardwareCapabilitiesHeight.at(0);
 		this->mHwCapableSize.width = hardwareCapabilitiesWidth.at(0);
-
-		this->mRequestedSize = *static_cast<MSVideoSize*>(arg);
 
 		this->setVsizeHelper();
 
@@ -237,19 +256,15 @@ namespace AndroidVideo {
 	// Helper
 
 	void AndroidVideoCamera2::setImage() {
-		int32_t rowStride32[3];
-		int32_t pixelStride32[3];
 		int rowStride[3];
 		int pixelStride[3];
 		MSPicture msPicture;
-		MSRect rect;
+		MSRect rect, rectSrc;
 		int bufferSize[3] = {0};
-		int destPixelStride[3] = {1};
 		uint8_t* bufferPlane[3] = {nullptr};
 		AImage* image = nullptr;
 		mblk_t* yuvBlock = nullptr;
 
-		ms_error("ALLO setImage");
 		this->lock();
 
 		if (!this->mImageReader) {
@@ -262,53 +277,74 @@ namespace AndroidVideo {
 			return;
 		}
 
-		/*if (this->mRotation != UNDEFINED_ROTATION && this->mRotationSavedDuringVSize != this->mRotation) {
+		if (this->mRotation != UNDEFINED_ROTATION && this->mRotationSavedDuringVSize != this->mRotation) {
 			ms_warning("Rotation has changed (new value: %d) since vsize was run (old value: %d)."
 						"Will produce inverted images. Use set_device_orientation() then update call.\n",
 				this->mRotation, this->mRotationSavedDuringVSize);
-		}*/
+		}
 
-		//int image_rotation_correction = this->computeImageRotationCorrection();
+		int image_rotation_correction = this->computeImageRotationCorrection();
 
 		if (this->checkReturnMediaStatus(AImageReader_acquireLatestImage(this->mImageReader, &image)) != AMEDIA_OK) goto end;
 
 		// Get all plane
 		for (unsigned int i = 0 ; i < 3 ; i++) {
+			int32_t rowStride32;
+			int32_t pixelStride32;
+
 			if (this->checkReturnMediaStatus(AImage_getPlaneData(image, i, &bufferPlane[i], &bufferSize[i])) != AMEDIA_OK) goto end;
-			if (this->checkReturnMediaStatus(AImage_getPlaneRowStride(image, i, &rowStride32[i])) != AMEDIA_OK) goto end;
-			if (this->checkReturnMediaStatus(AImage_getPlanePixelStride(image, i, &pixelStride32[i])) != AMEDIA_OK) goto end;
-			pixelStride[i] = pixelStride32[i];
-			rowStride[i] = rowStride32[i];
+			if (this->checkReturnMediaStatus(AImage_getPlaneRowStride(image, i, &rowStride32)) != AMEDIA_OK) goto end;
+			if (this->checkReturnMediaStatus(AImage_getPlanePixelStride(image, i, &pixelStride32)) != AMEDIA_OK) goto end;
+
+			pixelStride[i] = pixelStride32;
+			rowStride[i] = rowStride32;
 		}
 
 		yuvBlock = ms_yuv_buf_allocator_get(this->mAllocator, &msPicture, this->mUsedSize.width, this->mUsedSize.height);
 
 		rect.x = 0;
 		rect.y = 0;
-		rect.h = this->mUsedSize.height;
-		rect.w = this->mUsedSize.width;
+		rect.w = this->mUsedSize.height;
+		rect.h = this->mUsedSize.width;
 
-		ms_yuv_buf_copy_with_pix_strides(bufferPlane, rowStride, pixelStride, rect, msPicture.planes, msPicture.strides, destPixelStride, rect);
+		{
+			AImageCropRect cropRect;
+			if (this->checkReturnMediaStatus(AImage_getCropRect(image, &cropRect)) != AMEDIA_OK) goto end;
+			rectSrc.h = cropRect.bottom - cropRect.top;
+			rectSrc.w = cropRect.right - cropRect.left;
+			rectSrc.y = cropRect.top;
+			rectSrc.x = cropRect.left;
+		}
 
-		/*int y_cropping_offset=0, cbcr_cropping_offset=0;
-		MSVideoSize targetSize;
-		this->mUseDownscaling ? targetSize.width = this->mRequestedSize.width * 2 : targetSize.width = this->mRequestedSize.width;
-		this->mUseDownscaling ? targetSize.height = this->mRequestedSize.height * 2 : targetSize.height = this->mRequestedSize.height;
-
-		this->computeCroppingOffsets(targetSize, &y_cropping_offset, &cbcr_cropping_offset);
-
-		int width = this->mHwCapableSize.width;
-		int height = this->mHwCapableSize.height;
-
-		uint8_t* y_src = reinterpret_cast<uint8_t*>(bufferPlane + y_cropping_offset);
-		uint8_t* cbcr_src = reinterpret_cast<uint8_t*>(bufferPlane + width * height + cbcr_cropping_offset);*/
-
-
-		/* Warning note: image_rotation_correction == 90 does not imply portrait mode !
-		(incorrect function naming).
-		It only implies one thing: image needs to rotated by that amount to be correctly
-		displayed.
-		*/
+		// U/V planar
+		if (pixelStride[1] == 1) {
+			yuvBlock = copy_yuv_with_rotation(this->mAllocator,
+				bufferPlane[0],
+				bufferPlane[1],
+				bufferPlane[2],
+				image_rotation_correction,
+				this->mUsedSize.width,
+				this->mUsedSize.height,
+				rowStride[0],
+				rowStride[1],
+				rowStride[2]);
+		} else {
+			const uint8_t* bufferCrb = bufferPlane[1];
+			if (bufferPlane[2] < bufferPlane[1]) {
+				bufferCrb = bufferPlane[2];
+			}
+			yuvBlock = copy_ycbcrbiplanar_to_true_yuv_with_rotation_and_down_scale_by_2(
+				this->mAllocator,
+				bufferPlane[0],
+				bufferCrb,
+				image_rotation_correction,
+				this->mUsedSize.width,
+				this->mUsedSize.height,
+				rowStride[0],
+				rowStride[1],
+				false,
+				false);
+		}
 
 		if (yuvBlock) this->mFrame = yuvBlock;
 
@@ -534,7 +570,7 @@ namespace AndroidVideo {
 			case AMEDIA_DRM_NEED_KEY :
 			case AMEDIA_DRM_LICENSE_EXPIRED :
 			case AMEDIA_ERROR_UNKNOWN :
-				ms_error("AndroidVideoCamera2: media_status_t: Unknown error.");
+				ms_error("AndroidVideoCamera2: media_status_t: Unknown error: %d.", status);
 				break;
 		}
 
