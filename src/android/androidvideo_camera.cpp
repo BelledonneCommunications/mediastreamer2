@@ -94,8 +94,8 @@ namespace AndroidVideo {
 			this->mJavaEnv->DeleteGlobalRef(this->mAndroidCamera);
 		}
 
-		this->mAndroidCamera = 0;
-		this->mPreviewWindow = 0;
+		this->mAndroidCamera = nullptr;
+		this->mPreviewWindow = nullptr;
 
 		if (this->mFrame){
 			freemsg(this->mFrame);
@@ -151,7 +151,7 @@ namespace AndroidVideo {
 		}
 
 		if (this->mAndroidCamera) {
-			if (this->mPreviewWindow == 0) {
+			if (!this->mPreviewWindow) {
 				ms_message("Preview capture window set for the 1st time (win: %p rotation:%d)\n", w, this->mRotation);
 			} else {
 				ms_message("Preview capture window changed (oldwin: %p newwin: %p rotation:%d)\n", this->mPreviewWindow, w, this->mRotation);

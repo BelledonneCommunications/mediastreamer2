@@ -44,8 +44,10 @@ class AndroidVideoCamera2 : public AndroidVideoAbstract {
 	ACameraDevice *mCameraDevice;
 
 	// Window
-	ANativeWindow *mWindows;
-	ACameraOutputTarget *mOutputTarget;
+	ANativeWindow *mWindowImageReader;
+	ANativeWindow *mWindowSurfaceView;
+	ACameraOutputTarget *mOutputTarget1;
+	ACameraOutputTarget *mOutputTarget2;
 
 	// Image Reader
 	AImageReader* mImageReader;

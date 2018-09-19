@@ -74,29 +74,31 @@ protected:
 
 public:
 	AndroidVideoAbstract(MSFilter *f) : mRotation(UNDEFINED_ROTATION), mRotationSavedDuringVSize(UNDEFINED_ROTATION), mFps(5),
-										mAndroidCamera(0), mPreviewWindow(0), mFrame(nullptr), mFilter(f), mWebcam(nullptr) {
+										mAndroidCamera(nullptr), mPreviewWindow(nullptr), mFrame(nullptr), mFilter(f), mWebcam(nullptr) {
 		ms_debug("Creating AndroidVideoAbstract for Android VIDEO capture filter");
-		ms_mutex_init(&mMutex, nullptr);
-		mJavaEnv = ms_get_jni_env();
-		mAllocator = ms_yuv_buf_allocator_new();
-		if (!mHelperClass) {
-			mHelperClass = getHelperClassGlobalRef(mJavaEnv);
+		ms_mutex_init(&this->mMutex, nullptr);
+		this->mJavaEnv = ms_get_jni_env();
+		this->mAllocator = ms_yuv_buf_allocator_new();
+		if (!this->mHelperClass) {
+			this->mHelperClass = getHelperClassGlobalRef(this->mJavaEnv);
 		}
 
-		snprintf(mFpsContext, sizeof(mFpsContext), "Captured mean fps=%%f");
+		snprintf(this->mFpsContext, sizeof(this->mFpsContext), "Captured mean fps=%%f");
 		f->data = this;
 	};
 
 	virtual ~AndroidVideoAbstract() {
 		ms_debug("Deleting AndroidVideoAbstract");
-		if (mFrame) {
-			freeb(mFrame);
+		if (this->mFrame) {
+			freeb(this->mFrame);
+			this->mFrame = nullptr;
 		}
-		if (mHelperClass && mJavaEnv) {
-			mJavaEnv->DeleteGlobalRef(mHelperClass);
-		}
-		ms_yuv_buf_allocator_free(mAllocator);
-		ms_mutex_destroy(&mMutex);
+		/*if (this->mHelperClass && this->mJavaEnv) {
+			this->mJavaEnv->DeleteGlobalRef(this->mHelperClass);
+			this->mHelperClass = nullptr;
+		}*/
+		ms_yuv_buf_allocator_free(this->mAllocator);
+		ms_mutex_destroy(&this->mMutex);
 	};
 
 	// Static methods
@@ -219,7 +221,8 @@ public:
 
 			// Return directly if one camera is not compatible
 			if (level != ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL_FULL &&
-				level != ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL_3) {
+				level != ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL_3 &&
+				level != ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED) {
 				ACameraManager_deleteCameraIdList(cameraIds);
 				ACameraManager_delete(cameraManager);
 				ms_message("AndroidVideo: Camera2 API level full not available for this device.");
