@@ -1,5 +1,5 @@
 /*
- *  androidvideo_camera2.cpp
+ *  androidvideo_capture_session.h
  *
  *  mediastreamer2 library - modular sound and video processing and streaming
  *  This is the video capture filter for Android using deprecated API android.hardware.Camera.
@@ -22,25 +22,17 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef androidvideo_camera2_include
-#define androidvideo_camera2_include
+#ifndef androidvideo_capture_session_include
+#define androidvideo_capture_session_include
 
-#include "androidvideo_abstract.h"
-
-#include <iostream>
-#include <typeinfo>
-
-#include <camera/NdkCameraManager.h>
-#include <camera/NdkCameraDevice.h>
 #include <media/NdkImageReader.h>
 
-
 namespace AndroidVideo {
-class AndroidVideoCamera2 : public AndroidVideoAbstract {
+class AndroidVideoCaptureSession {
 	private:
-	// Camera
 	ACameraManager *mCameraManager;
-	ACameraCaptureSession *mCameraSession;
+	ACameraCaptureSession *mCameraSession1;
+	ACameraCaptureSession *mCameraSession2;
 	ACameraDevice *mCameraDevice;
 
 	// Window
@@ -53,15 +45,22 @@ class AndroidVideoCamera2 : public AndroidVideoAbstract {
 	AImageReader* mImageReader;
 
 	// Session
-	ACaptureSessionOutput *mSessionOutput;
-	ACaptureSessionOutputContainer *mSessionOutputContainer;
-	bool mSessionReady;
-	bool mSessionStop;
-	bool mSessionReset;
+	ACaptureSessionOutput *mSessionOutput1;
+	ACaptureSessionOutput *mSessionOutput2;
+	ACaptureSessionOutputContainer *mSessionOutputContainer1;
+	ACaptureSessionOutputContainer *mSessionOutputContainer2;
+	bool mSessionReady1;
+	bool mSessionReady2;
+	bool mSessionStop1;
+	bool mSessionStop2;
+	bool mSessionReset1;
+	bool mSessionReset2;
 
 	// Request
-	ACaptureRequest *mCaptureRequest;
-	bool mRequestRepeat;
+	ACaptureRequest *mCaptureRequest1;
+	ACaptureRequest *mCaptureRequest2;
+	bool mRequestRepeat1;
+	bool mRequestRepeat2;
 
 	// Callback
 	ACameraDevice_StateCallbacks mDeviceCallback;
@@ -70,8 +69,9 @@ class AndroidVideoCamera2 : public AndroidVideoAbstract {
 	AImageReader_ImageListener mImageCallback;
 
 	public:
-		AndroidVideoCamera2(MSFilter *f);
-		~AndroidVideoCamera2();
+		AndroidVideoCaptureSession(AImageReader*);
+        AndroidVideoCaptureSession(ANativeWindow*);
+		~AndroidVideoCaptureSession();
 
 		// Filter methods
 		void videoCaptureInit();
@@ -81,8 +81,6 @@ class AndroidVideoCamera2 : public AndroidVideoAbstract {
 		void videoCaptureUninit();
 
 		// Callbacks
-		static void onDisconnected(void* context, ACameraDevice* device);
-		static void onError(void* context, ACameraDevice* device, int error);
 		static void onSessionActive(void* context, ACameraCaptureSession *session);
 		static void onSessionReady(void* context, ACameraCaptureSession *session);
 		static void onSessionClosed(void* context, ACameraCaptureSession *session);
@@ -96,8 +94,8 @@ class AndroidVideoCamera2 : public AndroidVideoAbstract {
 
 		void putImage(jbyteArray frame);
 	private:
-		AndroidVideoCamera2(const AndroidVideoCamera2&) = delete;
-		AndroidVideoCamera2() = delete;
+		AndroidVideoCaptureSession(const AndroidVideoCaptureSession&) = delete;
+		AndroidVideoCaptureSession() = delete;
 
 		// Helper
 		void setImage();
@@ -109,8 +107,8 @@ class AndroidVideoCamera2 : public AndroidVideoAbstract {
 		void uninitWindow();
 
 		void initSession();
-		void sessionReady();
-		void sessionClosed();
+		void sessionReady(ACameraCaptureSession *session);
+		void sessionClosed(ACameraCaptureSession *session);
 		void uninitSession();
 
 		void initRequest();
@@ -121,4 +119,4 @@ class AndroidVideoCamera2 : public AndroidVideoAbstract {
 };
 }
 
-#endif // androidvideo_camera2_include
+#endif // androidvideo_capture_session_include
