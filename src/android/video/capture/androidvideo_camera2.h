@@ -2,8 +2,6 @@
  *  androidvideo_camera2.h
  *
  *  mediastreamer2 library - modular sound and video processing and streaming
- *  This is the video capture filter for Android using deprecated API android.hardware.Camera.
- *  It uses one of the JNI wrappers to access Android video capture API(5,8,9).
  *
  *  Copyright (C) 2018  Belledonne Communications, Grenoble, France
  *
@@ -34,42 +32,27 @@
 #include <camera/NdkCameraDevice.h>
 #include <media/NdkImageReader.h>
 
+#include "androidvideo_capture_session.h"
 
 namespace AndroidVideo {
 class AndroidVideoCamera2 : public AndroidVideoAbstract {
+	friend class AndroidVideoCaptureSession;
+
 	private:
 	// Camera
 	ACameraManager *mCameraManager;
-	ACameraCaptureSession *mCameraSession1;
-	ACameraCaptureSession *mCameraSession2;
 	ACameraDevice *mCameraDevice;
 
 	// Window
-	ANativeWindow *mWindowImageReader;
 	ANativeWindow *mWindowSurfaceView;
-	ACameraOutputTarget *mOutputTarget1;
-	ACameraOutputTarget *mOutputTarget2;
+	ANativeWindow *mWindowImageReader;
 
 	// Image Reader
 	AImageReader* mImageReader;
 
 	// Session
-	ACaptureSessionOutput *mSessionOutput1;
-	ACaptureSessionOutput *mSessionOutput2;
-	ACaptureSessionOutputContainer *mSessionOutputContainer1;
-	ACaptureSessionOutputContainer *mSessionOutputContainer2;
-	bool mSessionReady1;
-	bool mSessionReady2;
-	bool mSessionStop1;
-	bool mSessionStop2;
-	bool mSessionReset1;
-	bool mSessionReset2;
-
-	// Request
-	ACaptureRequest *mCaptureRequest1;
-	ACaptureRequest *mCaptureRequest2;
-	bool mRequestRepeat1;
-	bool mRequestRepeat2;
+	AndroidVideoCaptureSession *mPreviewSession;
+	AndroidVideoCaptureSession *mCaptureSession;
 
 	// Callback
 	ACameraDevice_StateCallbacks mDeviceCallback;
@@ -115,14 +98,6 @@ class AndroidVideoCamera2 : public AndroidVideoAbstract {
 
 		void initWindow();
 		void uninitWindow();
-
-		void initSession();
-		void sessionReady(ACameraCaptureSession *session);
-		void sessionClosed(ACameraCaptureSession *session);
-		void uninitSession();
-
-		void initRequest();
-		void uninitRequest();
 
 		camera_status_t checkReturnCameraStatus(camera_status_t status);
 		media_status_t checkReturnMediaStatus(media_status_t status);
