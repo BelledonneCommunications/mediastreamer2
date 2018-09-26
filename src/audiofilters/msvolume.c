@@ -61,6 +61,10 @@ typedef struct Volume{
 	float target_gain; /*the target gain choosed by echo limiter and noise gate*/
 	int sustain_time; /* time in ms for which echo limiter remains active after resuming from speech to silence.*/
 	int sustain_dur;
+	unsigned int silence_duration; // silence threshold duration in ms
+	int silence_detection_enable; // silence detection enabled information
+	int silence_event_send;
+	unsigned int last_voice_detection; // last time voice was detected
 	MSFilter *peer;
 #ifdef HAVE_SPEEXDSP
 	SpeexPreprocessState *speex_pp;
@@ -107,6 +111,10 @@ static void volume_init(MSFilter *f){
 	v->ng_floorgain=min_ng_floorgain;
 	v->ng_gain = 1;
 	v->remove_dc=FALSE;
+	v->silence_detection_enable = 0;
+	v->silence_duration = 0;
+	v->last_voice_detection = 0;
+	v->silence_event_send = 0;
 #ifdef HAVE_SPEEXDSP
 	v->speex_pp=NULL;
 #endif
@@ -163,15 +171,18 @@ static int volume_get_linear(MSFilter *f, void *arg){
 	*farg = v->energy;
 	return 0;
 }
+
 // use our builtin agc
 #if 0
-static float volume_agc_process(Volume *v, mblk_t *om){
+static float volume_agc_process(MSFilter *f, mblk_t *om){
+	Volume *v = (Volume*) f->data;
 	speex_preprocess_run(v->speex_pp,(int16_t*)om->b_rptr);
 	return 1;
 }
 #else
 
-static float volume_agc_process(Volume *v, mblk_t *om) {
+static float volume_agc_process(MSFilter *f, mblk_t *om) {
+	Volume *v = (Volume*) f->data;
 	static int counter;
 	// target is: 1
 	float gain_reduct = (agc_threshold + v->level_pk) / 1;
@@ -180,6 +191,21 @@ static float volume_agc_process(Volume *v, mblk_t *om) {
 		ms_debug("_level=%f, gain reduction=%f, gain=%f, ng_gain=%f %f %f",
 				v->level_pk, gain_reduct, v->gain, v->ng_gain, v->ng_threshold, v->static_gain);
 	}
+#ifdef HAVE_SPEEXDSP
+	if (v->speex_pp && v->silence_detection_enable && v->silence_duration > 0) {
+		// Voice detected
+		if (speex_preprocess_run(v->speex_pp,(int16_t*)om->b_rptr)) {
+			v->last_voice_detection = f->ticker->time;
+			v->silence_event_send = 0;
+		} else if (!v->silence_event_send) {
+			if ((v->last_voice_detection + v->silence_duration) <= f->ticker->time) {
+				v->silence_event_send = 1;
+				ms_filter_notify_no_arg(f, MS_FILTER_SILENCE_DETECTED);
+			}
+		}
+	}
+#endif
+
 	return gain_reduct;
 }
 
@@ -383,6 +409,18 @@ static int volume_remove_dc(MSFilter *f, void *arg){
 	return 0;
 }
 
+static int volume_enable_silence_detection(MSFilter *f, void *arg) {
+	Volume *v=(Volume*)f->data;
+	v->silence_detection_enable = *(int*)arg;
+	return 0;
+}
+
+static int volume_set_silence_threshold_duration(MSFilter *f, void *arg) {
+	Volume *v=(Volume*)f->data;
+	v->silence_duration = *(unsigned int*)arg;
+	return 0;
+}
+
 static MS2_INLINE int16_t saturate(int val) {
 	return (val>32767) ? 32767 : ( (val<-32767) ? -32767 : val);
 }
@@ -508,7 +546,7 @@ static void volume_process(MSFilter *f){
 			 * remote speaker. AGC operates fully, too (local speaker close to local mic!);
 			 * having agc gain reduction also contribute to total reduction makes sense.
 			 */
-			if (v->agc_enabled) target_gain/= volume_agc_process(v, om);
+			if (v->agc_enabled) target_gain/= volume_agc_process(f, om);
 			if (v->noise_gate_enabled)
 				volume_noise_gate_process(v, v->instant_energy, om);
 			apply_gain(v, om, target_gain);
@@ -549,6 +587,8 @@ static MSFilterMethod methods[]={
 	{	MS_VOLUME_REMOVE_DC, volume_remove_dc },
 	{	MS_VOLUME_GET_MIN	,	volume_get_min	},
 	{	MS_VOLUME_GET_MAX	,	volume_get_max	},
+	{	MS_VOLUME_ENABLE_SILENCE_DETECTION	,	volume_enable_silence_detection},
+	{	MS_VOLUME_SET_SILENCE_THRESHOLD_DURATION	,	volume_set_silence_threshold_duration},
 	{	0			,	NULL			}
 };
 
