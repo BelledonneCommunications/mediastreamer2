@@ -89,12 +89,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 /**
  * Set threshold duration in millisec
 **/
-#define MS_VOLUME_SET_SILENCE_THRESHOLD_DURATION MS_FILTER_METHOD(MS_VOLUME_ID,21,unsigned int)
+#define MS_VOLUME_SET_SILENCE_DURATION_THRESHOLD MS_FILTER_METHOD(MS_VOLUME_ID,21,unsigned int)
 
 /**
  * Triggered when we detect a silence during a specified time
 **/
-#define MS_FILTER_SILENCE_DETECTED	MS_FILTER_BASE_EVENT_NO_ARG(1)
+#define MS_VOLUME_EVENT_SILENCE_DETECTED	MS_FILTER_BASE_EVENT_NO_ARG(0)
 
 extern MSFilterDesc ms_volume_desc;
 

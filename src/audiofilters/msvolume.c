@@ -200,7 +200,7 @@ static float volume_agc_process(MSFilter *f, mblk_t *om) {
 		} else if (!v->silence_event_send) {
 			if ((v->last_voice_detection + v->silence_duration) <= f->ticker->time) {
 				v->silence_event_send = 1;
-				ms_filter_notify_no_arg(f, MS_FILTER_SILENCE_DETECTED);
+				ms_filter_notify_no_arg(f, MS_VOLUME_EVENT_SILENCE_DETECTED);
 			}
 		}
 	}
@@ -588,7 +588,7 @@ static MSFilterMethod methods[]={
 	{	MS_VOLUME_GET_MIN	,	volume_get_min	},
 	{	MS_VOLUME_GET_MAX	,	volume_get_max	},
 	{	MS_VOLUME_ENABLE_SILENCE_DETECTION	,	volume_enable_silence_detection},
-	{	MS_VOLUME_SET_SILENCE_THRESHOLD_DURATION	,	volume_set_silence_threshold_duration},
+	{	MS_VOLUME_SET_SILENCE_DURATION_THRESHOLD	,	volume_set_silence_threshold_duration},
 	{	0			,	NULL			}
 };
 
