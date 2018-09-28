@@ -191,25 +191,30 @@ static float volume_agc_process(MSFilter *f, mblk_t *om) {
 		ms_debug("_level=%f, gain reduction=%f, gain=%f, ng_gain=%f %f %f",
 				v->level_pk, gain_reduct, v->gain, v->ng_gain, v->ng_threshold, v->static_gain);
 	}
-#ifdef HAVE_SPEEXDSP
-	if (v->speex_pp && v->silence_detection_enable && v->silence_duration > 0) {
-		// Voice detected
-		if (speex_preprocess_run(v->speex_pp,(int16_t*)om->b_rptr)) {
-			v->last_voice_detection = f->ticker->time;
-			v->silence_event_send = 0;
-		} else if (!v->silence_event_send) {
-			if ((v->last_voice_detection + v->silence_duration) <= f->ticker->time) {
-				v->silence_event_send = 1;
-				ms_filter_notify_no_arg(f, MS_VOLUME_EVENT_SILENCE_DETECTED);
-			}
-		}
-	}
-#endif
 
 	return gain_reduct;
 }
 
 #endif
+
+static void volume_vad_process(MSFilter *f, mblk_t *om) {
+#ifdef HAVE_SPEEXDSP
+	Volume *v = (Volume*) f->data;
+	if (v->speex_pp && v->silence_duration > 0) {
+		// Voice detected
+		if (speex_preprocess_run(v->speex_pp,(int16_t*)om->b_rptr)) {
+			v->last_voice_detection = f->ticker->time;
+			v->silence_event_send = 0;
+		} else if ((v->last_voice_detection + v->silence_duration) <= f->ticker->time) {
+			if (!v->silence_event_send) {
+				ms_filter_notify_no_arg(f, MS_VOLUME_EVENT_SILENCE_DETECTED);
+				ms_message("Silence event sent.");
+			}
+			v->silence_event_send = 1;
+		}
+	}
+#endif
+}
 
 static MS2_INLINE float compute_gain(Volume *v, float energy, float weight) {
 	float ret = v->static_gain / (1 + (energy * weight));
@@ -415,7 +420,7 @@ static int volume_enable_silence_detection(MSFilter *f, void *arg) {
 	return 0;
 }
 
-static int volume_set_silence_threshold_duration(MSFilter *f, void *arg) {
+static int volume_set_silence_duration_threshold(MSFilter *f, void *arg) {
 	Volume *v=(Volume*)f->data;
 	v->silence_duration = *(unsigned int*)arg;
 	return 0;
@@ -498,22 +503,25 @@ static void volume_preprocess(MSFilter *f){
 	Volume *v=(Volume*)f->data;
 	/*process agc by chunks of 10 ms*/
 	v->nsamples=(int)(0.01*(float)v->sample_rate);
-	if (v->agc_enabled){
+
+	if (v->agc_enabled) {
 		ms_message("AGC is enabled.");
-#if defined HAVE_SPEEXDSP && !defined MS_FIXED_POINT
-		if (v->speex_pp==NULL){
-			int tmp=1;
-			v->speex_pp=speex_preprocess_state_init(v->nsamples,v->sample_rate);
-			if (speex_preprocess_ctl(v->speex_pp,SPEEX_PREPROCESS_SET_AGC,&tmp)==-1){
-				ms_warning("Speex AGC is not available.");
-			}
-			tmp=0;
-			speex_preprocess_ctl(v->speex_pp,SPEEX_PREPROCESS_SET_VAD,&tmp);
-			speex_preprocess_ctl(v->speex_pp,SPEEX_PREPROCESS_SET_DENOISE,&tmp);
-			speex_preprocess_ctl(v->speex_pp,SPEEX_PREPROCESS_SET_DEREVERB,&tmp);
-		}
-#endif
 	}
+#if defined HAVE_SPEEXDSP && !defined MS_FIXED_POINT
+	if (v->speex_pp==NULL && (v->agc_enabled || v->silence_detection_enable)){
+		int tmp=1;
+		v->speex_pp=speex_preprocess_state_init(v->nsamples,v->sample_rate);
+		if (v->agc_enabled && speex_preprocess_ctl(v->speex_pp,SPEEX_PREPROCESS_SET_AGC,&tmp)==-1){
+			ms_warning("Speex AGC is not available.");
+		}
+		if (v->silence_detection_enable && speex_preprocess_ctl(v->speex_pp,SPEEX_PREPROCESS_SET_VAD,&tmp)==-1) {
+			ms_warning("Speex VAD is not available.");
+		}
+		tmp=0;
+		speex_preprocess_ctl(v->speex_pp,SPEEX_PREPROCESS_SET_DENOISE,&tmp);
+		speex_preprocess_ctl(v->speex_pp,SPEEX_PREPROCESS_SET_DEREVERB,&tmp);
+	}
+#endif
 	ortp_extremum_reset(&v->min);
 	ortp_extremum_reset(&v->max);
 }
@@ -528,29 +536,28 @@ static void volume_process(MSFilter *f){
 	 * override this target gain, and order must be well thought out
 	 */
 	if (v->agc_enabled || v->peer!=NULL){
-		mblk_t *om;
 		size_t nbytes=(size_t)(v->nsamples*2);
 		ms_bufferizer_put_from_queue(v->buffer,f->inputs[0]);
 		while(ms_bufferizer_get_avail(v->buffer)>=nbytes){
-			om=allocb(nbytes,0);
-			ms_bufferizer_read(v->buffer,om->b_wptr,nbytes);
-			om->b_wptr+=nbytes;
-			update_energy(v,(int16_t*)om->b_rptr, v->nsamples, f->ticker->time);
+			m=allocb(nbytes,0);
+			ms_bufferizer_read(v->buffer,m->b_wptr,nbytes);
+			m->b_wptr+=nbytes;
+			update_energy(v,(int16_t*)m->b_rptr, v->nsamples, f->ticker->time);
 			target_gain = v->static_gain;
 
 			if (v->peer)  /* this ptr set = echo limiter enable flag */
-				target_gain = volume_echo_avoider_process(v, om);
+				target_gain = volume_echo_avoider_process(v, m);
 
 			/* Multiply with gain from echo limiter, not "choose smallest". Why?
 			 * Remote talks, local echo suppress via mic path, but still audible in
 			 * remote speaker. AGC operates fully, too (local speaker close to local mic!);
 			 * having agc gain reduction also contribute to total reduction makes sense.
 			 */
-			if (v->agc_enabled) target_gain/= volume_agc_process(f, om);
-			if (v->noise_gate_enabled)
-				volume_noise_gate_process(v, v->instant_energy, om);
-			apply_gain(v, om, target_gain);
-			ms_queue_put(f->outputs[0],om);
+			if (v->silence_detection_enable) volume_vad_process(f, m);
+			if (v->agc_enabled) target_gain/= volume_agc_process(f, m);
+			if (v->noise_gate_enabled) volume_noise_gate_process(v, v->instant_energy, m);
+			apply_gain(v, m, target_gain);
+			ms_queue_put(f->outputs[0],m);
 		}
 	}else{
 		/*light processing: no agc. Work in place in the input buffer*/
@@ -558,8 +565,8 @@ static void volume_process(MSFilter *f){
 			update_energy(v,(int16_t*)m->b_rptr, (int)((m->b_wptr - m->b_rptr) / 2), f->ticker->time);
 			target_gain = v->static_gain;
 
-			if (v->noise_gate_enabled)
-				volume_noise_gate_process(v, v->instant_energy, m);
+			if (v->silence_detection_enable) volume_vad_process(f, m);
+			if (v->noise_gate_enabled) volume_noise_gate_process(v, v->instant_energy, m);
 			apply_gain(v, m, target_gain);
 			ms_queue_put(f->outputs[0],m);
 		}
@@ -588,7 +595,7 @@ static MSFilterMethod methods[]={
 	{	MS_VOLUME_GET_MIN	,	volume_get_min	},
 	{	MS_VOLUME_GET_MAX	,	volume_get_max	},
 	{	MS_VOLUME_ENABLE_SILENCE_DETECTION	,	volume_enable_silence_detection},
-	{	MS_VOLUME_SET_SILENCE_DURATION_THRESHOLD	,	volume_set_silence_threshold_duration},
+	{	MS_VOLUME_SET_SILENCE_DURATION_THRESHOLD	,	volume_set_silence_duration_threshold},
 	{	0			,	NULL			}
 };
 
