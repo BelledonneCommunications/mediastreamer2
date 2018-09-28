@@ -64,7 +64,7 @@ typedef struct Volume{
 	unsigned int silence_duration; // silence threshold duration in ms
 	int silence_detection_enable; // silence detection enabled information
 	int silence_event_send;
-	unsigned int last_voice_detection; // last time voice was detected
+	uint64_t last_voice_detection; // last time voice was detected
 	MSFilter *peer;
 #ifdef HAVE_SPEEXDSP
 	SpeexPreprocessState *speex_pp;

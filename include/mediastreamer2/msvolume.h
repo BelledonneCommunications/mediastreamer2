@@ -94,7 +94,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 /**
  * Triggered when we detect a silence during a specified time
 **/
-#define MS_VOLUME_EVENT_SILENCE_DETECTED	MS_FILTER_BASE_EVENT_NO_ARG(0)
+#define MS_VOLUME_EVENT_SILENCE_DETECTED MS_FILTER_EVENT_NO_ARG(MS_VOLUME_ID,0)
 
 extern MSFilterDesc ms_volume_desc;
 
