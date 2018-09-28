@@ -50,6 +50,8 @@ static void tone_detected_cb(void *data, MSFilter *f, unsigned int event_id, MST
 	ms_tester_tone_detected = TRUE;
 }
 
+#ifdef HAVE_SPEEXDSP
+
 #define TEST_SILENCE_VOICE_FILE_NAME	"sounds/test_silence_voice.wav"
 
 typedef struct struct_silence_callback_data {
@@ -74,7 +76,6 @@ static void player_cb(void *data, MSFilter *f, unsigned int event_id, void *arg)
 	}
 }
 
-#ifdef HAVE_SPEEXDSP
 static void silence_detection(void) {
 	MSConnectionHelper h;
 	silence_callback_data silence_data;
@@ -83,7 +84,7 @@ static void silence_detection(void) {
 	unsigned int filter_mask = FILTER_MASK_FILEPLAY | FILTER_MASK_VOIDSINK;
 	char* recorded_file = bc_tester_res(TEST_SILENCE_VOICE_FILE_NAME);
 	unsigned int enable_silence = 1;
-	unsigned int duration_threshold = 500;
+	unsigned int duration_threshold = 1000;
 	silence_data.voice_detected_number = 0;
 	player_data.end_of_file = FALSE;
 
