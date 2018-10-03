@@ -115,6 +115,10 @@ static inline int avcodec_decode_video2(AVCodecContext *avctx, AVFrame *picture,
 extern "C" {
 #endif
 
+#ifndef AV_INPUT_BUFFER_PADDING_SIZE
+    #define AV_INPUT_BUFFER_PADDING_SIZE FF_INPUT_BUFFER_PADDING_SIZE
+#endif
+
 #ifndef HAVE_FUN_avcodec_encode_video2
 int avcodec_encode_video2 (AVCodecContext *avctx, AVPacket *avpkt, const AVFrame *frame, int *got_packet_ptr);
 #endif

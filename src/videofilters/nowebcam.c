@@ -34,7 +34,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #endif
 
-#define FF_INPUT_BUFFER_PADDING_SIZE 32
+#ifndef NO_FFMPEG
+#include "ffmpeg-priv.h"
+#else
+#define AV_INPUT_BUFFER_PADDING_SIZE 32
+#endif
 
 #if LIBAVCODEC_VERSION_MAJOR >= 57
 
@@ -130,7 +134,7 @@ static mblk_t *_ms_load_jpeg_as_yuv(const char *jpgpath, MSVideoSize *reqsize) {
 			ms_error("Cannot load %s", jpgpath);
 			return NULL;
 		}
-		jpgbuf=(uint8_t*)ms_malloc0(statbuf.st_size + FF_INPUT_BUFFER_PADDING_SIZE);
+		jpgbuf=(uint8_t*)ms_malloc0(statbuf.st_size + AV_INPUT_BUFFER_PADDING_SIZE);
 		if (jpgbuf == NULL) {
 			close(fd);
 			ms_error("Cannot allocate buffer for %s", jpgpath);
