@@ -1,6 +1,6 @@
 /*
 mediastreamer2 library - modular sound and video processing and streaming
-Copyright (C) 2010  Simon MORLAT (simon.morlat@linphone.org)
+Copyright (C) 2010-2018  Simon MORLAT (simon.morlat@linphone.org)
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -40,23 +40,25 @@ static void adapter_uninit(MSFilter *f){
 	ms_free(f->data);
 }
 
+static
+
 static void adapter_process(MSFilter *f){
 	AdapterState *s=(AdapterState*)f->data;
 	mblk_t *im,*om;
 	size_t msgsize;
-	
-	while((im=ms_queue_get(f->inputs[0]))!=NULL){
-		if (s->inputchans==s->outputchans){
+
+	while ((im=ms_queue_get(f->inputs[0])) != NULL) {
+		if (s->inputchans==s->outputchans) {
 			ms_queue_put(f->outputs[0],im);
-		}else if (s->inputchans==2){
+		} else if (s->inputchans ==2 ) {
 			msgsize=msgdsize(im)/2;
 			om=allocb(msgsize,0);
-			for (;im->b_rptr<im->b_wptr;im->b_rptr+=4,om->b_wptr+=2){
+			for ( ; im->b_rptr < im->b_wptr ; im->b_rptr += 4 , om->b_wptr += 2 ){
 				*(int16_t*)om->b_wptr=*(int16_t*)im->b_rptr;
 			}
 			ms_queue_put(f->outputs[0],om);
 			freemsg(im);
-		}else if (s->outputchans==2){
+		} else if (s->outputchans == 2) {
 			msgsize=msgdsize(im)*2;
 			om=allocb(msgsize,0);
 			for (;im->b_rptr<im->b_wptr;im->b_rptr+=2,om->b_wptr+=4){
@@ -97,8 +99,8 @@ static MSFilterMethod methods[]={
 	{	MS_FILTER_SET_NCHANNELS , adapter_set_nchannels },
 	{	MS_FILTER_GET_NCHANNELS, adapter_get_nchannels },
 	{	MS_CHANNEL_ADAPTER_SET_OUTPUT_NCHANNELS, adapter_set_out_nchannels },
-	{  MS_CHANNEL_ADAPTER_GET_OUTPUT_NCHANNELS, adapter_get_out_nchannels },
-	{ 0,	NULL }
+	{	MS_CHANNEL_ADAPTER_GET_OUTPUT_NCHANNELS, adapter_get_out_nchannels },
+	{	0,	NULL }
 };
 
 
