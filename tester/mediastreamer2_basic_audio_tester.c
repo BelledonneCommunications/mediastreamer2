@@ -59,12 +59,15 @@ static void tone_detected_cb(void *data, MSFilter *f, unsigned int event_id, MST
 
 typedef struct struct_silence_callback_data {
 	int voice_detected_number;
+	uint64_t silence_duration[10];
 } silence_callback_data;
 
 static void silence_detected_cb(void *data, MSFilter *f, unsigned int event_id, void *arg) {
+	silence_callback_data *silence = (silence_callback_data *)data;
 	if (event_id == MS_VAD_EVENT_SILENCE_DETECTED) {
-		silence_callback_data *silence = (silence_callback_data *)data;
 		silence->voice_detected_number++;
+	} else if (event_id == MS_VAD_EVENT_SILENCE_ENDED) {
+		silence->silence_duration[silence->voice_detected_number-1] = *(uint64_t*)arg;
 	}
 }
 
@@ -80,7 +83,7 @@ static void player_cb(void *data, MSFilter *f, unsigned int event_id, void *arg)
 }
 
 // Waiting time in ms
-static void _silence_detection(const char* filename, unsigned int duration_threshold, int vad_mode, int number_detection, int waiting_time) {
+static void _silence_detection(const char* filename, unsigned int duration_threshold, uint64_t* silence_duration, uint64_t delay, int vad_mode, int number_detection, int waiting_time) {
 	int sample_rate;
 	MSConnectionHelper h;
 	silence_callback_data silence_data;
@@ -107,7 +110,6 @@ static void _silence_detection(const char* filename, unsigned int duration_thres
 	ms_filter_add_notify_callback(voice_detector, silence_detected_cb, &silence_data, TRUE);
 	ms_filter_add_notify_callback(ms_tester_fileplay, player_cb, &player_data, TRUE);
 
-
 	ms_filter_call_method(ms_tester_fileplay, MS_FILE_PLAYER_OPEN, recorded_file);
 	ms_filter_call_method_noarg(ms_tester_fileplay, MS_FILE_PLAYER_START);
 	ms_filter_call_method(ms_tester_fileplay, MS_FILTER_GET_SAMPLE_RATE, &sample_rate);
@@ -126,6 +128,12 @@ static void _silence_detection(const char* filename, unsigned int duration_thres
 	BC_ASSERT_TRUE(wait_for_until(NULL, NULL, &player_data.end_of_file, TRUE, waiting_time));
 
 	BC_ASSERT_EQUAL(silence_data.voice_detected_number, number_detection, int, "%d");
+	if (number_detection > 0 && number_detection == silence_data.voice_detected_number) {
+		for (int i = 0 ; i < number_detection-1 ; i++) {
+			BC_ASSERT_LOWER_STRICT((unsigned long long)silence_data.silence_duration[i], (unsigned long long)(silence_duration[i] + delay), unsigned long long, "%llu");
+			BC_ASSERT_GREATER_STRICT((unsigned long long)silence_data.silence_duration[i], (unsigned long long)(silence_duration[i] - delay), unsigned long long, "%llu");
+		}
+	}
 
 	ms_filter_call_method_noarg(ms_tester_fileplay, MS_FILE_PLAYER_CLOSE);
 	ms_ticker_detach(ms_tester_ticker, ms_tester_fileplay);
@@ -147,23 +155,27 @@ static void _silence_detection(const char* filename, unsigned int duration_thres
 }
 
 static void silence_detection_48000(void) {
-	_silence_detection(TEST_SILENCE_VOICE_48000_FILE_NAME, 1000, 3, 5, 26000);
+	uint64_t duration[5] = {3710, 2210, 1780, 5290};
+	_silence_detection(TEST_SILENCE_VOICE_48000_FILE_NAME, 1000, duration, 50, 3, 5, 26000);
 }
 
 static void silence_detection_44100(void) {
-	_silence_detection(TEST_SILENCE_VOICE_44100_FILE_NAME, 1000, 3, 0, 26000);
+	_silence_detection(TEST_SILENCE_VOICE_44100_FILE_NAME, 1000, NULL, 0, 3, 0, 26000);
 }
 
 static void silence_detection_32000(void) {
-	_silence_detection(TEST_SILENCE_VOICE_32000_FILE_NAME, 1000, 3, 6, 26000);
+	uint64_t duration[6] = {3710, 2210, 1780, 1050, 5290};
+	_silence_detection(TEST_SILENCE_VOICE_32000_FILE_NAME, 1000, duration, 50, 3, 6, 26000);
 }
 
 static void silence_detection_16000(void) {
-	_silence_detection(TEST_SILENCE_VOICE_16000_FILE_NAME, 1000, 3, 6, 26000);
+	uint64_t duration[6] = {3710, 2210, 1780, 1050, 5290};
+	_silence_detection(TEST_SILENCE_VOICE_16000_FILE_NAME, 1000, duration, 50, 3, 6, 26000);
 }
 
 static void silence_detection_8000(void) {
-	_silence_detection(TEST_SILENCE_VOICE_8000_FILE_NAME, 1000, 3, 6, 26000);
+	uint64_t duration[6] = {3710, 2210, 1780, 1050, 5290};
+	_silence_detection(TEST_SILENCE_VOICE_8000_FILE_NAME, 1000, duration, 50, 3, 6, 26000);
 }
 
 static void dtmfgen_tonedet(void) {
