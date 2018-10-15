@@ -337,15 +337,18 @@ typedef enum _MSAudioRoute MSAudioRoute;
 #define MS_VAD_ENABLE_SILENCE_DETECTION \
 	MS_FILTER_METHOD(MSFilterVADInterface, 0, int)
 
+/* Set the silence duration threshold in ms */
 #define MS_VAD_SET_SILENCE_DURATION_THRESHOLD \
 	MS_FILTER_METHOD(MSFilterVADInterface, 1, unsigned int)
 
+/* Specific to each VAD implementation */
 #define MS_VAD_SET_MODE \
 	MS_FILTER_METHOD(MSFilterVADInterface, 2, int)
 
 #define MS_VAD_EVENT_SILENCE_DETECTED \
 	MS_FILTER_EVENT_NO_ARG(MSFilterVADInterface, 0)
 
+/* Give the end of silence and duration in ms */
 #define MS_VAD_EVENT_SILENCE_ENDED \
 	MS_FILTER_EVENT(MSFilterVADInterface, 1, unsigned int)
 
