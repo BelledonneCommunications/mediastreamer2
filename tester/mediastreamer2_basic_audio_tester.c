@@ -534,17 +534,6 @@ static void dtmfgen_filerec_fileplay_tonedet(void) {
 	free(recorded_file);
 }
 
-typedef struct struct_player_callback_data {
-	int end_of_file;
-} player_callback_data;
-
-static void player_cb(void *data, MSFilter *f, unsigned int event_id, void *arg) {
-	if (event_id == MS_FILE_PLAYER_EOF) {
-		player_callback_data *player = (player_callback_data *)data;
-		player->end_of_file = TRUE;
-	}
-}
-
 #define SOUND_TEST_1 "sounds/hello8000.wav"
 #define SOUND_TEST_2 "sounds/arpeggio_8000_mono.wav"
 #define RECORD_SOUND "sounds/mixed_file.wav"
