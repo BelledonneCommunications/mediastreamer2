@@ -38,8 +38,6 @@ typedef struct AdapterState {
 
 static void adapter_init(MSFilter *f) {
 	AdapterState *s = ms_new0(AdapterState, 1);
-	ms_bufferizer_init(&s->input_buffer1);
-	ms_bufferizer_init(&s->input_buffer2);
 	s->inputchans = 1;
 	s->outputchans = 1;
 	s->sample_rate = 8000;
@@ -50,16 +48,18 @@ static void adapter_init(MSFilter *f) {
 
 static void adapter_uninit(MSFilter *f) {
 	AdapterState *s = (AdapterState*)f->data;
-	ms_bufferizer_uninit(&s->input_buffer1);
-	ms_bufferizer_uninit(&s->input_buffer2);
 	ms_free(s);
 }
 
 static void adapter_preprocess(MSFilter *f) {
 	AdapterState *s = (AdapterState*)f->data;
-	s->buffer_size = ((f->ticker->interval * s->sample_rate) / 1000) * 2;
-	s->buffer1 = ms_new(uint8_t, s->buffer_size);
-	s->buffer2 = ms_new(uint8_t, s->buffer_size);
+	if (s->inputchans == 2 && s->outputchans == 1) {
+		s->buffer_size = ((f->ticker->interval * s->sample_rate) / 1000) * 2;
+		s->buffer1 = ms_new(uint8_t, s->buffer_size);
+		s->buffer2 = ms_new(uint8_t, s->buffer_size);
+		ms_bufferizer_init(&s->input_buffer1);
+		ms_bufferizer_init(&s->input_buffer2);
+	}
 }
 
 static void adapter_process(MSFilter *f) {
@@ -119,6 +119,8 @@ static void adapter_process(MSFilter *f) {
 
 static void adapter_postprocess(MSFilter *f) {
 	AdapterState *s = (AdapterState*)f->data;
+	ms_bufferizer_uninit(&s->input_buffer1);
+	ms_bufferizer_uninit(&s->input_buffer2);
 	if (s->buffer1) ms_free(s->buffer1);
 	if (s->buffer2) ms_free(s->buffer2);
 	s->buffer1 = NULL;
