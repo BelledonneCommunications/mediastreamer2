@@ -29,7 +29,7 @@ typedef struct AdapterState {
 	int inputchans;
 	int outputchans;
 	int sample_rate;
-	unsigned int buffer_size;
+	size_t buffer_size;
 	uint8_t *buffer1;
 	uint8_t *buffer2;
 	MSBufferizer input_buffer1;
@@ -41,8 +41,6 @@ static void adapter_init(MSFilter *f) {
 	s->inputchans = 1;
 	s->outputchans = 1;
 	s->sample_rate = 8000;
-	s->buffer1 = NULL;
-	s->buffer2 = NULL;
 	f->data = s;
 }
 
