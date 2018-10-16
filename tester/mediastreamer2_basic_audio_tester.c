@@ -594,7 +594,6 @@ static void two_mono_into_one_stereo(void) {
 	ms_filter_call_method_noarg(ms_tester_filerec, MS_FILE_REC_START);
 
 	ms_ticker_attach(ms_tester_ticker, player1);
-	ms_ticker_attach(ms_tester_ticker, player2);
 
 	BC_ASSERT_TRUE(wait_for_until(NULL, NULL, &player1_data.end_of_file, TRUE, 15000));
 	BC_ASSERT_TRUE(wait_for_until(NULL, NULL, &player2_data.end_of_file, TRUE, 15000));
@@ -604,7 +603,6 @@ static void two_mono_into_one_stereo(void) {
 	ms_filter_call_method_noarg(ms_tester_filerec, MS_FILE_REC_STOP);
 	ms_filter_call_method_noarg(ms_tester_filerec, MS_FILE_REC_CLOSE);
 
-	ms_ticker_detach(ms_tester_ticker, player2);
 	ms_ticker_detach(ms_tester_ticker, player1);
 
 	ms_filter_unlink(player1, 0, mixer_mono, 0);

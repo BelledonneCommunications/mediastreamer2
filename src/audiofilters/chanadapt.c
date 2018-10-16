@@ -25,63 +25,70 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  This filter transforms stereo buffers to mono and vice versa.
 */
 
-typedef struct AdapterState{
+typedef struct AdapterState {
 	int inputchans;
 	int outputchans;
 	int sample_rate;
+	unsigned int buffer_size;
+	uint8_t *buffer1;
+	uint8_t *buffer2;
 	MSBufferizer input_buffer1;
 	MSBufferizer input_buffer2;
 }AdapterState;
 
-static void adapter_init(MSFilter *f){
+static void adapter_init(MSFilter *f) {
 	AdapterState *s = ms_new0(AdapterState, 1);
 	ms_bufferizer_init(&s->input_buffer1);
 	ms_bufferizer_init(&s->input_buffer2);
 	s->inputchans = 1;
 	s->outputchans = 1;
 	s->sample_rate = 8000;
+	s->buffer1 = NULL;
+	s->buffer2 = NULL;
 	f->data = s;
 }
 
-static void adapter_uninit(MSFilter *f){
+static void adapter_uninit(MSFilter *f) {
 	AdapterState *s = (AdapterState*)f->data;
 	ms_bufferizer_uninit(&s->input_buffer1);
 	ms_bufferizer_uninit(&s->input_buffer2);
 	ms_free(s);
 }
 
-static void adapter_process(MSFilter *f){
+static void adapter_preprocess(MSFilter *f) {
+	AdapterState *s = (AdapterState*)f->data;
+	s->buffer_size = ((f->ticker->interval * s->sample_rate) / 1000) * 2;
+	s->buffer1 = ms_new(uint8_t, s->buffer_size);
+	s->buffer2 = ms_new(uint8_t, s->buffer_size);
+}
+
+static void adapter_process(MSFilter *f) {
 	AdapterState *s = (AdapterState*)f->data;
 
 	// Two mono input t stereo output
 	if (s->inputchans == 2 && s->outputchans == 1) {
-		size_t min_buffer_size, buffer_size1, buffer_size2;
-		uint8_t *buffer1, *buffer2;
+		size_t buffer_size1, buffer_size2;
 
 		ms_bufferizer_put_from_queue(&s->input_buffer1, f->inputs[0]);
 		ms_bufferizer_put_from_queue(&s->input_buffer2, f->inputs[1]);
 
-		min_buffer_size = (f->ticker->interval * s->sample_rate) / 1000;
-
 		buffer_size1 = ms_bufferizer_get_avail(&s->input_buffer1);
 		buffer_size2 = ms_bufferizer_get_avail(&s->input_buffer2);
 
-		while (buffer_size1 >= min_buffer_size || buffer_size2 >= min_buffer_size) {
+		while (buffer_size1 >= s->buffer_size || buffer_size2 >= s->buffer_size) {
 			mblk_t *om;
-			buffer1 = (uint8_t*)alloca(min_buffer_size);
-			buffer2 = (uint8_t*)alloca(min_buffer_size);
 
-			if (buffer_size1 < min_buffer_size) memset(buffer1, 0, min_buffer_size);
-			if (buffer_size2 < min_buffer_size) memset(buffer2, 0, min_buffer_size);
+			if (buffer_size1 < s->buffer_size) memset(s->buffer1, 0, s->buffer_size);
+			if (buffer_size2 < s->buffer_size) memset(s->buffer2, 0, s->buffer_size);
 
-			ms_bufferizer_read(&s->input_buffer1, buffer1, min_buffer_size);
-			ms_bufferizer_read(&s->input_buffer2, buffer2, min_buffer_size);
+			ms_bufferizer_read(&s->input_buffer1, s->buffer1, s->buffer_size);
+			ms_bufferizer_read(&s->input_buffer2, s->buffer2, s->buffer_size);
 
-			om = allocb(min_buffer_size * 2, 0);
+			om = allocb(s->buffer_size * 2, 0);
 
-			for (unsigned int i = 0 ; i < min_buffer_size / sizeof(int16_t) ; i++ , om->b_wptr += 4) {
-				((int16_t*)om->b_wptr)[0] = ((int16_t*)buffer1)[i];
-				((int16_t*)om->b_wptr)[1] = ((int16_t*)buffer2)[i];
+			for (unsigned int i = 0 ; i < s->buffer_size / sizeof(int16_t) ; i++ , om->b_wptr += 4) {
+				((int16_t*)om->b_wptr)[0] = ((int16_t*)s->buffer1)[i];
+				((int16_t*)om->b_wptr)[1] = ((int16_t*)s->buffer2)[i];
 			}
 
 			ms_queue_put(f->outputs[0], om);
@@ -108,6 +115,14 @@ static void adapter_process(MSFilter *f){
 			}
 		}
 	}
+}
+
+static void adapter_postprocess(MSFilter *f) {
+	AdapterState *s = (AdapterState*)f->data;
+	if (s->buffer1) ms_free(s->buffer1);
+	if (s->buffer2) ms_free(s->buffer2);
+	s->buffer1 = NULL;
+	s->buffer2 = NULL;
 }
 
 static int adapter_set_sample_rate(MSFilter *f, void *data) {
@@ -156,7 +171,7 @@ static MSFilterMethod methods[] = {
 	{	0,	NULL }
 };
 
-MSFilterDesc ms_channel_adapter_desc={
+MSFilterDesc ms_channel_adapter_desc = {
 	MS_CHANNEL_ADAPTER_ID,
 	"MSChannelAdapter",
 	N_("A filter that converts from mono to stereo and vice versa."),
@@ -165,9 +180,9 @@ MSFilterDesc ms_channel_adapter_desc={
 	2,
 	1,
 	adapter_init,
-	NULL,
+	adapter_preprocess,
 	adapter_process,
-	NULL,
+	adapter_postprocess,
 	adapter_uninit,
 	methods
 };
