@@ -26,8 +26,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
 typedef struct AdapterState {
-	int inputchans;
-	int outputchans;
+	int inputchans; // means the number of channels but not the number of filter input
+	int outputchans; // means the number of channels but not the number of filter output
 	int sample_rate;
 	size_t buffer_size;
 	uint8_t *buffer1;
