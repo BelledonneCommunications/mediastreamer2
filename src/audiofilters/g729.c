@@ -52,7 +52,11 @@ static void msbcg729_decoder_process(MSFilter *f){
 	while((inputMessage=ms_queue_get(f->inputs[0]))) {
 		while(inputMessage->b_rptr<inputMessage->b_wptr) {
 			/* if remaining data in RTP payload have the size of a SID frame it must be one, see RFC3551 section 4.5.6 : any SID frame must be the last one of the RPT payload */
-			uint8_t SIDFrameFlag = ((inputMessage->b_wptr-inputMessage->b_rptr)==NOISE_BITSTREAM_FRAME_SIZE)?1:0;
+			size_t remain = inputMessage->b_wptr - inputMessage->b_rptr;
+			uint8_t SIDFrameFlag = (remain==NOISE_BITSTREAM_FRAME_SIZE)?1:0;
+			if (!SIDFrameFlag && remain < BITSTREAM_FRAME_SIZE) {
+				break;
+			}
 			outputMessage = allocb(SIGNAL_FRAME_SIZE,0);
 			mblk_meta_copy(inputMessage, outputMessage);
 			bcg729Decoder(obj->decoderChannelContext, inputMessage->b_rptr, (SIDFrameFlag==1)?NOISE_BITSTREAM_FRAME_SIZE:BITSTREAM_FRAME_SIZE, 0, SIDFrameFlag, 0, (int16_t *)(outputMessage->b_wptr));
