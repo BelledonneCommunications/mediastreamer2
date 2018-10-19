@@ -181,7 +181,7 @@ static MSFilterMethod methods[] = {
 };
 
 MSFilterDesc ms_android_texture_display_desc = {
-	.id=MS_ANDROID_DISPLAY_ID,
+	.id=MS_ANDROID_TEXTURE_DISPLAY_ID,
 	.name="MSAndroidTextureDisplay",
 	.text="Video display filter for Android.",
 	.category=MS_FILTER_OTHER,
