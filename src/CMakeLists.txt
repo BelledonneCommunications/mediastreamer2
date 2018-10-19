@@ -23,7 +23,7 @@
 find_library(LIBM NAMES m)
 
 # See: https://cmake.org/cmake/help/v3.12/policy/CMP0072.html
-if(${CMAKE_VERSION} VERSION_GREATER "3.11")
+if(POLICY CMP0072)
 	cmake_policy(SET CMP0072 NEW)
 endif()
 
