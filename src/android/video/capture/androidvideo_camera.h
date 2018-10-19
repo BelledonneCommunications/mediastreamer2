@@ -29,33 +29,33 @@
 
 namespace AndroidVideo {
 class AndroidVideoCamera : public AndroidVideoAbstract {
-	private:
-		jmethodID mMethodActivateAutoFocus;
-		jmethodID mMethodSelectNearestResolutionAvailable;
-		jmethodID mMethodSetPreviewDisplaySurface;
-		jmethodID mMethodStartRecording;
-		jmethodID mMethodStopRecording;
-	public:
-		AndroidVideoCamera(MSFilter *f);
-		~AndroidVideoCamera();
+private:
+	jmethodID mMethodActivateAutoFocus;
+	jmethodID mMethodSelectNearestResolutionAvailable;
+	jmethodID mMethodSetPreviewDisplaySurface;
+	jmethodID mMethodStartRecording;
+	jmethodID mMethodStopRecording;
+public:
+	AndroidVideoCamera(MSFilter *f);
+	~AndroidVideoCamera();
 
-		// Filter methods
-		void videoCaptureInit();
-		void videoCapturePreprocess();
-		void videoCaptureProcess();
-		void videoCapturePostprocess();
-		void videoCaptureUninit();
+	// Filter methods
+	void videoCaptureInit();
+	void videoCapturePreprocess();
+	void videoCaptureProcess();
+	void videoCapturePostprocess();
+	void videoCaptureUninit();
 
-		// Other methods
-		int videoCaptureSetVsize(void *arg);
-		int videoSetNativePreviewWindow(void *arg);
-		int videoCaptureSetAutofocus(void *arg);
+	// Other methods
+	int videoCaptureSetVsize(void *arg);
+	int videoSetNativePreviewWindow(void *arg);
+	int videoCaptureSetAutofocus(void *arg);
 
-		void putImage(jbyteArray frame);
-		void initJNIMethod();
-	private:
-		AndroidVideoCamera(const AndroidVideoCamera&) = delete;
-		AndroidVideoCamera() = delete;
+	void putImage(jbyteArray frame);
+	void initJNIMethod();
+private:
+	AndroidVideoCamera(const AndroidVideoCamera&) = delete;
+	AndroidVideoCamera() = delete;
 };
 }
 

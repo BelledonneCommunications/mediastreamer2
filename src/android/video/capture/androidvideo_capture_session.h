@@ -23,14 +23,16 @@
 #ifndef androidvideo_capture_session_include
 #define androidvideo_capture_session_include
 
-#include "androidvideo_camera2.h"
-
 #include <camera/NdkCameraDevice.h>
 #include <media/NdkImageReader.h>
 
+#include "androidvideo_camera2.h"
+
 namespace AndroidVideo {
+class AndroidVideoCamera2;
+
 class AndroidVideoCaptureSession {
-	private:
+private:
 	AndroidVideoCamera2 *mAndroidVideoCamera2;
 
 	// Session
@@ -39,6 +41,7 @@ class AndroidVideoCaptureSession {
 	// Window
 	ANativeWindow *mWindow;
 	ACameraOutputTarget *mOutputTarget;
+	bool mPreview;
 
 	// Image Reader
 	AImageReader* mImageReader;
@@ -56,28 +59,34 @@ class AndroidVideoCaptureSession {
 
 	// Callback
 	ACameraCaptureSession_stateCallbacks *mCaptureSessionCallback;
-	ACameraCaptureSession_captureCallbacks *mCaptureCallbacks;
 	AImageReader_ImageListener *mImageCallback;
 
-	public:
-	AndroidVideoCaptureSession(AndroidVideoCamera2 *);
-	~AndroidVideoCaptureSession();
+public:
+	AndroidVideoCaptureSession(AndroidVideoCamera2 *avc, ACameraCaptureSession_stateCallbacks *cbSession, AImageReader_ImageListener *cbImage, bool preview = false);
+	~AndroidVideoCaptureSession() = default;
 
+	AImageReader* getImageReader();
+	void setWindow(ANativeWindow *mWindow);
+
+	// ANativeWindow is given when it's a preview
 	void init();
-	void uninit();
 
 	void repeatingRequest();
 	void stopRepeatingRequest();
 	void abortCapture();
 
-	private:
+	void sessionReady();
+	void sessionClosed();
+
+private:
 	AndroidVideoCaptureSession(const AndroidVideoCaptureSession&) = delete;
 	AndroidVideoCaptureSession() = delete;
 
 	// Helper
+	void initWindow();
+	void uninitWindow();
+
 	void initSession();
-	void sessionReady();
-	void sessionClosed();
 	void uninitSession();
 
 	void initRequest();

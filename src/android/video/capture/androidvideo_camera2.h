@@ -35,20 +35,18 @@
 #include "androidvideo_capture_session.h"
 
 namespace AndroidVideo {
+class AndroidVideoCaptureSession;
+
 class AndroidVideoCamera2 : public AndroidVideoAbstract {
 	friend class AndroidVideoCaptureSession;
 
-	private:
+private:
 	// Camera
 	ACameraManager *mCameraManager;
 	ACameraDevice *mCameraDevice;
 
 	// Window
 	ANativeWindow *mWindowSurfaceView;
-	ANativeWindow *mWindowImageReader;
-
-	// Image Reader
-	AImageReader* mImageReader;
 
 	// Session
 	AndroidVideoCaptureSession *mPreviewSession;
@@ -56,51 +54,50 @@ class AndroidVideoCamera2 : public AndroidVideoAbstract {
 
 	// Callback
 	ACameraDevice_StateCallbacks mDeviceCallback;
-	ACameraCaptureSession_stateCallbacks mCaptureSessionCallback;
-	ACameraCaptureSession_captureCallbacks mCaptureCallbacks;
+	ACameraCaptureSession_stateCallbacks mCaptureSessionCallbackPreview;
+	ACameraCaptureSession_stateCallbacks mCaptureSessionCallbackCapture;
 	AImageReader_ImageListener mImageCallback;
 
-	public:
-		AndroidVideoCamera2(MSFilter *f);
-		~AndroidVideoCamera2();
+public:
+	AndroidVideoCamera2(MSFilter *f);
+	~AndroidVideoCamera2();
 
-		// Filter methods
-		void videoCaptureInit();
-		void videoCapturePreprocess();
-		void videoCaptureProcess();
-		void videoCapturePostprocess();
-		void videoCaptureUninit();
+	// Filter methods
+	void videoCaptureInit();
+	void videoCapturePreprocess();
+	void videoCaptureProcess();
+	void videoCapturePostprocess();
+	void videoCaptureUninit();
 
-		// Callbacks
-		static void onDisconnected(void* context, ACameraDevice* device);
-		static void onError(void* context, ACameraDevice* device, int error);
-		static void onSessionActive(void* context, ACameraCaptureSession *session);
-		static void onSessionReady(void* context, ACameraCaptureSession *session);
-		static void onSessionClosed(void* context, ACameraCaptureSession *session);
-		static void onCaptureSequenceCompleted(void* context, ACameraCaptureSession* session, int sequenceId, int64_t frameNumber);
-		static void onImageAvailable(void* context, AImageReader* reader);
+	// Callbacks
+	static void onDisconnected(void* context, ACameraDevice* device);
+	static void onError(void* context, ACameraDevice* device, int error);
+	static void onSessionActive(void* context, ACameraCaptureSession *session);
+	static void onSessionReady(void* context, ACameraCaptureSession *session);
+	static void onSessionClosed(void* context, ACameraCaptureSession *session);
+	static void onImageAvailable(void* context, AImageReader* reader);
 
-		// Other methods
-		int videoCaptureSetVsize(void *arg);
-		int videoSetNativePreviewWindow(void *arg);
-		int videoCaptureSetAutofocus(void *arg);
+	// Other methods
+	int videoCaptureSetVsize(void *arg);
+	int videoSetNativePreviewWindow(void *arg);
+	int videoCaptureSetAutofocus(void *arg);
 
-		void putImage(jbyteArray frame);
-	private:
-		AndroidVideoCamera2(const AndroidVideoCamera2&) = delete;
-		AndroidVideoCamera2() = delete;
+	void putImage(jbyteArray frame);
+private:
+	AndroidVideoCamera2(const AndroidVideoCamera2&) = delete;
+	AndroidVideoCamera2() = delete;
 
-		// Helper
-		void setImage();
+	void lock();
+	void unlock();
 
-		void initCamera();
-		void uninitCamera();
+	// Helper
+	void setImage();
 
-		void initWindow();
-		void uninitWindow();
+	void initCamera();
+	void uninitCamera();
 
-		camera_status_t checkReturnCameraStatus(camera_status_t status);
-		media_status_t checkReturnMediaStatus(media_status_t status);
+	camera_status_t checkReturnCameraStatus(camera_status_t status);
+	media_status_t checkReturnMediaStatus(media_status_t status);
 };
 }
 

@@ -31,7 +31,7 @@
 #include "mediastreamer2/mscommon.h"
 
 namespace AndroidVideo {
-	camera_status_t checkReturnCameraStatus(camera_status_t status, const std::string &caller) {
+	static camera_status_t checkReturnCameraStatus(camera_status_t status, const std::string &caller) {
 		switch (status) {
 			case ACAMERA_OK:
 				return ACAMERA_OK;
@@ -83,7 +83,7 @@ namespace AndroidVideo {
 		return ACAMERA_ERROR_BASE;
 	}
 
-	media_status_t checkReturnMediaStatus(media_status_t status, const std::string &caller) {
+	static media_status_t checkReturnMediaStatus(media_status_t status, const std::string &caller) {
 		switch (status) {
 			case AMEDIA_OK:
 				return AMEDIA_OK;
@@ -110,7 +110,7 @@ namespace AndroidVideo {
 			case AMEDIA_DRM_NEED_KEY :
 			case AMEDIA_DRM_LICENSE_EXPIRED :
 			case AMEDIA_ERROR_UNKNOWN :
-				ms_error("%s: media_status_t: Unknown error: %d.", status, caller.c_str());
+				ms_error("%s: media_status_t: Unknown error: %d.", caller.c_str(), status);
 				break;
 		}
 

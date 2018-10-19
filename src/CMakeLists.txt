@@ -304,13 +304,9 @@ if(ENABLE_VIDEO)
 			android/android_mediacodec.cpp
 			android/android-display-bad.cpp
 			android/video/capture/androidvideo.cpp
-			android/video/capture/androidvideo_abstract.h
 			android/video/capture/androidvideo_camera.cpp
-			android/video/capture/androidvideo_camera.h
 			android/video/capture/androidvideo_camera2.cpp
-			android/video/capture/androidvideo_camera2.h
 			android/video/capture/androidvideo_capture_session.cpp
-			android/video/capture/androidvideo_capture_session.h
 		)
 	endif()
 	if (ENABLE_QNX)

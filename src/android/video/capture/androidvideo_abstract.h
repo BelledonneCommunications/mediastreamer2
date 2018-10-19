@@ -42,7 +42,7 @@ extern MSWebCamDesc ms_android_video_capture_desc;
 namespace AndroidVideo {
 
 static const int UNDEFINED_ROTATION = -1;
-static const char* AndroidWrapperPath = "org/linphone/mediastream/video/capture/AndroidVideoJniWrapper";
+static const std::string AndroidWrapperPath = "org/linphone/mediastream/video/capture/AndroidVideoJniWrapper";
 struct AndroidWebcamConfig {
 	int id;
 	int frontFacing;
@@ -104,11 +104,10 @@ public:
 	// Static methods
 	static jclass getHelperClassGlobalRef(JNIEnv *env) {
 		ms_debug("getHelperClassGlobalRef (env: %p)", env);
-		const char* className = AndroidWrapperPath;
 
-		jclass c = env->FindClass(className);
+		jclass c = env->FindClass(AndroidWrapperPath.c_str());
 		if (c == 0) {
-			ms_error("Could not load class '%s'", className);
+			ms_error("Could not load class '%s'", AndroidWrapperPath.c_str());
 			return nullptr;
 		} else {
 			jclass globalRef = reinterpret_cast<jclass>(env->NewGlobalRef(c));
