@@ -98,7 +98,7 @@ static void android_texture_display_init_opengl(AndroidTextureDisplay *ad) {
 	};
 	context = eglCreateContext(display, config, NULL, contextAttrs);
 
-	if (eglMakeCurrent(display, surface, surface, context) == EGL_FALSE) {         
+	if (eglMakeCurrent(display, surface, surface, context) == EGL_FALSE) {
 		ms_debug("Unable to eglMakeCurrent");
 		return;
 	}

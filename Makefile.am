@@ -126,13 +126,11 @@ java/proguard.cfg \
 java/src/org/linphone/mediastream/Log.java \
 java/src/org/linphone/mediastream/Version.java \
 java/src/org/linphone/mediastream/video/AndroidVideoWindowImpl.java \
-java/src/org/linphone/mediastream/video/capture/AndroidVideoApi5JniWrapper.java \
-java/src/org/linphone/mediastream/video/capture/AndroidVideoApi8JniWrapper.java \
-java/src/org/linphone/mediastream/video/capture/AndroidVideoApi9JniWrapper.java \
 java/src/org/linphone/mediastream/video/capture/AndroidVideoJniWrapper.java \
 java/src/org/linphone/mediastream/video/capture/hwconf/AndroidCameraConfiguration.java \
 java/src/org/linphone/mediastream/video/capture/hwconf/AndroidCameraConfigurationReader5.java \
 java/src/org/linphone/mediastream/video/capture/hwconf/AndroidCameraConfigurationReader9.java \
+java/src/org/linphone/mediastream/video/capture/hwconf/AndroidCameraConfigurationReader21.java \
 java/src/org/linphone/mediastream/video/capture/hwconf/Hacks.java \
 java/src/org/linphone/mediastream/video/display/GL2JNIView.java \
 java/src/org/linphone/mediastream/video/display/OpenGLESDisplay.java \

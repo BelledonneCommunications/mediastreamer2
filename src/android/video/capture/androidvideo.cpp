@@ -26,29 +26,15 @@
 #include "androidvideo_camera2.h"
 #include "mediastreamer2/msfilter.h"
 #include "mediastreamer2/msjava.h"
-#include "mediastreamer2/msvideo.h"
-#include "mediastreamer2/mswebcam.h"
 
 #include <jni.h>
-#include <math.h>
-
-static const char* VersionPath = "org/linphone/mediastream/Version";
 
 /************************ Private helper methods ************************/
 static AndroidVideo::AndroidVideoAbstract* getAndroidVideoCamera(JNIEnv *env, MSFilter *f);
 
 /************************ Helper methods ************************/
-static int getAndroidSdkVersion(JNIEnv *env) {
-	jclass version = env->FindClass(VersionPath);
-	jmethodID method = env->GetStaticMethodID(version, "sdk", "()I");
-	int android_sdk_version = env->CallStaticIntMethod(version, method);
-	ms_message("AndroidVideo: Android SDK version found is %i", android_sdk_version);
-	env->DeleteLocalRef(version);
-	return android_sdk_version;
-}
-
 static AndroidVideo::AndroidVideoAbstract* getAndroidVideoCamera(JNIEnv *env, MSFilter *f) {
-	int android_sdk_version = getAndroidSdkVersion(env);
+	int android_sdk_version = ms_get_android_sdk_version();
 
 	// Android API equal or sup 24 and API Camera2 is available we use this API
 	if (android_sdk_version >= 24 && AndroidVideo::AndroidVideoAbstract::apiCamera2Available()) {
@@ -127,7 +113,7 @@ static MSFilterMethod video_capture_methods[]={
 		{	MS_FILTER_SET_VIDEO_SIZE, &video_capture_set_vsize},
 		{	MS_FILTER_GET_VIDEO_SIZE, &video_capture_get_vsize},
 		{	MS_FILTER_GET_PIX_FMT, &video_capture_get_pix_fmt},
-		{	MS_VIDEO_DISPLAY_SET_NATIVE_WINDOW_ID , &video_set_native_preview_window },//preview is managed by capture filter
+		{	MS_VIDEO_DISPLAY_SET_NATIVE_WINDOW_ID , &video_set_native_preview_window },
 		{	MS_VIDEO_DISPLAY_GET_NATIVE_WINDOW_ID , &video_get_native_preview_window },
 		{	MS_VIDEO_CAPTURE_SET_DEVICE_ORIENTATION, &video_set_device_rotation },
 		{	MS_VIDEO_CAPTURE_SET_AUTOFOCUS, &video_capture_set_autofocus },
@@ -167,7 +153,7 @@ static MSFilter *video_capture_create_reader(MSWebCam *obj) {
 }
 
 static void video_capture_detect(MSWebCamManager *obj) {
-	if (getAndroidSdkVersion(ms_get_jni_env()) >= 24) {
+	if (ms_get_android_sdk_version() >= 24) {
 		AndroidVideo::AndroidVideoAbstract::camera2Detect(obj);
 	} else {
 		AndroidVideo::AndroidVideoAbstract::cameraDetect(obj);

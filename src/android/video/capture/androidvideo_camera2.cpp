@@ -3,7 +3,7 @@
  *
  *  mediastreamer2 library - modular sound and video processing and streaming
  *
- *  Copyright (C) 2018  Belledonne Communications, Grenoble, France
+ *  Copyright (C) 2010-2018  Belledonne Communications, Grenoble, France
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -34,16 +34,13 @@
 
 #include "androidvideo_utils.h"
 
-using namespace std;
-
 namespace AndroidVideo {
 	AndroidVideoCamera2::AndroidVideoCamera2(MSFilter *f) : AndroidVideoAbstract(f) {
 		ms_message("Creating AndroidVideoCamera2 for Android VIDEO capture filter");
 		this->mCameraManager = ACameraManager_create();
 		this->mCameraDevice = nullptr;
 
-		this->mPreviewSession = nullptr;
-		this->mCaptureSession = nullptr;
+		this->mSession = nullptr;
 
 		this->mWindowSurfaceView = nullptr;
 
@@ -51,18 +48,17 @@ namespace AndroidVideo {
 		this->mDeviceCallback.onDisconnected = this->onDisconnected;
 		this->mDeviceCallback.onError = this->onError;
 
-		this->mCaptureSessionCallbackPreview.context = nullptr;
-		this->mCaptureSessionCallbackPreview.onActive = this->onSessionActive;
-		this->mCaptureSessionCallbackPreview.onClosed = this->onSessionClosed;
-		this->mCaptureSessionCallbackPreview.onReady = this->onSessionReady;
-		this->mCaptureSessionCallbackCapture = this->mCaptureSessionCallbackPreview;
+		this->mCaptureSessionCallback.context = nullptr;
+		this->mCaptureSessionCallback.onActive = this->onSessionActive;
+		this->mCaptureSessionCallback.onClosed = this->onSessionClosed;
+		this->mCaptureSessionCallback.onReady = this->onSessionReady;
 
 		this->mImageCallback.context = static_cast<void*>(this);
 		this->mImageCallback.onImageAvailable = this->onImageAvailable;
 	}
 
 	AndroidVideoCamera2::~AndroidVideoCamera2() {
-		ms_message("Deleting AndroidVideoCamera2");
+		ms_message("AndroidVideoCamera2: Deleting AndroidVideoCamera2");
 		this->uninitCamera();
 		if (this->mCameraManager) ACameraManager_delete(this->mCameraManager);
 	}
@@ -72,17 +68,14 @@ namespace AndroidVideo {
 	void AndroidVideoCamera2::videoCaptureInit() {
 		this->lock();
 		this->mUseDownscaling = 0;
-		//this->mPreviewSession = new AndroidVideoCaptureSession(this, &this->mCaptureSessionCallbackPreview, nullptr, true);
-		this->mCaptureSession = new AndroidVideoCaptureSession(this, &this->mCaptureSessionCallbackCapture, &this->mImageCallback);
-		this->mCaptureSessionCallbackPreview.context = static_cast<void*>(this->mPreviewSession);
-		this->mCaptureSessionCallbackCapture.context = static_cast<void*>(this->mCaptureSession);
+		this->mSession = new AndroidVideoCaptureSession(this, &this->mCaptureSessionCallback, &this->mImageCallback);
+		this->mCaptureSessionCallback.context = static_cast<void*>(this->mSession);
 		this->unlock();
 	}
 
 	void AndroidVideoCamera2::videoCapturePreprocess() {
 		this->lock();
 		this->initCamera();
-		this->mCaptureSession->init(); // Preview session will be init when window is get
 
 		// Check if there is a frame from other capture and delete it
 		if (this->mFrame) {
@@ -96,11 +89,10 @@ namespace AndroidVideo {
 	void AndroidVideoCamera2::videoCaptureProcess() {
 		this->lock();
 
-		//this->mPreviewSession->repeatingRequest();
-		this->mCaptureSession->repeatingRequest();
+		this->mSession->repeatingRequest();
 
 		// If frame not ready, return
-		if (this->mFrame == nullptr) {
+		if (!this->mFrame) {
 			this->unlock();
 			return;
 		}
@@ -115,17 +107,15 @@ namespace AndroidVideo {
 
 	void AndroidVideoCamera2::videoCapturePostprocess() {
 		this->lock();
-		//this->mPreviewSession->stopRepeatingRequest();
-		this->mCaptureSession->stopRepeatingRequest();
+		this->mSession->stopRepeatingRequest();
 		this->mPreviewWindow = nullptr;
+		this->uninitCamera();
 		this->unlock();
 	}
 
 	void AndroidVideoCamera2::videoCaptureUninit() {
 		this->lock();
-		this->mCaptureSessionCallbackPreview.context = nullptr;
-		this->mCaptureSessionCallbackCapture.context = nullptr;
-		this->uninitCamera();
+		this->mCaptureSessionCallback.context = nullptr;
 		this->unlock();
 	}
 
@@ -134,8 +124,8 @@ namespace AndroidVideo {
 	int AndroidVideoCamera2::videoCaptureSetVsize(void *arg) {
 		ACameraMetadata *deviceCaract;
 		ACameraMetadata_const_entry deviceEntry;
-		vector<int> hardwareCapabilitiesHeight;
-		vector<int> hardwareCapabilitiesWidth;
+		std::vector<int> hardwareCapabilitiesHeight;
+		std::vector<int> hardwareCapabilitiesWidth;
 
 		this->lock();
 
@@ -203,18 +193,17 @@ namespace AndroidVideo {
 				ms_message("Preview capture window changed (oldwin: %p newwin: %p rotation:%d)\n", this->mPreviewWindow, w, this->mRotation);
 			}
 			// Stop current session
-			//this->mPreviewSession->abortCapture();
-			//this->mCaptureSession->abortCapture();
+			this->mSession->abortCapture();
 		} else {
 			ms_message("Preview capture window set but camera not opened yet; remembering it for later use\n");
 		}
 
 		this->mPreviewWindow = w;
 		// We need to get Surface here because we only can get this in interface thread
-		this->mWindowSurfaceView = ANativeWindow_fromSurface(this->mJavaEnv, this->mPreviewWindow);
-		if (this->mPreviewSession && this->mWindowSurfaceView) {
-			this->mPreviewSession->setWindow(this->mWindowSurfaceView);
-			//this->mPreviewSession->init();
+		this->mWindowSurfaceView = (this->mPreviewWindow) ? ANativeWindow_fromSurface(this->mJavaEnv, this->mPreviewWindow) : nullptr;
+		if (this->mSession && this->mWindowSurfaceView) {
+			this->mSession->setWindowPreview(this->mWindowSurfaceView);
+			this->mSession->init();
 		}
 
 		this->unlock();
@@ -241,7 +230,6 @@ namespace AndroidVideo {
 	}
 
 	// Helper
-
 	void AndroidVideoCamera2::setImage() {
 		int rowStride[3];
 		int pixelStride[3];
@@ -254,7 +242,7 @@ namespace AndroidVideo {
 
 		this->lock();
 
-		if (!this->mCaptureSession || !this->mCaptureSession->getImageReader()) {
+		if (!this->mSession || !this->mSession->getImageReader()) {
 			this->unlock();
 			return;
 		}
@@ -272,7 +260,7 @@ namespace AndroidVideo {
 
 		int image_rotation_correction = this->computeImageRotationCorrection();
 
-		if (this->checkReturnMediaStatus(AImageReader_acquireLatestImage(this->mCaptureSession->getImageReader(), &image)) != AMEDIA_OK) goto end;
+		if (this->checkReturnMediaStatus(AImageReader_acquireLatestImage(this->mSession->getImageReader(), &image)) != AMEDIA_OK) goto end;
 
 		// Get all plane
 		for (unsigned int i = 0 ; i < 3 ; i++) {
@@ -349,21 +337,20 @@ namespace AndroidVideo {
 	}
 
 	void AndroidVideoCamera2::uninitCamera() {
-		if (this->mCameraDevice) {
-			this->checkReturnCameraStatus(ACameraDevice_close(this->mCameraDevice));
-			this->mCameraDevice = nullptr;
-		}
+		if (this->mCameraDevice) this->checkReturnCameraStatus(ACameraDevice_close(this->mCameraDevice));
+		this->mCameraDevice = nullptr;
 	}
 
 	// Callbacks
-
 	void AndroidVideoCamera2::onDisconnected(void* context, ACameraDevice* device) {
 		ms_message("AndroidVideoCamera2: Camera %s disconnected.", ACameraDevice_getId(device));
+		if (context) static_cast<AndroidVideoCamera2*>(context)->uninitCamera();
 	}
 
 	void AndroidVideoCamera2::onError(void* context, ACameraDevice* device, int error) {
 		// Stop capture if running etc...
 		ms_error("AndroidVideoCamera2: onError number %d", error);
+		if (context) static_cast<AndroidVideoCamera2*>(context)->uninitCamera();
 	}
 
 	void AndroidVideoCamera2::onSessionActive(void* context, ACameraCaptureSession *session) {
@@ -375,6 +362,7 @@ namespace AndroidVideo {
 	}
 
 	void AndroidVideoCamera2::onSessionClosed(void* context, ACameraCaptureSession *session) {
+		ms_message("AndroidVideoCamera2: onSessionClosed");
 		if (context) {
 			static_cast<AndroidVideoCaptureSession*>(context)->sessionClosed();
 			delete static_cast<AndroidVideoCaptureSession*>(context);

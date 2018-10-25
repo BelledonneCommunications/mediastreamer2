@@ -25,11 +25,12 @@
 #include "androidvideo_utils.h"
 
 namespace AndroidVideo {
-	AndroidVideoCaptureSession::AndroidVideoCaptureSession(AndroidVideoCamera2 *avc, ACameraCaptureSession_stateCallbacks *cbSession, AImageReader_ImageListener *cbImage, bool preview) {
+	AndroidVideoCaptureSession::AndroidVideoCaptureSession(AndroidVideoCamera2 *avc, ACameraCaptureSession_stateCallbacks *cbSession, AImageReader_ImageListener *cbImage) {
 		this->mAndroidVideoCamera2 = avc;
 
 		this->mCameraSession = nullptr;
 		this->mOutputTarget = nullptr;
+		this->mOutputTarget2 = nullptr;
 		this->mSessionOutput = nullptr;
 		this->mSessionOutputContainer = nullptr;
 		this->mSessionReady = false;
@@ -43,16 +44,14 @@ namespace AndroidVideo {
 		this->mImageCallback = cbImage;
 
 		this->mImageReader = nullptr;
-
-		this->mPreview = preview;
 	}
 
 	AImageReader* AndroidVideoCaptureSession::getImageReader() {
 		return this->mImageReader;
 	}
 
-	void AndroidVideoCaptureSession::setWindow(ANativeWindow *window) {
-		this->mWindow = window;
+	void AndroidVideoCaptureSession::setWindowPreview(ANativeWindow *window) {
+		this->mWindowPreview = window;
 	}
 
 	void AndroidVideoCaptureSession::init() {
@@ -62,7 +61,7 @@ namespace AndroidVideo {
 	}
 
 	void AndroidVideoCaptureSession::repeatingRequest() {
-		if (this->mCameraSession && this->mRequestRepeat && this->mCaptureRequest) {
+		if (this->mCameraSession && this->mRequestRepeat && !this->mSessionStop && !this->mSessionReset && this->mCaptureRequest) {
 			if (this->checkReturnCameraStatus(ACameraCaptureSession_setRepeatingRequest(this->mCameraSession, nullptr, 1, &this->mCaptureRequest, nullptr)) == ACAMERA_OK) {
 				this->mRequestRepeat = false;
 			}
@@ -93,12 +92,11 @@ namespace AndroidVideo {
 	// Helper
 	void AndroidVideoCaptureSession::initWindow() {
 		if (this->mAndroidVideoCamera2->mCameraDevice) {
-			//TODO change size for preview
 			if (this->checkReturnMediaStatus(AImageReader_new(this->mAndroidVideoCamera2->mUsedSize.width, this->mAndroidVideoCamera2->mUsedSize.height, AIMAGE_FORMAT_YUV_420_888, 4, &this->mImageReader)) != AMEDIA_OK) {
 				this->mImageReader = nullptr;
 				return;
 			}
-			if (!this->mPreview && this->checkReturnMediaStatus(AImageReader_getWindow(this->mImageReader, &this->mWindow)) != AMEDIA_OK) {
+			if (this->checkReturnMediaStatus(AImageReader_getWindow(this->mImageReader, &this->mWindowCapture)) != AMEDIA_OK) {
 				this->uninitWindow();
 				return;
 			}
@@ -114,16 +112,21 @@ namespace AndroidVideo {
 			AImageReader_delete(this->mImageReader);
 			this->mImageReader = nullptr;
 		}
-		if (!this->mPreview && this->mWindow) {
-			ANativeWindow_release(this->mWindow);
-			this->mWindow = nullptr;
+		if (this->mWindowCapture) {
+			ANativeWindow_release(this->mWindowCapture);
+			this->mWindowCapture = nullptr;
 		}
 	}
 
 	void AndroidVideoCaptureSession::initSession() {
-		if (this->mAndroidVideoCamera2->mCameraDevice && this->mWindow) {
-			if (this->checkReturnCameraStatus(ACaptureSessionOutput_create(this->mWindow, &this->mSessionOutput)) != ACAMERA_OK) {
+		if (this->mAndroidVideoCamera2->mCameraDevice && this->mWindowPreview && this->mWindowCapture) {
+			if (this->checkReturnCameraStatus(ACaptureSessionOutput_create(this->mWindowPreview, &this->mSessionOutput)) != ACAMERA_OK) {
 				this->mSessionOutput = nullptr;
+				this->uninitSession();
+				return;
+			}
+			if (this->checkReturnCameraStatus(ACaptureSessionOutput_create(this->mWindowCapture, &this->mSessionOutput2)) != ACAMERA_OK) {
+				this->mSessionOutput2 = nullptr;
 				this->uninitSession();
 				return;
 			}
@@ -136,13 +139,17 @@ namespace AndroidVideo {
 				this->uninitSession();
 				return;
 			}
+			if (this->checkReturnCameraStatus(ACaptureSessionOutputContainer_add(this->mSessionOutputContainer, this->mSessionOutput2)) != ACAMERA_OK) {
+				this->uninitSession();
+				return;
+			}
 			if (this->checkReturnCameraStatus(ACameraDevice_createCaptureSession(this->mAndroidVideoCamera2->mCameraDevice, this->mSessionOutputContainer, this->mCaptureSessionCallback, &this->mCameraSession)) != ACAMERA_OK) {
 				this->uninitSession();
 				this->mCameraSession = nullptr;
 				return;
 			}
 			this->mSessionStop = false;
-			this->mSessionReady = true;
+			this->mSessionReset = false;
 		}
 	}
 
@@ -153,11 +160,6 @@ namespace AndroidVideo {
 			this->uninitRequest();
 			this->uninitSession();
 			this->uninitWindow();
-		}
-		if (!this->mPreview && this->mSessionReset) {
-			this->mSessionReset = false;
-			this->initSession();
-			this->initRequest();
 		}
 		this->mAndroidVideoCamera2->unlock();
 	}
@@ -177,6 +179,10 @@ namespace AndroidVideo {
 			ACaptureSessionOutput_free(this->mSessionOutput);
 			this->mSessionOutput = nullptr;
 		}
+		if (this->mSessionOutput2) {
+			ACaptureSessionOutput_free(this->mSessionOutput2);
+			this->mSessionOutput2 = nullptr;
+		}
 		if (this->mCameraSession) {
 			ACameraCaptureSession_close(this->mCameraSession);
 			this->mCameraSession = nullptr;
@@ -186,14 +192,19 @@ namespace AndroidVideo {
 	}
 
 	void AndroidVideoCaptureSession::initRequest() {
-		if (this->mAndroidVideoCamera2->mCameraDevice && this->mWindow) {
-			if (this->checkReturnCameraStatus(ACameraDevice_createCaptureRequest(this->mAndroidVideoCamera2->mCameraDevice, (this->mPreview) ? TEMPLATE_PREVIEW : TEMPLATE_RECORD, &this->mCaptureRequest)) != ACAMERA_OK) {
+		if (this->mAndroidVideoCamera2->mCameraDevice && this->mWindowPreview && this->mWindowCapture) {
+			if (this->checkReturnCameraStatus(ACameraDevice_createCaptureRequest(this->mAndroidVideoCamera2->mCameraDevice, TEMPLATE_RECORD, &this->mCaptureRequest)) != ACAMERA_OK) {
 				this->mCaptureRequest = nullptr;
 				this->uninitRequest();
 				return;
 			}
-			if (this->checkReturnCameraStatus(ACameraOutputTarget_create(this->mWindow, &this->mOutputTarget)) != ACAMERA_OK) {
+			if (this->checkReturnCameraStatus(ACameraOutputTarget_create(this->mWindowPreview, &this->mOutputTarget)) != ACAMERA_OK) {
 				this->mOutputTarget = nullptr;
+				this->uninitRequest();
+				return;
+			}
+			if (this->checkReturnCameraStatus(ACameraOutputTarget_create(this->mWindowCapture, &this->mOutputTarget2)) != ACAMERA_OK) {
+				this->mOutputTarget2 = nullptr;
 				this->uninitRequest();
 				return;
 			}
@@ -201,12 +212,22 @@ namespace AndroidVideo {
 				this->uninitRequest();
 				return;
 			}
+			if (this->checkReturnCameraStatus(ACaptureRequest_addTarget(this->mCaptureRequest, this->mOutputTarget2)) != ACAMERA_OK) {
+				this->uninitRequest();
+				return;
+			}
+			this->mSessionReady = true;
 		}
 	}
+
 	void AndroidVideoCaptureSession::uninitRequest() {
 		if (this->mOutputTarget) {
 			ACameraOutputTarget_free(this->mOutputTarget);
 			this->mOutputTarget = nullptr;
+		}
+		if (this->mOutputTarget2) {
+			ACameraOutputTarget_free(this->mOutputTarget2);
+			this->mOutputTarget2 = nullptr;
 		}
 		if (this->mCaptureRequest) {
 			ACaptureRequest_free(this->mCaptureRequest);

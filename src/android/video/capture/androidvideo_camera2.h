@@ -49,13 +49,11 @@ private:
 	ANativeWindow *mWindowSurfaceView;
 
 	// Session
-	AndroidVideoCaptureSession *mPreviewSession;
-	AndroidVideoCaptureSession *mCaptureSession;
+	AndroidVideoCaptureSession *mSession;
 
 	// Callback
 	ACameraDevice_StateCallbacks mDeviceCallback;
-	ACameraCaptureSession_stateCallbacks mCaptureSessionCallbackPreview;
-	ACameraCaptureSession_stateCallbacks mCaptureSessionCallbackCapture;
+	ACameraCaptureSession_stateCallbacks mCaptureSessionCallback;
 	AImageReader_ImageListener mImageCallback;
 
 public:

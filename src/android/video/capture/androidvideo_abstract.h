@@ -93,10 +93,10 @@ public:
 			freeb(this->mFrame);
 			this->mFrame = nullptr;
 		}
-		/*if (this->mHelperClass && this->mJavaEnv) {
+		if (this->mHelperClass && this->mJavaEnv) {
 			this->mJavaEnv->DeleteGlobalRef(this->mHelperClass);
 			this->mHelperClass = nullptr;
-		}*/
+		}
 		ms_yuv_buf_allocator_free(this->mAllocator);
 		ms_mutex_destroy(&this->mMutex);
 	};
@@ -304,6 +304,7 @@ protected:
 		ms_mutex_unlock(&this->mMutex);
 	};
 
+	// TODO Maybe refactor needed in this tools functions
 	// Tools
 	int computeImageRotationCorrection() {
 		int result;

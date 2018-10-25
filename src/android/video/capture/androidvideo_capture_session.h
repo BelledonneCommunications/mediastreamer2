@@ -39,15 +39,17 @@ private:
 	ACameraCaptureSession *mCameraSession;
 
 	// Window
-	ANativeWindow *mWindow;
+	ANativeWindow *mWindowCapture;
+	ANativeWindow *mWindowPreview;
 	ACameraOutputTarget *mOutputTarget;
-	bool mPreview;
+	ACameraOutputTarget *mOutputTarget2;
 
 	// Image Reader
 	AImageReader* mImageReader;
 
 	// Session
 	ACaptureSessionOutput *mSessionOutput;
+	ACaptureSessionOutput *mSessionOutput2;
 	ACaptureSessionOutputContainer *mSessionOutputContainer;
 	bool mSessionReady;
 	bool mSessionStop;
@@ -62,13 +64,12 @@ private:
 	AImageReader_ImageListener *mImageCallback;
 
 public:
-	AndroidVideoCaptureSession(AndroidVideoCamera2 *avc, ACameraCaptureSession_stateCallbacks *cbSession, AImageReader_ImageListener *cbImage, bool preview = false);
+	AndroidVideoCaptureSession(AndroidVideoCamera2 *avc, ACameraCaptureSession_stateCallbacks *cbSession, AImageReader_ImageListener *cbImage);
 	~AndroidVideoCaptureSession() = default;
 
 	AImageReader* getImageReader();
-	void setWindow(ANativeWindow *mWindow);
+	void setWindowPreview(ANativeWindow *mWindow);
 
-	// ANativeWindow is given when it's a preview
 	void init();
 
 	void repeatingRequest();
