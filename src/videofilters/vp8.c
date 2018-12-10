@@ -198,7 +198,7 @@ static void enc_preprocess(MSFilter *f) {
 		if (s->cfg.g_threads <= 2) cpuused = 8;
 		else if (s->cfg.g_threads <= 4) cpuused = 5;
 		else cpuused = 1;
-		
+
 	}
 	if( s->cfg.g_threads == 1 ){
 		/* on mono-core iOS devices, we reduce the quality a bit more due to VP8 being slower with new Clang compilers */
@@ -232,11 +232,11 @@ static void enc_preprocess(MSFilter *f) {
 	} else if (s->frame_count == 0) {
 		ms_video_starter_init(&s->starter);
 	}
-	
+
 	s->process_thread = ms_worker_thread_new();
 	qinit(&s->entry_q);
 	s->exit_q = ms_queue_new(0, 0, 0, 0);
-	
+
 	s->ready = TRUE;
 }
 
@@ -455,9 +455,9 @@ static void enc_process_frame_task(void *obj) {
 	MSPicture yuv;
 	bool_t is_ref_frame=FALSE;
 	vpx_image_t img;
-	
+
 #if defined(__ANDROID__) || (TARGET_OS_IPHONE == 1) || defined(__arm__) || defined(_M_ARM)
-	
+
 	ms_filter_lock(f);
 	if ((im = getq(&s->entry_q)) == NULL) {
 		ms_warning("VP8 async process: No frame in entry queue");
@@ -470,7 +470,7 @@ static void enc_process_frame_task(void *obj) {
 		return;
 	}
 #endif
-	
+
 #if defined(__ANDROID__) || (TARGET_OS_IPHONE == 1) || defined(__arm__) || defined(_M_ARM)
 	if (s->entry_q.q_mcount >= 3){
 		/*don't let too much buffers to be queued here, it makes no sense for a real time processing and would consume too much memory*/
@@ -507,6 +507,7 @@ static void enc_process_frame_task(void *obj) {
 	if (err) {
 		ms_error("vpx_codec_encode failed : %d %s (%s)\n", err, vpx_codec_err_to_string(err), vpx_codec_error_detail(&s->codec));
 	} else {
+		bool_t first_packet = TRUE;
 		vpx_codec_iter_t iter = NULL;
 		const vpx_codec_cx_pkt_t *pkt;
 		bctbx_list_t *list = NULL;
@@ -545,7 +546,7 @@ static void enc_process_frame_task(void *obj) {
 				packet->m->b_wptr += pkt->data.frame.sz;
 				mblk_set_timestamp_info(packet->m, timestamp);
 				packet->pd = ms_new0(Vp8RtpFmtPayloadDescriptor, 1);
-				packet->pd->start_of_partition = TRUE;
+				packet->pd->start_of_partition = first_packet;
 				packet->pd->non_reference_frame = s->avpf_enabled && !is_ref_frame;
 				if (s->avpf_enabled == TRUE) {
 					packet->pd->extended_control_bits_present = TRUE;
@@ -565,6 +566,7 @@ static void enc_process_frame_task(void *obj) {
 					mblk_set_marker_info(packet->m, TRUE);
 				}
 				list = bctbx_list_append(list, packet);
+				if (first_packet) first_packet = FALSE;
 			}
 		}
 
@@ -575,7 +577,7 @@ static void enc_process_frame_task(void *obj) {
 			(flags & VP8_EFLAG_NO_REF_ARF) ? "NOREFARF" : "        ",
 			(flags & VP8_EFLAG_NO_REF_LAST) ? "NOREFLAST" : "         ");
 #endif
-		
+
 #if defined(__ANDROID__) || (TARGET_OS_IPHONE == 1) || defined(__arm__) || defined(_M_ARM)
 		ms_filter_lock(f);
 		vp8rtpfmt_packer_process(&s->packer, list, s->exit_q, f->factory);
@@ -631,7 +633,7 @@ static void enc_process(MSFilter *f) {
 		enc_process_frame_task((void*)f);
 #endif
 	}
-		
+
 #if defined(__ANDROID__) || (TARGET_OS_IPHONE == 1) || defined(__arm__) || defined(_M_ARM)
 	/* Put each frame we have in exit_q in f->output[0] */
 	while ((exit_f = ms_queue_get(s->exit_q)) != NULL) {
@@ -747,7 +749,7 @@ static int enc_notify_sli(MSFilter *f, void *data) {
 
 	diff=(64 + (int)(most_recent & 0x3F) - (int)(sli->picture_id & 0x3F)) % 64;
 	s->last_sli_id=most_recent-diff;
-	
+
 	fs=enc_get_most_recent_reference_frame(s,FALSE);
 	ms_message("VP8: receiving SLI with pic id [%i], last-ref=[%i], most recent pic id=[%i]",s->last_sli_id, fs ? (int)fs->picture_id : 0, most_recent);
 	if (s->frames_state.golden.picture_id == s->last_sli_id) {
