@@ -210,7 +210,7 @@ build-mediastreamer:
     - ls -la
   dependencies:
     - build-ortp
-  artifacts
+  artifacts:
     paths:
       - build-mediastreamer/tester/*
       - install/*
