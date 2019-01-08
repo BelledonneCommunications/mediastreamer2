@@ -379,7 +379,7 @@ SoundDeviceDescription* ms_devices_info_get_sound_device_description(MSDevicesIn
 	if (!d) {
 		ms_message("No information available for [%s/%s/%s],", manufacturer, model, platform);
 #ifdef __ANDROID__
-		if (ms2_android_get_sdk_version() >= 8){
+		if (ms2_android_get_sdk_version() >= 26){
 			d = &genericSoundDeviceDescriptorAboveAndroid8;
 			ms_message("Using android >= 8 sound device descriptor.");
 		}else d = &genericSoundDeviceDescriptor;
