@@ -51,4 +51,10 @@ JNIEXPORT jint JNICALL Java_org_linphone_mediastream_Factory_getDeviceFlags(JNIE
 	return ms_devices_info_get_sound_device_description(((MSFactory *) factoryPtr)->devices_info)->flags;
 }
 
+#if !defined(ENABLE_AAUDIO) && defined(__ANDROID__)
+JNIEXPORT void JNICALL Java_org_linphone_mediastream_MediastreamerAndroidContext_setAAudioDeviceFavoriteSampleRate(JNIEnv* env, jclass thiz, jint samplerate) {
+	// This is a stub for when not using the AAudio plugin
+}
+#endif
+
 } // extern "C"

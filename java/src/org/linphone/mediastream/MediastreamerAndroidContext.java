@@ -34,6 +34,7 @@ public class MediastreamerAndroidContext {
 
 	private native void setDeviceFavoriteSampleRate(int samplerate);
 	private native void setDeviceFavoriteBufferSize(int bufferSize);
+	private native void setAAudioDeviceFavoriteSampleRate(int samplerate);
 
 	private static Context mContext;
 
@@ -78,6 +79,7 @@ public class MediastreamerAndroidContext {
 			Log.i("[Device] Output frames per buffer: " + bufferSize + ", output sample rates: " + sampleRate + " for OpenSLES MS sound card.");
 			mac.setDeviceFavoriteSampleRate(sampleRate);
 			mac.setDeviceFavoriteBufferSize(bufferSize);
+			mac.setAAudioDeviceFavoriteSampleRate(sampleRate);
 		} else {
 			Log.i("Android < 4.4 detected, android context not used.");
 		}
