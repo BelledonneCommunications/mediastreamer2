@@ -18,7 +18,7 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#include "hardware_echo_canceller.h"
+#include <mediastreamer2/hardware_echo_canceller.h>
 
 jobject enable_hardware_echo_canceller(JNIEnv *env, int sessionId) {
 	jobject aec = NULL;

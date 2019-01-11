@@ -30,7 +30,7 @@
 
 #include <jni.h>
 
-#include "hardware_echo_canceller.h"
+#include <mediastreamer2/hardware_echo_canceller.h>
 
 #define NATIVE_USE_HARDWARE_RATE 1
 //#define TRACE_SND_WRITE_TIMINGS

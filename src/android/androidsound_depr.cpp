@@ -32,7 +32,7 @@
 #include "mediastreamer2/zrtp.h"
 #include <cpu-features.h>
 
-#include "hardware_echo_canceller.h"
+#include "mediastreamer2/hardware_echo_canceller.h"
 
 #define USE_HARDWARE_RATE 1
 

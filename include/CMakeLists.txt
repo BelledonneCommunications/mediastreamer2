@@ -30,6 +30,7 @@ set(HEADER_FILES
 	dtmfgen.h
 	flowcontrol.h
 	formats.h
+	hardware_echo_canceller.h
 	ice.h
 	mediastream.h
 	ms_srtp.h
