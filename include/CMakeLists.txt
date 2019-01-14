@@ -22,6 +22,7 @@
 
 set(HEADER_FILES
 	allfilters.h
+	android_utils.h
 	bitratecontrol.h
 	bits_rw.h
 	devices.h
@@ -30,7 +31,6 @@ set(HEADER_FILES
 	dtmfgen.h
 	flowcontrol.h
 	formats.h
-	hardware_echo_canceller.h
 	ice.h
 	mediastream.h
 	ms_srtp.h
