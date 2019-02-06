@@ -84,7 +84,6 @@ static int dec_init_mediacodec(DecData *d) {
 		ms_error("MSMediaCodecH264Dec: starting failure: %i", (int)status);
 		goto end;
 	}
-	d->need_key_frame = TRUE;
 
 end:
 	AMediaFormat_delete(format);
@@ -114,6 +113,7 @@ static void dec_init(MSFilter *f) {
 static void dec_preprocess(MSFilter *f) {
 	DecData *d = (DecData *)f->data;
 	d->first_image_decoded = FALSE;
+	d->need_key_frame = TRUE;
 }
 
 static void dec_postprocess(MSFilter *f) {
