@@ -308,6 +308,10 @@ static void dec_process(MSFilter *f) {
 			}
 		}
 
+		/* nalusToFrame() MUST be called here to ensure that SPS/PPS are extracted
+		   in case they aren't in an I-frame. */
+		size = nalusToFrame(d, &nalus, &need_reinit);
+
 		if (d->need_key_frame && !(unpacking_ret & Rfc3984IsKeyFrame)) {
 			request_pli = TRUE;
 			ms_queue_flush(&nalus);
@@ -316,7 +320,6 @@ static void dec_process(MSFilter *f) {
 
 		if (unpacking_ret & Rfc3984IsKeyFrame) ms_message("MSMediaCodecH264Dec: I-frame received");
 
-		size = nalusToFrame(d, &nalus, &need_reinit);
 		//Initialise the video size
 		if((d->codec==NULL) && d->sps) {
 			dec_init_mediacodec(d);
