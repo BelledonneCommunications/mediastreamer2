@@ -85,6 +85,10 @@ static int dec_init_mediacodec(DecData *d) {
 		goto end;
 	}
 
+	// Delay the execution for 3ms in order the implementation of the decoder
+	// have enough time to initialize itself.
+	ms_usleep(3000);
+
 end:
 	AMediaFormat_delete(format);
 	return status;
