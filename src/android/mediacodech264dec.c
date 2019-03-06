@@ -17,6 +17,8 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
+#include <sys/system_properties.h>
+
 #include "mediastreamer2/msfilter.h"
 #include "mediastreamer2/rfc3984.h"
 #include "mediastreamer2/msvideo.h"
@@ -30,7 +32,19 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "ortp/b64.h"
 
 #define TIMEOUT_US 0
+#define DEVICE_INFO_STRLEN 256
 
+typedef struct {
+	char manufacturer[DEVICE_INFO_STRLEN];
+	char model[DEVICE_INFO_STRLEN];
+	char platform[DEVICE_INFO_STRLEN];
+} DeviceInfo;
+
+static void _get_device_info(DeviceInfo *info) {
+	if (__system_property_get("ro.product.manufacturer", info->manufacturer) < 0) info->manufacturer[0] = '\0';
+	if (__system_property_get("ro.product.model", info->model) < 0) info->model[0] = '\0';
+	if (__system_property_get("ro.board.platform", info->platform) < 0) info->platform[0] = '\0';
+}
 
 typedef struct _DecData {
 	mblk_t *sps, *pps;
@@ -43,6 +57,7 @@ typedef struct _DecData {
 	uint8_t *bitstream;
 	int bitstream_size;
 	MSYuvBufAllocator *buf_allocator;
+	int64_t input_buffer_timeout;
 	bool_t buffer_queued;
 	bool_t first_image_decoded;
 	bool_t avpf_enabled;
@@ -85,10 +100,6 @@ static int dec_init_mediacodec(DecData *d) {
 		goto end;
 	}
 
-	// Delay the execution for 3ms in order the implementation of the decoder
-	// have enough time to initialize itself.
-	ms_usleep(3000);
-
 end:
 	AMediaFormat_delete(format);
 	return status;
@@ -96,6 +107,7 @@ end:
 
 static void dec_init(MSFilter *f) {
 	DecData *d = ms_new0(DecData, 1);
+	DeviceInfo device_info;
 
 	ms_message("MSMediaCodecH264Dec initialization");
 	f->data = d;
@@ -112,6 +124,15 @@ static void dec_init(MSFilter *f) {
 	d->bitstream = ms_malloc0(d->bitstream_size);
 	d->buf_allocator = ms_yuv_buf_allocator_new();
 	ms_average_fps_init(&d->fps, " H264 decoder: FPS: %f");
+
+	_get_device_info(&device_info);
+	ms_message("MSMediaCodecH264Dec: got device information: (manufacturer=%s, model=%s, platform=%s)", device_info.manufacturer, device_info.model, device_info.platform);
+	if (strcmp(device_info.manufacturer, "rockchip") == 0 && strcmp(device_info.model, "X9-LX") == 0 && strcmp(device_info.platform, "rk3288") == 0) {
+		d->input_buffer_timeout = 100000;
+		ms_message("MSMediaCodecH264Dec: setting input buffer timeout to %dms", (int)d->input_buffer_timeout/1000);
+	} else {
+		d->input_buffer_timeout = TIMEOUT_US;
+	}
 }
 
 static void dec_preprocess(MSFilter *f) {
@@ -338,7 +359,7 @@ static void dec_process(MSFilter *f) {
 		}
 
 		/*First put our H264 bitstream into the decoder*/
-		iBufidx = AMediaCodec_dequeueInputBuffer(d->codec, TIMEOUT_US);
+		iBufidx = AMediaCodec_dequeueInputBuffer(d->codec, d->input_buffer_timeout);
 
 		if (iBufidx >= 0) {
 			struct timespec ts;
