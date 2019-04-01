@@ -25,8 +25,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "box-plot.h"
 
+#undef min
+#undef max
 #define min(x, y) (x < y) ? x : y;
 #define max(x, y) (x < y) ? y : x;
+
 
 void ms_box_plot_reset(MSBoxPlot *bp) {
 	memset(bp, 0, sizeof(MSBoxPlot));
