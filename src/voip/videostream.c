@@ -519,11 +519,13 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate){
 		}
 	}
 
-	vconf.vsize=stream->sent_vsize;// get_compatible_size(vconf.vsize,stream->sent_vsize);
-	if (stream->preview_vsize.width!=0){
-		preview_vsize=stream->preview_vsize;
-	}else{
-		preview_vsize=vconf.vsize;
+	if (!ms_filter_implements_interface(stream->source, MSFilterVideoEncoderInterface)) {
+		vconf.vsize=stream->sent_vsize;// get_compatible_size(vconf.vsize,stream->sent_vsize);
+		if (stream->preview_vsize.width!=0){
+			preview_vsize=stream->preview_vsize;
+		} else {
+			preview_vsize=vconf.vsize;
+		}
 	}
 
 	if (is_player){
@@ -535,10 +537,16 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate){
 			pf.fmt=ms_factory_get_video_format(stream->ms.factory,"VP8",vsize,0,NULL);
 		}
 		cam_vsize=pf.fmt->vsize;
-	}else{
-		ms_filter_call_method(stream->source,MS_FILTER_SET_VIDEO_SIZE,&preview_vsize);
-		/*the camera may not support the target size and suggest a one close to the target */
-		ms_filter_call_method(stream->source,MS_FILTER_GET_VIDEO_SIZE,&cam_vsize);
+	} else {
+		if (ms_filter_implements_interface(stream->source, MSFilterVideoEncoderInterface)) {
+			//MS_FILTER_SET_VIDEO_SIZE and MS_FILTER_SET_VIDEO_SIZE are deprecated for MSFilterVideoEncoderInterface types
+			//Use the size returned by the above call to MS_VIDEO_ENCODER_GET_CONFIGURATION directly
+			cam_vsize = vconf.vsize;
+		} else {
+			ms_filter_call_method(stream->source,MS_FILTER_SET_VIDEO_SIZE,&preview_vsize);
+			/*the camera may not support the target size and suggest a one close to the target */
+			ms_filter_call_method(stream->source,MS_FILTER_GET_VIDEO_SIZE,&cam_vsize);
+		}
 	}
 
 	if (cam_vsize.width*cam_vsize.height<=vconf.vsize.width*vconf.vsize.height){
@@ -1138,8 +1146,10 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 			/*configure the display window */
 			if(stream->output != NULL) {
 				int autofit = 1;
+				//Use default size. If output supports it, it should resize automatically after first received frame
 				disp_size.width=MS_VIDEO_SIZE_CIF_W;
 				disp_size.height=MS_VIDEO_SIZE_CIF_H;
+
 				ms_filter_call_method(stream->output,MS_FILTER_SET_VIDEO_SIZE,&disp_size);
 
 				/* if pixconv is used, force yuv420 */
@@ -1182,9 +1192,13 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 		}
 		if (stream->output!=NULL)
 			ms_connection_helper_link (&ch,stream->output,0,-1);
-		/* the video source must be send for preview , if it exists*/
-		if (stream->tee!=NULL && stream->output!=NULL && stream->output2==NULL)
-			ms_filter_link(stream->tee,1,stream->output,1);
+		/* the video source must be send for preview , if it exists. */
+		if (stream->tee!=NULL && stream->output!=NULL && stream->output2==NULL) {
+			//Don't add the preview output if the source is encoded. We could also add a decoding step here
+			if (stream->source_performs_encoding == FALSE) {
+				ms_filter_link(stream->tee,1,stream->output,1);
+			}
+		}
 	}
 	if (stream->dir == MediaStreamSendOnly) {
 		stream->ms.rtprecv = ms_factory_create_filter(stream->ms.factory, MS_RTP_RECV_ID);
@@ -1498,8 +1512,11 @@ static MSFilter* _video_stream_stop(VideoStream * stream, bool_t keep_source)
 				}
 				if(stream->output)
 					ms_connection_helper_unlink (&h,stream->output,0,-1);
-				if (stream->tee && stream->output && stream->output2==NULL)
-					ms_filter_unlink(stream->tee,1,stream->output,1);
+				if (stream->tee && stream->output && stream->output2==NULL) {
+					if (stream->source_performs_encoding == FALSE) {
+						ms_filter_unlink(stream->tee,1,stream->output,1);
+					}
+				}
 			}
 		}
 	}
