@@ -38,7 +38,6 @@ static MSFactory* _factory = NULL;
 static CodecsManager *_h264_codecs_manager = NULL;
 
 
-
 MSWebCam* mediastreamer2_tester_get_mire_webcam(MSWebCamManager *mgr) {
 	MSWebCam *cam;
 
@@ -493,7 +492,6 @@ static void multicast_video_stream(void) {
 	marielle->local_rtcp=0; /*no rtcp*/
 	video_stream_tester_set_local_ip(margaux,"0.0.0.0");
 
-
 	if (supported) {
 		int dummy=0;
 		init_video_streams(marielle, margaux, FALSE, TRUE, NULL,VP8_PAYLOAD_TYPE);
@@ -917,6 +915,62 @@ static void video_configuration_stream_h264(void) {
 #endif
 }
 
+video_stream_tester_t* video_stream_tester_elph264_cam_new(void) {
+	video_stream_tester_t* vst = ms_new0(video_stream_tester_t,1);
+	video_stream_tester_set_local_ip(vst,"127.0.0.1");
+	vst->cam = ms_web_cam_manager_get_cam(ms_factory_get_web_cam_manager(_factory), "ELP-USB100W04H: /dev/elp-h264");
+	vst->local_rtp=-1; /*random*/
+	vst->local_rtcp=-1; /*random*/
+#if TARGET_OS_OSX
+	vst->vconf = ms_new0(MSVideoConfiguration, 1);
+	vst->vconf->vsize = MS_VIDEO_SIZE_VGA;
+	vst->vconf->required_bitrate = 500000;
+#endif
+	return  vst;
+}
+
+static void video_stream_elph264_camera() {
+	if (bctbx_file_exist("/dev/elp-h264")) {
+		return;
+	}
+	MSVideoConfiguration asked;
+	MSVideoConfiguration expected;
+	asked.bitrate_limit=expected.bitrate_limit=1024000;
+	asked.required_bitrate=expected.required_bitrate=1024000;
+	asked.fps=expected.fps=30;
+	asked.vsize.width=expected.vsize.width=MS_VIDEO_SIZE_720P_W;
+	asked.vsize.height=expected.vsize.height=MS_VIDEO_SIZE_720P_H;
+
+	video_stream_tester_t* marielle=video_stream_tester_elph264_cam_new();
+	video_stream_tester_t* margaux=video_stream_tester_elph264_cam_new();
+	PayloadType* pt = rtp_profile_get_payload(&rtp_profile, H264_PAYLOAD_TYPE);
+	bool_t supported = pt ? ms_factory_codec_supported(_factory, pt->mime_type) : FALSE;
+
+	if (supported) {
+		margaux->vconf = ms_new0(MSVideoConfiguration, 1);
+		margaux->vconf->required_bitrate = asked.required_bitrate;
+		margaux->vconf->bitrate_limit = asked.bitrate_limit;
+		margaux->vconf->vsize = asked.vsize;
+		margaux->vconf->fps = asked.fps;
+
+		init_video_streams(marielle, margaux, FALSE, TRUE, NULL, H264_PAYLOAD_TYPE);
+
+		BC_ASSERT_TRUE(wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms, &marielle->stats.number_of_RR, 4, 30000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats));
+
+		video_stream_get_local_rtp_stats(marielle->vs, &marielle->stats.rtp);
+		video_stream_get_local_rtp_stats(margaux->vs, &margaux->stats.rtp);
+
+		BC_ASSERT_TRUE(ms_video_size_equal(video_stream_get_received_video_size(marielle->vs), margaux->vconf->vsize));
+		BC_ASSERT_TRUE(fabs(video_stream_get_received_framerate(marielle->vs)-margaux->vconf->fps) < 2);
+
+		uninit_video_streams(marielle, margaux);
+	} else {
+		ms_error("H264 codec is not supported!");
+	}
+	video_stream_tester_destroy(marielle);
+	video_stream_tester_destroy(margaux);
+}
+
 static void video_configuration_stream_all_h264_codec_combinations(void) {
 	codecs_manager_test_all_combinations(_h264_codecs_manager, video_configuration_stream_h264);
 }
@@ -938,6 +992,7 @@ static test_t tests[] = {
 	TEST_NO_TAG("AVP video stream first iframe lost H264"  , video_stream_first_iframe_lost_all_h264_codec_combinations),
 	TEST_NO_TAG("Video configuration VP8"                  , video_configuration_stream_vp8),
 	TEST_NO_TAG("Video configuration H264"                 , video_configuration_stream_all_h264_codec_combinations),
+	TEST_NO_TAG("Video steam camera ELPH264"	       , video_stream_elph264_camera),
 	TEST_NO_TAG("AVPF RPSI count"                          , avpf_rpsi_count)
 };
 
