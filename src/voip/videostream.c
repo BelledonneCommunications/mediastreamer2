@@ -1671,20 +1671,28 @@ static void configure_video_preview_source(VideoPreview *stream) {
 		ms_filter_call_method(stream->source, MS_VIDEO_DISPLAY_SET_DEVICE_ORIENTATION, &stream->device_orientation);
 	}
 
-	ms_filter_call_method(stream->source, MS_FILTER_SET_VIDEO_SIZE, &vsize);
-	if (ms_filter_get_id(stream->source) != MS_STATIC_IMAGE_ID) {
-		ms_filter_call_method(stream->source, MS_FILTER_SET_FPS, &fps);
-	}
-	ms_filter_call_method(stream->source, MS_FILTER_GET_VIDEO_SIZE, &vsize);
 	ms_filter_call_method(stream->source, MS_FILTER_GET_PIX_FMT, &format);
+
+	if (!ms_filter_implements_interface(stream->source, MSFilterVideoEncoderInterface)) {
+		ms_filter_call_method(stream->source, MS_FILTER_SET_VIDEO_SIZE, &vsize);
+		if (ms_filter_get_id(stream->source) != MS_STATIC_IMAGE_ID) {
+			ms_filter_call_method(stream->source, MS_FILTER_SET_FPS, &fps);
+		}
+		ms_filter_call_method(stream->source, MS_FILTER_GET_VIDEO_SIZE, &vsize);
+	} else {
+		MSVideoConfiguration vconf;
+		ms_filter_call_method(stream->source, MS_VIDEO_ENCODER_GET_CONFIGURATION, &vconf);
+		vconf.vsize = vsize;
+		vconf.fps = fps;
+		ms_filter_call_method(stream->source, MS_VIDEO_ENCODER_SET_CONFIGURATION, &vconf);
+	}
 
 	if (format == MS_MJPEG) {
 		stream->pixconv = ms_factory_create_filter(stream->ms.factory, MS_MJPEG_DEC_ID);
 		if (stream->pixconv == NULL) {
 			ms_error("Could not create mjpeg decoder, check your build options.");
 		}
-	}
-	else {
+	} else if (!ms_filter_implements_interface(stream->source, MSFilterVideoEncoderInterface)) {
 		stream->pixconv = ms_factory_create_filter(stream->ms.factory, MS_PIX_CONV_ID);
 		ms_filter_call_method(stream->pixconv, MS_FILTER_SET_PIX_FMT, &format);
 		ms_filter_call_method(stream->pixconv, MS_FILTER_SET_VIDEO_SIZE, &vsize);
@@ -1728,6 +1736,17 @@ void video_preview_start(VideoPreview *stream, MSWebCam *device) {
 
 	ms_connection_helper_start(&ch);
 	ms_connection_helper_link(&ch, stream->source, -1, 0);
+
+	if (ms_filter_implements_interface(stream->source, MSFilterVideoEncoderInterface)) {
+		/* Need to decode first */
+		stream->ms.decoder = ms_factory_create_decoder(stream->ms.factory, stream->source->desc->enc_fmt);
+		if (stream->ms.decoder == NULL) {
+			/* big problem: we don't have a registered decoderfor this payload...*/
+			ms_error("video_preview_start: No decoder available for payload %s.", stream->source->desc->enc_fmt);
+			return;
+		}
+		ms_connection_helper_link(&ch,stream->ms.decoder,0,0);
+	}
 
 	if (stream->output2) {
 		if (stream->preview_window_id != 0) {
@@ -1791,6 +1810,9 @@ static MSFilter* _video_preview_stop( VideoPreview* stream, bool_t keep_source) 
 
 	ms_connection_helper_start(&ch);
 	ms_connection_helper_unlink(&ch, stream->source, -1, 0);
+	if (stream->ms.decoder) {
+		ms_connection_helper_unlink(&ch, stream->ms.decoder, 0, 0);
+	}
 	if (stream->pixconv) {
 		ms_connection_helper_unlink(&ch, stream->pixconv, 0, 0);
 	}
