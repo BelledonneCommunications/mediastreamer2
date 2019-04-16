@@ -418,10 +418,10 @@ static AVCaptureVideoOrientation Angle2AVCaptureVideoOrientation(int deviceOrien
 		mOutputVideoSize = mCameraVideoSize;
 		mDownScalingRequired = false;
 	} else if ((outputSize.width * outputSize.height) == (MS_VIDEO_SIZE_QVGA_W * MS_VIDEO_SIZE_QVGA_H)) {
-		[session setSessionPreset: AVCaptureSessionPreset640x480];
-		mCameraVideoSize = MS_VIDEO_SIZE_VGA;
+		[session setSessionPreset: AVCaptureSessionPreset320x240];
+		mCameraVideoSize = MS_VIDEO_SIZE_QVGA;
 		mOutputVideoSize = MS_VIDEO_SIZE_QVGA;
-		mDownScalingRequired = true;
+		mDownScalingRequired = false;
 	} else if ( (outputSize.width * outputSize.height) == (MS_VIDEO_SIZE_CIF_W * MS_VIDEO_SIZE_CIF_H) ){
 		[session setSessionPreset:AVCaptureSessionPreset352x288];
         mCameraVideoSize     = MS_VIDEO_SIZE_CIF;

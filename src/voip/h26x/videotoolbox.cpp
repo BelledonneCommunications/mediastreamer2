@@ -30,8 +30,7 @@ using namespace std;
 namespace mediastreamer {
 
 const MSVideoConfiguration vth264enc_video_confs[] = {
-	MS_VIDEO_CONF(1536000,  3000000, SXGA_MINUS, 25, 2),
-	MS_VIDEO_CONF(1024000,  2048000,       720P, 25, 2),
+	MS_VIDEO_CONF(1024000,  3000000,       720P, 25, 2),
 	MS_VIDEO_CONF( 850000,  2048000,        XGA, 25, 2),
 	MS_VIDEO_CONF( 750000,  1500000,       SVGA, 25, 2),
 	MS_VIDEO_CONF( 600000,  3000000,        VGA, 30, 2),
