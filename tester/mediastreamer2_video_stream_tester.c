@@ -73,7 +73,7 @@ static CodecsManager *codecs_manager_new(MSFactory *factory, const char *mime) {
 	for (it=factory->desc_list; it; it=bctbx_list_next(it)) {
 		MSFilterDesc *desc = (MSFilterDesc *)it->data;
 		if (desc->enc_fmt && strcasecmp(desc->enc_fmt, mime) == 0 && (desc->flags & MS_FILTER_IS_ENABLED)) {
-			if (desc->category == MS_FILTER_ENCODER) {
+			if (desc->category == MS_FILTER_ENCODER && desc->category != MS_FILTER_ENCODING_CAPTURER) {
 				cm->encoders = bctbx_list_append(cm->encoders, desc);
 			} else if (desc->category == MS_FILTER_DECODER) {
 				cm->decoders = bctbx_list_append(cm->decoders, desc);
@@ -901,7 +901,7 @@ static void video_configuration_stream_h264(void) {
 	asked.fps=expected.fps=12;
 	asked.vsize.width=expected.vsize.width=MS_VIDEO_SIZE_VGA_W;
 	asked.vsize.height=expected.vsize.height=MS_VIDEO_SIZE_VGA_H;
-	video_configuration_stream_base(&asked,&expected,VP8_PAYLOAD_TYPE);
+	video_configuration_stream_base(&asked,&expected,H264_PAYLOAD_TYPE);
 
 	/*Test video rotation (inverted height <-> width). Not supported on desktop
 	because no real use case yet.*/
@@ -921,16 +921,16 @@ video_stream_tester_t* video_stream_tester_elph264_cam_new(void) {
 	vst->cam = ms_web_cam_manager_get_cam(ms_factory_get_web_cam_manager(_factory), "ELP-USB100W04H: /dev/elp-h264");
 	vst->local_rtp=-1; /*random*/
 	vst->local_rtcp=-1; /*random*/
-#if TARGET_OS_OSX
 	vst->vconf = ms_new0(MSVideoConfiguration, 1);
-	vst->vconf->vsize = MS_VIDEO_SIZE_VGA;
+	vst->vconf->vsize = MS_VIDEO_SIZE_720P;
+	vst->vconf->fps = 30;
 	vst->vconf->required_bitrate = 500000;
-#endif
 	return  vst;
 }
 
 static void video_stream_elph264_camera() {
-	if (bctbx_file_exist("/dev/elp-h264")) {
+	if (bctbx_file_exist("/dev/elp-h264") != 0) {
+		ms_error("Ignoring video_stream_elph264_camera test because required device is not present.");
 		return;
 	}
 	MSVideoConfiguration asked;
