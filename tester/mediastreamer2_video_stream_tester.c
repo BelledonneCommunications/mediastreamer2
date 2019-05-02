@@ -144,6 +144,8 @@ static int tester_before_all(void) {
 	_h264_codecs_manager = codecs_manager_new(_factory, "h264");
 
 	cam_manager = ms_factory_get_web_cam_manager(_factory);
+	//Disable h264 camera by default because of potential conflict with other h264 encoders
+	ms_factory_enable_filter_from_name(_factory, "h264camera", FALSE);
 	if(mire != NULL) ms_web_cam_manager_add_cam(cam_manager, mire);
 
 	return 0;
@@ -932,6 +934,8 @@ static void video_stream_elph264_camera() {
 	if (bctbx_file_exist("/dev/elp-h264") != 0) {
 		ms_error("Ignoring video_stream_elph264_camera test because required device is not present.");
 		return;
+	} else {
+		ms_factory_enable_filter_from_name(_factory, "h264camera", TRUE);
 	}
 	MSVideoConfiguration asked;
 	MSVideoConfiguration expected;
