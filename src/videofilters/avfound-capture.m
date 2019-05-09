@@ -169,8 +169,6 @@ static void capture_queue_cleanup(void* p) {
 							 nil];
 		[output setVideoSettings:dic];
 		
-		
-		
 		[session startRunning];
 		ms_message("AVCapture: Engine started");
 	}
@@ -375,11 +373,21 @@ static void v4m_process(MSFilter * obj){
 		}
 
 		if (om != NULL) {
-			timestamp=obj->ticker->time*90;/* rtp uses a 90000 Hz clockrate for video*/
-			mblk_set_timestamp_info(om,timestamp);
-			mblk_set_marker_info(om,TRUE);	
-			ms_queue_put(obj->outputs[0],om);
-			ms_average_fps_update(&s->afps, obj->ticker->time);
+			YuvBuf frame_size;
+			MSVideoSize desired_size = [s->webcam usedSize];
+
+			ms_yuv_buf_init_from_mblk(&frame_size, om);
+
+			if (frame_size.w * frame_size.h == desired_size.width * desired_size.height) { 
+				timestamp=obj->ticker->time*90;/* rtp uses a 90000 Hz clockrate for video*/
+				mblk_set_timestamp_info(om,timestamp);
+				mblk_set_marker_info(om,TRUE);
+				ms_queue_put(obj->outputs[0],om);
+				ms_average_fps_update(&s->afps, obj->ticker->time);
+			} else {
+				ms_warning("AVCapture frame (%dx%d) does not have desired size (%dx%d), discarding...", frame_size.w, frame_size.h, desired_size.width, desired_size.height);
+				freemsg(om);
+			}
 		}
 	}
 
