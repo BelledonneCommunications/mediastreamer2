@@ -539,7 +539,7 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate){
 		cam_vsize=pf.fmt->vsize;
 	} else {
 		if (ms_filter_implements_interface(stream->source, MSFilterVideoEncoderInterface)) {
-			//MS_FILTER_SET_VIDEO_SIZE and MS_FILTER_SET_VIDEO_SIZE are deprecated for MSFilterVideoEncoderInterface types
+			//MS_FILTER_GET_VIDEO_SIZE and MS_FILTER_SET_VIDEO_SIZE are deprecated for MSFilterVideoEncoderInterface types
 			//Use the size returned by the above call to MS_VIDEO_ENCODER_GET_CONFIGURATION directly
 			cam_vsize = vconf.vsize;
 		} else {
