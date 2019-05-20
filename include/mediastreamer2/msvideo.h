@@ -126,8 +126,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define MS_VIDEO_SIZE_UXGA_W 1600
 #define MS_VIDEO_SIZE_UXGA_H 1200
 
-
-
+#define MS_CAMERA_PREVIEW_SIZE_CHANGED MS_FILTER_EVENT(MS_ANDROID_VIDEO_READ_ID, 0, const char*)
 
 typedef struct MSRect{
 	int x,y,w,h;
