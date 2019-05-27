@@ -32,7 +32,7 @@ if(MSVC AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsPhone" AND NOT CMAKE_SYSTEM_N
 	find_library(LIBMINGWEX NAMES mingwex)
 endif()
 
-find_program(AWK_PROGRAM awk)
+find_program(AWK_PROGRAM awk CMAKE_FIND_ROOT_PATH_BOTH)
 if(NOT AWK_PROGRAM)
 	message(FATAL_ERROR "You need the awk program to build mediastreamer2.")
 endif()
@@ -428,7 +428,7 @@ add_custom_target(ms2-voipdescs-header
 
 if(APPLE OR ANDROID OR OPENGL_FOUND OR GLX_FOUND OR QTANGLE_FOUND)
 	find_package(PythonInterp REQUIRED)
-	find_program(SED_PROGRAM sed)
+	find_program(SED_PROGRAM sed CMAKE_FIND_ROOT_PATH_BOTH)
 	if(NOT SED_PROGRAM)
 		message(FATAL_ERROR "You need the sed program to build mediastreamer2.")
 	endif()

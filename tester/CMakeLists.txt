@@ -29,7 +29,6 @@ else()
 	endif()
 endif()
 
-
 set(SOUND_FILES
 	sounds/arpeggio_8000_mono.wav
 	sounds/bird_44100_stereo.wav
@@ -100,7 +99,6 @@ set(SOURCE_FILES_C
 	mediastreamer2_audio_stream_tester.c
 	mediastreamer2_basic_audio_tester.c
 	mediastreamer2_framework_tester.c
-	mediastreamer2_neon_tester.c
 	mediastreamer2_player_tester.c
 	mediastreamer2_sound_card_tester.c
 	mediastreamer2_tester.c
@@ -108,6 +106,15 @@ set(SOURCE_FILES_C
 	mediastreamer2_text_stream_tester.c
 	mediastreamer2_jitterbuffer_tester.c
 )
+
+if (ENABLE_SPEEX_DSP)
+	list(APPEND SOURCE_FILES_C mediastreamer2_neon_tester.c)
+	#We need to explicitely link speexdsp if this file is included
+	if(SPEEXDSP_FOUND)
+		list(APPEND MS2_LIBS_FOR_TESTER ${SPEEXDSP_LIBRARIES})
+	endif()
+endif()
+
 set(SOURCE_FILES_CXX )
 set(SOURCE_FILES_OBJC )
 
