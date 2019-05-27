@@ -104,7 +104,6 @@ set(SOURCE_FILES_C
 	mediastreamer2_audio_stream_tester.c
 	mediastreamer2_basic_audio_tester.c
 	mediastreamer2_framework_tester.c
-	mediastreamer2_neon_tester.c
 	mediastreamer2_player_tester.c
 	mediastreamer2_sound_card_tester.c
 	mediastreamer2_tester.c
