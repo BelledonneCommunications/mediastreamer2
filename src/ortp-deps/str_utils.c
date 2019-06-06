@@ -327,20 +327,20 @@ void msgb_allocator_init(msgb_allocator_t *a){
 	qinit(&a->q);
 }
 
-mblk_t *msgb_allocator_alloc(msgb_allocator_t *a, int size){
-	queue_t *q=&a->q;
-	mblk_t *m,*found=NULL;
+mblk_t *msgb_allocator_alloc(msgb_allocator_t *a, int size) {
+	queue_t *q = &a->q;
+	mblk_t *m, *found = NULL;
 
 	/*lookup for an unused msgb (data block with ref count ==1)*/
-	for(m=qbegin(q);!qend(q,m);m=qnext(q,m)){
-		if (m->b_datap->db_ref==1 && m->b_datap->db_lim-m->b_datap->db_base>=size){
-			found=m;
+	for (m = qbegin(q); !qend(q, m); m = qnext(q, m)) {
+		if (m && m->b_datap && m->b_datap->db_ref == 1 && m->b_datap->db_lim - m->b_datap->db_base >= size) {
+			found = m;
 			break;
 		}
 	}
-	if (found==NULL){
-		found=allocb(size,0);
-		putq(q,found);
+	if (found == NULL) {
+		found = allocb(size, 0);
+		putq(q, found);
 	}
 	return dupb(found);
 }
