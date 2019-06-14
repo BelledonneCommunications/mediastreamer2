@@ -1012,20 +1012,40 @@ static void video_stream_normal_loss_with_nack_context(void) {
 	bool_t supported = ms_factory_codec_supported(_factory, "vp8");
 
 	if (supported) {
+		JBParameters initial_jitter_params, current_jitter_params;
 		int dummy = 0;
 		params.enabled = TRUE;
 		params.loss_rate = 3.;
+
 		init_video_streams(marielle, margaux, TRUE, FALSE, &params, VP8_PAYLOAD_TYPE, TRUE);
+
+		rtp_session_get_jitter_buffer_params(margaux->vs->ms.sessions.rtp_session, &initial_jitter_params);
 
 		wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms,
 			&dummy, 1, 10000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats);
 
 		BC_ASSERT_LOWER(margaux->stats.number_of_sent_SLI, 5, int, "%d");
 
+		/* Since there is some loss_rate the nack context should increase the min_size */
+		rtp_session_get_jitter_buffer_params(margaux->vs->ms.sessions.rtp_session, &current_jitter_params);
+		BC_ASSERT_GREATER(current_jitter_params.min_size, initial_jitter_params.min_size, int, "%d");
+
+		params.loss_rate = 0.;
+		rtp_session_enable_network_simulation(marielle->vs->ms.sessions.rtp_session, &params);
+		rtp_session_enable_network_simulation(margaux->vs->ms.sessions.rtp_session, &params);
+
+		wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms,
+			&dummy, 1, 6000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats);
+
+		/* Since no NACK is sent in the last 5 seconds, the jitter min size is set back to default */
+		rtp_session_get_jitter_buffer_params(margaux->vs->ms.sessions.rtp_session, &current_jitter_params);
+		BC_ASSERT_EQUAL(current_jitter_params.min_size, initial_jitter_params.min_size, int, "%d");
+
 		uninit_video_streams(marielle, margaux);
 	} else {
 		ms_error("Codec is not supported!");
 	}
+
 	video_stream_tester_destroy(marielle);
 	video_stream_tester_destroy(margaux);
 }
