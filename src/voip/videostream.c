@@ -268,6 +268,9 @@ void video_stream_iterate(VideoStream *stream){
 	if (stream->ms.video_quality_controller) {
 		ms_video_quality_controller_process_timer(stream->ms.video_quality_controller);
 	}
+	if (stream->nack_context) {
+		ortp_nack_context_process_timer(stream->nack_context);
+	}
 }
 
 const char *video_stream_get_default_video_renderer(VideoStream *stream){
