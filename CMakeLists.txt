@@ -20,7 +20,7 @@
 #
 ############################################################################
 
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.1)
 project(mediastreamer2 VERSION 2.16.1 LANGUAGES C CXX)
 
 # See: https://cmake.org/cmake/help/v3.12/policy/CMP0072.html
@@ -673,7 +673,7 @@ if(ENABLE_DOC)
 endif()
 add_subdirectory(include)
 add_subdirectory(src)
-if(ENABLE_UNIT_TESTS AND BCTOOLBOX_TESTER_FOUND)
+if(ENABLE_UNIT_TESTS)
 	add_subdirectory(tester)
 endif()
 if(ENABLE_TOOLS)
