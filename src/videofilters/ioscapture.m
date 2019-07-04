@@ -413,13 +413,24 @@ static AVCaptureVideoOrientation Angle2AVCaptureVideoOrientation(int deviceOrien
 		mOutputVideoSize.height = outputSize.height;
 		mDownScalingRequired = false;
 	} else if ((outputSize.width * outputSize.height) == (MS_VIDEO_SIZE_VGA_W * MS_VIDEO_SIZE_VGA_H)) {
-		[session setSessionPreset: AVCaptureSessionPreset640x480];
-		mCameraVideoSize = MS_VIDEO_SIZE_VGA;
-		mOutputVideoSize = mCameraVideoSize;
-		mDownScalingRequired = false;
+		if ([session canSetSessionPreset: AVCaptureSessionPreset640x480]) {
+			[session setSessionPreset: AVCaptureSessionPreset640x480];
+			mCameraVideoSize = MS_VIDEO_SIZE_VGA;
+			mDownScalingRequired = false;
+		} else {
+			[session setSessionPreset: AVCaptureSessionPreset1280x720];
+			mCameraVideoSize = MS_VIDEO_SIZE_720P;
+			mDownScalingRequired = true;
+		}
+		mOutputVideoSize = MS_VIDEO_SIZE_VGA;
 	} else if ((outputSize.width * outputSize.height) == (MS_VIDEO_SIZE_QVGA_W * MS_VIDEO_SIZE_QVGA_H)) {
-		[session setSessionPreset: AVCaptureSessionPreset640x480];
-		mCameraVideoSize = MS_VIDEO_SIZE_VGA;
+		if ([session canSetSessionPreset: AVCaptureSessionPreset640x480]) {
+			[session setSessionPreset: AVCaptureSessionPreset640x480];
+			mCameraVideoSize = MS_VIDEO_SIZE_VGA;
+		} else {
+			[session setSessionPreset: AVCaptureSessionPreset1280x720];
+			mCameraVideoSize = MS_VIDEO_SIZE_720P;
+		}
 		mOutputVideoSize = MS_VIDEO_SIZE_QVGA;
 		mDownScalingRequired = true;
 	} else if ( (outputSize.width * outputSize.height) == (MS_VIDEO_SIZE_CIF_W * MS_VIDEO_SIZE_CIF_H) ){
