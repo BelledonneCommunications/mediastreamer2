@@ -551,6 +551,7 @@ if(ENABLE_SHARED)
 	)
 endif()
 
+
 if(FFMPEG_FOUND AND NOT WIN32)
 	set(NO_DEPRECATED_DECLARATIONS_SOURCE_FILES
 		videofilters/videoenc.c
