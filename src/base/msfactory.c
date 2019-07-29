@@ -274,7 +274,11 @@ void ms_factory_register_filter(MSFactory* factory, MSFilterDesc* desc ) {
 }
 
 bool_t ms_factory_codec_supported(MSFactory* factory, const char *mime) {
-	return ms_factory_has_encoder(factory, mime) &&	ms_factory_has_decoder(factory, mime);
+	// Allow  partial codec support (either only encoder or decoder, or both)
+	// This could be improved by forcing higher-level APIs to use only
+	// ms_factory_has_encoder or ms_factory_has_decoder. Or by givin this
+	// method context about	the stream for recv/send only support
+	return ms_factory_has_encoder(factory, mime) ||	ms_factory_has_decoder(factory, mime);
 }
 
 bool_t ms_factory_has_encoder(MSFactory* factory, const char *mime) {
