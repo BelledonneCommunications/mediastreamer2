@@ -58,6 +58,7 @@ extern void _register_videotoolbox_if_supported(MSFactory *factory);
 
 #ifdef __APPLE__
    #include "TargetConditionals.h"
+   #include "mediastreamer2/iosnotifications.h"
 #endif
 
 #ifdef __ANDROID__
@@ -283,7 +284,7 @@ void ms_factory_init_voip(MSFactory *obj){
 		}
 	}
 #endif
-	
+
 	/* register builtin VoIP MSFilter's */
 	for (i=0;ms_voip_filter_descs[i]!=NULL;i++){
 		ms_factory_register_filter(obj,ms_voip_filter_descs[i]);
@@ -291,8 +292,16 @@ void ms_factory_init_voip(MSFactory *obj){
 
 	cm=ms_snd_card_manager_new();
 	ms_message("Registering all soundcard handlers");
+
+
+
 	cm->factory=obj;
 	obj->sndcardmanager = cm;
+
+#ifdef __APPLE__
+  addAudioSessionObserver(obj->sndcardmanager);
+#endif
+
 	for (i=0;ms_snd_card_descs[i]!=NULL;i++){
 		ms_snd_card_manager_register_desc(cm,ms_snd_card_descs[i]);
 	}
@@ -344,6 +353,9 @@ void ms_factory_uninit_voip(MSFactory *obj){
 		if (obj->devices_info) ms_devices_info_free(obj->devices_info);
 		obj->voip_initd = FALSE;
 	}
+#ifdef __APPLE__
+  removeAudioSessionObserver();
+#endif
 }
 
 MSFactory *ms_factory_new_with_voip(void){

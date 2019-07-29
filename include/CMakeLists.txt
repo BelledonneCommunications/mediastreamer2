@@ -83,6 +83,10 @@ set(HEADER_FILES
 	mspcapfileplayer.h
 )
 
+if(APPLE)
+	list(APPEND HEADER_FILES iosnotifications.h)
+endif()
+
 set(MEDIASTREAMER2_HEADER_FILES )
 foreach(HEADER_FILE ${HEADER_FILES})
 	list(APPEND MEDIASTREAMER2_HEADER_FILES "${CMAKE_CURRENT_LIST_DIR}/mediastreamer2/${HEADER_FILE}")
