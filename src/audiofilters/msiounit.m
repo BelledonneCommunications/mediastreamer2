@@ -23,10 +23,12 @@
 #import <AVFoundation/AVAudioSession.h>
 #import <Foundation/NSArray.h>
 #import <Foundation/NSString.h>
+#import <UserNotifications/UserNotifications.h>
 
 #import "mediastreamer2/mssndcard.h"
 #import "mediastreamer2/msfilter.h"
 #import "mediastreamer2/msticker.h"
+#include "mediastreamer2/mscommon.h"
 
 static const int flowControlInterval = 5000; // ms
 static const int flowControlThreshold = 40; // ms
@@ -43,6 +45,34 @@ static const int flowControlThreshold = 40; // ms
 
 static AudioUnitElement inputBus = 1;
 static AudioUnitElement outputBus = 0;
+static id<NSObject> localAudioSessionObserver;
+
+static void reset_card(MSSndCard *obj){
+	if (obj && (ms_snd_card_get_capabilities(obj) & MS_SND_CARD_CAP_IS_SLOW)) {
+		ms_snd_card_set_usage_hint(obj, FALSE);
+	}
+}
+
+static void addAudioSessionObserver(MSSndCard *obj) {
+	ms_message("[IOS]Audio Session interruption notification added.");
+	localAudioSessionObserver=[NSNotificationCenter.defaultCenter addObserverForName:AVAudioSessionInterruptionNotification
+						object:nil
+						 queue:nil
+					usingBlock:^(NSNotification* notification) {
+						int interruptionType = [notification.userInfo[AVAudioSessionInterruptionTypeKey] intValue];
+						if (interruptionType == AVAudioSessionInterruptionTypeBegan) {
+							ms_message("[IOS]Sound interruption detected!");
+							reset_card(obj);
+					}
+	       }];
+}
+
+static void removeAudioSessionObserver(void) {
+	ms_message("[IOS]Audio Session interruption notification removed.");
+	[NSNotificationCenter.defaultCenter removeObserver:localAudioSessionObserver
+	                                     name:AVAudioSessionInterruptionNotification
+	                                     object:nil];
+}
 
 static const char *audio_unit_format_error (OSStatus error) {
 	switch (error) {
@@ -411,6 +441,7 @@ static void destroy_audio_unit (au_card_t* d) {
 			[[AVAudioSession sharedInstance] setActive:FALSE withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&err];
 			if(err) ms_error("Unable to activate audio session because : %s", [err localizedDescription].UTF8String);
 			err = nil;
+			removeAudioSessionObserver();
 		}
 		ms_message("AudioUnit destroyed");
 		d->audio_unit_state = MSAudioUnitNotCreated;
@@ -696,6 +727,7 @@ static void configure_audio_session(au_card_t* d) {
 			}
 			time_end = ortp_get_cur_time_ms();
 			ms_message("MSAURead/MSAUWrite: configureAudioSession() took %i ms.", (int)(time_end - time_start));
+			addAudioSessionObserver(d->ms_snd_card);
 			d->audio_session_configured=TRUE;
 		} else {
 			ms_message("Audio session already correctly configured.");
