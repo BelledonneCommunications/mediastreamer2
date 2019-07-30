@@ -158,6 +158,46 @@ RtpSession * ms_create_duplex_rtp_session(const char* local_ip, int loc_rtp_port
 	return rtpr;
 }
 
+RtpSession * ms_create_rtp_session(const char* local_ip, int loc_rtp_port, int loc_rtcp_port, int mtu, MediaStreamDir stream_direction) {
+	RtpSession *rtpr = NULL;
+
+	if (stream_direction == MediaStreamSendOnly) {
+		rtpr = rtp_session_new(RTP_SESSION_SENDONLY);
+	} else if (stream_direction == MediaStreamSendRecv) {
+		rtpr = rtp_session_new(RTP_SESSION_SENDRECV);
+	} else if (stream_direction == MediaStreamRecvOnly) {
+		rtpr = rtp_session_new(RTP_SESSION_RECVONLY);
+	}
+	if (stream_direction != MediaStreamSendOnly) {
+		rtp_session_set_recv_buf_size(rtpr, MAX(mtu , MS_MINIMAL_MTU));
+	}
+	rtp_session_set_scheduling_mode(rtpr, 0);
+	rtp_session_set_blocking_mode(rtpr, 0);
+	rtp_session_enable_adaptive_jitter_compensation(rtpr, TRUE);
+	rtp_session_set_symmetric_rtp(rtpr, TRUE);
+	if (local_ip) {
+		rtp_session_set_local_addr(rtpr, local_ip, loc_rtp_port, loc_rtcp_port);
+	} else {
+		local_ip = "::0";
+		if (rtp_session_set_local_addr(rtpr, local_ip, loc_rtp_port, loc_rtcp_port) < 0) {
+			local_ip = "0.0.0.0";
+			rtp_session_set_local_addr(rtpr, local_ip, loc_rtp_port, loc_rtcp_port);
+		}
+	}
+
+	rtp_session_signal_connect(rtpr, "timestamp_jump", (RtpCallback)rtp_session_resync, NULL);
+	rtp_session_signal_connect(rtpr, "ssrc_changed", (RtpCallback)rtp_session_resync, NULL);
+
+	rtp_session_set_ssrc_changed_threshold(rtpr, 0);
+	rtp_session_set_rtcp_report_interval(rtpr, 2500);	/* At the beginning of the session send more reports. */
+	rtp_session_set_multicast_loopback(rtpr,TRUE); /*very useful, specially for testing purposes*/
+	rtp_session_set_send_ts_offset(rtpr, (uint32_t)bctbx_random());
+	rtp_session_enable_avpf_feature(rtpr, ORTP_AVPF_FEATURE_TMMBR, TRUE);
+	disable_checksums(rtp_session_get_rtp_socket(rtpr));
+	return rtpr;
+}
+
+
 int media_stream_join_multicast_group(MediaStream *stream, const char *ip){
 	return rtp_session_join_multicast_group(stream->sessions.rtp_session,ip);
 }

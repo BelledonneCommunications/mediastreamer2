@@ -323,8 +323,7 @@ static float video_stream_get_rtcp_xr_average_lq_quality_rating(void *userdata) 
 	return stream ? media_stream_get_average_lq_quality_rating(&stream->ms) : -1;
 }
 
-
-VideoStream *video_stream_new(MSFactory* factory, int loc_rtp_port, int loc_rtcp_port, bool_t use_ipv6){
+VideoStream *video_stream_new(MSFactory* factory, int loc_rtp_port, int loc_rtcp_port, bool_t use_ipv6) {
 	return video_stream_new2(factory, use_ipv6 ? "::" : "0.0.0.0", loc_rtp_port, loc_rtcp_port);
 }
 
@@ -332,11 +331,28 @@ VideoStream *video_stream_new2(MSFactory* factory, const char* ip, int loc_rtp_p
 	MSMediaStreamSessions sessions={0};
 	VideoStream *obj;
 	sessions.rtp_session=ms_create_duplex_rtp_session(ip,loc_rtp_port,loc_rtcp_port, ms_factory_get_mtu(factory));
-	obj=video_stream_new_with_sessions(factory, &sessions);
+	obj = video_stream_new_with_sessions(factory, &sessions);
 	obj->ms.owns_sessions=TRUE;
 	return obj;
 }
 
+VideoStream *video_stream_new3(MSFactory* factory, const char* ip, int loc_rtp_port, int loc_rtcp_port, MediaStreamDir stream_direction) {
+	MSMediaStreamSessions sessions={0};
+	VideoStream *obj;
+	sessions.rtp_session=ms_create_rtp_session(ip,loc_rtp_port,loc_rtcp_port, ms_factory_get_mtu(factory), stream_direction);
+	obj=video_stream_new_with_sessions(factory, &sessions);
+	obj->ms.owns_sessions=TRUE;
+
+	//Set stream direction from rtp session
+	if (sessions.rtp_session->mode == RTP_SESSION_SENDONLY) {
+		video_stream_set_direction(obj, MediaStreamSendOnly);
+	} else if (sessions.rtp_session->mode == RTP_SESSION_SENDRECV) {
+		video_stream_set_direction(obj, MediaStreamSendRecv);
+	} else if (sessions.rtp_session->mode == RTP_SESSION_RECVONLY) {
+		video_stream_set_direction(obj, MediaStreamRecvOnly);
+	}
+	return obj;
+}
 
 VideoStream *video_stream_new_with_sessions(MSFactory* factory, const MSMediaStreamSessions *sessions){
 	VideoStream *stream = (VideoStream *)ms_new0 (VideoStream, 1);
@@ -358,13 +374,15 @@ VideoStream *video_stream_new_with_sessions(MSFactory* factory, const MSMediaStr
 	stream->ms.qi=ms_quality_indicator_new(stream->ms.sessions.rtp_session);
 	ms_quality_indicator_set_label(stream->ms.qi,"video");
 
-	stream->ms.rtpsend=ms_factory_create_filter(stream->ms.factory, MS_RTP_SEND_ID);
+	if (stream->ms.sessions.rtp_session->mode != RTP_SESSION_RECVONLY) {
+		stream->ms.rtpsend=ms_factory_create_filter(stream->ms.factory, MS_RTP_SEND_ID);
+	}
 
 	stream->ms.ice_check_list=NULL;
 	MS_VIDEO_SIZE_ASSIGN(stream->sent_vsize, CIF);
 	stream->forced_fps=0;
 	stream->real_fps=0;
-	stream->dir=MediaStreamSendRecv;
+
 	stream->display_filter_auto_rotate_enabled=0;
 	stream->freeze_on_error = FALSE;
 	stream->source_performs_encoding = FALSE;
@@ -816,8 +834,8 @@ int video_stream_start_from_io(VideoStream *stream, RtpProfile *profile, const c
 
 	if (!ms_media_stream_io_is_consistent(io)) return -1;
 
-	if (stream->dir != MediaStreamRecvOnly){
-		switch(io->input.type){
+	if (stream->dir != MediaStreamRecvOnly) {
+		switch(io->input.type) {
 			case MSResourceRtp:
 				stream->rtp_io_session = io->input.session;
 				source = ms_factory_create_filter(stream->ms.factory, MS_RTP_RECV_ID);
@@ -829,7 +847,7 @@ int video_stream_start_from_io(VideoStream *stream, RtpProfile *profile, const c
 			break;
 			case MSResourceFile:
 				source = ms_factory_create_filter(stream->ms.factory, MS_MKV_PLAYER_ID);
-				if (!source){
+				if (!source) {
 					ms_error("Mediastreamer2 library compiled without libmastroska2");
 					return -1;
 				}
@@ -844,7 +862,7 @@ int video_stream_start_from_io(VideoStream *stream, RtpProfile *profile, const c
 			break;
 		}
 	}
-	if (stream->dir != MediaStreamSendOnly){
+	if (stream->dir != MediaStreamSendOnly) {
 		switch (io->output.type){
 			case MSResourceRtp:
 				output = ms_factory_create_filter(stream->ms.factory, MS_RTP_SEND_ID);
@@ -989,11 +1007,13 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 	}
 	if (pt->flags & PAYLOAD_TYPE_RTCP_FEEDBACK_ENABLED) avpf_enabled = TRUE;
 
+
 	if ((cam != NULL) && (cam->desc->encode_to_mime_type != NULL) && (cam->desc->encode_to_mime_type(cam, pt->mime_type) == TRUE)) {
 		stream->source_performs_encoding = TRUE;
 	}
 
 	rtp_session_set_profile(rtps,profile);
+
 	if (rem_rtp_port>0)
 		rtp_session_set_remote_addr_full(rtps,rem_rtp_ip,rem_rtp_port,rem_rtcp_ip,rem_rtcp_port);
 	if (rem_rtcp_port > 0) {
@@ -1026,11 +1046,13 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 	rtp_session_set_rtp_socket_recv_buffer_size(stream->ms.sessions.rtp_session,socket_buf_size);
 	rtp_session_set_rtp_socket_send_buffer_size(stream->ms.sessions.rtp_session,socket_buf_size);
 
-	/* Plumb the outgoing stream */
-	if (rem_rtp_port>0) ms_filter_call_method(stream->ms.rtpsend,MS_RTP_SEND_SET_SESSION,stream->ms.sessions.rtp_session);
-	ms_filter_call_method(stream->ms.rtpsend, MS_RTP_SEND_ENABLE_TS_ADJUSTMENT, &do_ts_adjustments);
+	if (stream->dir != MediaStreamRecvOnly) {
+		/* Plumb the outgoing stream */
+		if (rem_rtp_port>0) ms_filter_call_method(stream->ms.rtpsend,MS_RTP_SEND_SET_SESSION,stream->ms.sessions.rtp_session);
+		ms_filter_call_method(stream->ms.rtpsend, MS_RTP_SEND_ENABLE_TS_ADJUSTMENT, &do_ts_adjustments);
+	}
 
-	if (stream->dir==MediaStreamRecvOnly){
+	if (stream->dir == MediaStreamRecvOnly) {
 		/* Create a dummy sending stream to send the STUN packets to open firewall ports. */
 		MSConnectionHelper ch;
 		bool_t send_silence = FALSE;
@@ -1046,6 +1068,7 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 			ms_filter_call_method(source, MS_FILTER_SET_PIX_FMT, &format);
 		} else if (!rtp_source) {
 			stream->ms.encoder=ms_factory_create_encoder(stream->ms.factory, pt->mime_type);
+
 			if (stream->ms.encoder==NULL){
 				/* big problem: we don't have a registered codec for this payload...*/
 				ms_error("videostream.c: No encoder available for payload %i:%s.",payload,pt->mime_type);
@@ -1063,7 +1086,6 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 			if (stream->source_performs_encoding == TRUE) {
 				stream->ms.encoder = stream->source;	/* Consider the encoder is the source */
 			}
-
 			apply_video_preset(stream, pt);
 			apply_bitrate_limit(stream, pt);
 
@@ -1114,13 +1136,13 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 	if (pt->normal_bitrate > 0) {
 		rtp_session_set_target_upload_bandwidth(stream->ms.sessions.rtp_session, pt->normal_bitrate);
 	}
-	if (stream->dir==MediaStreamSendRecv || stream->dir==MediaStreamRecvOnly){
+	if (stream->dir != MediaStreamSendOnly) {
 		MSConnectionHelper ch;
 
 		if (!rtp_output) {
 			/* create decoder first */
 			stream->ms.decoder=ms_factory_create_decoder(stream->ms.factory, pt->mime_type);
-			if (stream->ms.decoder==NULL){
+			if (stream->ms.decoder==NULL) {
 				/* big problem: we don't have a registered decoderfor this payload...*/
 				ms_error("videostream.c: No decoder available for payload %i:%s.",payload,pt->mime_type);
 				return -1;
@@ -1128,11 +1150,11 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 		}
 
 		/* display logic */
-		if (stream->rendercb!=NULL){
+		if (stream->rendercb!=NULL) {
 			/* rendering logic delegated to user suppsourcelied callback */
 			stream->output=ms_factory_create_filter(stream->ms.factory, MS_EXT_DISPLAY_ID);
 			ms_filter_add_notify_callback(stream->output,ext_display_cb,stream,TRUE);
-		}else{
+		} else {
 			/* no user supplied callback -> create filter */
 			MSVideoDisplayDecodingSupport decoding_support;
 

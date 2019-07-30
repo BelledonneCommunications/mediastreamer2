@@ -511,6 +511,17 @@ MS2_PUBLIC AudioStream *audio_stream_new(MSFactory* factory, int loc_rtp_port, i
 MS2_PUBLIC AudioStream *audio_stream_new2(MSFactory* factory, const char* ip, int loc_rtp_port, int loc_rtcp_port);
 
 
+/**
+ * Creates an AudioStream object listening on a RTP port for a dedicated address.
+ * @param loc_ip the local ip to listen for RTP packets. Can be ::, O.O.O.O or any ip4/6 addresses
+ * @param loc_rtp_port the local UDP port to listen for RTP packets.
+ * @param loc_rtcp_port the local UDP port to listen for RTCP packets
+ * @param factory
+ * @param stream_direction The direction of the audio stream (SendRecv, SendOnly, RecvOnly)
+ * @return a new AudioStream.
+**/
+MS2_PUBLIC AudioStream *audio_stream_new3(MSFactory* factory, const char* ip, int loc_rtp_port, int loc_rtcp_port, MediaStreamDir stream_direction);
+
 /**Creates an AudioStream object from initialized MSMediaStreamSessions.
  * @param sessions the MSMediaStreamSessions
  * @param factory the MSFActory from the core object
@@ -881,6 +892,16 @@ MS2_PUBLIC VideoStream *video_stream_new(MSFactory* factory, int loc_rtp_port, i
 **/
 MS2_PUBLIC VideoStream *video_stream_new2(MSFactory* factory, const char* ip, int loc_rtp_port, int loc_rtcp_port);
 
+/**
+ * Creates a VideoStream object listening on a RTP port for a dedicated address.
+ * @param loc_ip the local ip to listen for RTP packets. Can be ::, O.O.O.O or any ip4/6 addresses
+ * @param [in] loc_rtp_port the local UDP port to listen for RTP packets.
+ * @param [in] loc_rtcp_port the local UDP port to listen for RTCP packets
+ * @param [in] stream_direction	The direction of the video stream (SendRecv, SendOnly, RecvOnly)
+ * @return a new VideoStream.
+ **/
+MS2_PUBLIC VideoStream *video_stream_new3(MSFactory* factory, const char* ip, int loc_rtp_port, int loc_rtcp_port, MediaStreamDir stream_direction);
+
 MS2_PUBLIC VideoStream *video_stream_new_with_sessions(MSFactory* factory, const MSMediaStreamSessions *sessions);
 MS2_PUBLIC void video_stream_set_direction(VideoStream *vs, MediaStreamDir dir);
 static MS2_INLINE void video_stream_enable_adaptive_bitrate_control(VideoStream *stream, bool_t enabled) {
@@ -1246,6 +1267,17 @@ MS2_PUBLIC MSWebCamDesc *ms_mire_webcam_desc_get(void);
  * @param[in] local_rtcp_port The local port to bind the RTCP socket to.
  */
 MS2_PUBLIC RtpSession * ms_create_duplex_rtp_session(const char* local_ip, int loc_rtp_port, int loc_rtcp_port, int mtu);
+
+
+/**
+ * Create an RTP session with given stream direction.
+ * @param[in] local_ip The local IP to bind the RTP and RTCP sockets to.
+ * @param[in] local_rtp_port The local port to bind the RTP socket to.
+ * @param[in] local_rtcp_port The local port to bind the RTCP socket to.
+ * @param[in] stream_direction The stream direction
+ */
+MS2_PUBLIC RtpSession * ms_create_rtp_session(const char* local_ip, int loc_rtp_port, int loc_rtcp_port, int mtu, MediaStreamDir stream_direction);
+
 
 /**
  * Asks the audio playback filter to route to the selected device (currently only used for blackberry)

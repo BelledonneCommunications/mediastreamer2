@@ -120,12 +120,11 @@ typedef struct _MediastreamDatas {
 	bool_t two_windows;
 	bool_t el;
 	bool_t enable_srtp;
-	
 	bool_t interactive;
 	bool_t enable_avpf;
 	bool_t enable_rtcp;
 	bool_t freeze_on_error;
-	
+
 	float el_speed;
 	float el_thres;
 	float el_force;
@@ -144,6 +143,7 @@ typedef struct _MediastreamDatas {
 	float zoom;
 	float zoom_cx, zoom_cy;
 
+	MediaStreamDir stream_dir;
 	AudioStream *audio;
 	PayloadType *pt;
 	RtpSession *session;
@@ -168,7 +168,7 @@ MediastreamDatas* init_default_args(void);
 /* parse args */
 bool_t parse_args(int argc, char** argv, MediastreamDatas* out);
 /* setup streams */
-void setup_media_streams(MediastreamDatas* args);
+int setup_media_streams(MediastreamDatas* args);
 /* run loop*/
 void mediastream_run_loop(MediastreamDatas* args);
 /* exit */
@@ -281,10 +281,9 @@ int main(int argc, char * argv[])
 		return 0;
 	}
 
-	setup_media_streams(args);
-
-	mediastream_run_loop(args);
-
+	if (setup_media_streams(args) == 0) {
+		mediastream_run_loop(args);
+	}
 	clear_mediastreams(args);
 
 	free(args);
@@ -343,6 +342,7 @@ MediastreamDatas* init_default_args(void) {
 	args->zoom = 1.0;
 	args->zoom_cx = args->zoom_cy = 0.5;
 
+	args->stream_dir = MediaStreamSendRecv;
 	args->audio = NULL;
 	args->session = NULL;
 	args->pt = NULL;
@@ -532,6 +532,20 @@ bool_t parse_args(int argc, char** argv, MediastreamDatas* out) {
 				out->srtp_local_master_key = argv[i++];
 				out->srtp_remote_master_key = argv[i++];
 			}
+		} else if (strcmp(argv[i],"--stream-dir")==0){
+			i++;
+			if (i<argc) {
+				if (strcmp(argv[i], "MediaStreamSendOnly") == 0) {
+					out->stream_dir = MediaStreamSendOnly;
+				} else if (strcmp(argv[i], "MediaStreamSendRecv") == 0) {
+					out->stream_dir = MediaStreamSendRecv;
+				} else if (strcmp(argv[i], "MediaStreamRecvOnly") == 0) {
+					out->stream_dir = MediaStreamRecvOnly;
+				}
+			} else{
+				ms_error("Missing argument for --stream-dir");
+				return FALSE;
+			}
 		} else if (strcmp(argv[i],"--netsim-bandwidth")==0){
 			i++;
 			if (i<argc){
@@ -541,7 +555,7 @@ bool_t parse_args(int argc, char** argv, MediastreamDatas* out) {
 				ms_error("Missing argument for --netsim-bandwidth");
 				return FALSE;
 			}
-		}else if (strcmp(argv[i],"--netsim-lossrate")==0){
+		} else if (strcmp(argv[i],"--netsim-lossrate")==0){
 			i++;
 			if (i<argc){
 				out->netsim.loss_rate=(float)atoi(argv[i]);
@@ -554,7 +568,7 @@ bool_t parse_args(int argc, char** argv, MediastreamDatas* out) {
 				ms_error("Missing argument for --netsim-lossrate");
 				return FALSE;
 			}
-		}else if (strcmp(argv[i],"--netsim-consecutive-loss-probability")==0){
+		} else if (strcmp(argv[i],"--netsim-consecutive-loss-probability")==0){
 			i++;
 			if (i<argc){
 				sscanf(argv[i],"%f",&out->netsim.consecutive_loss_probability);
@@ -692,7 +706,7 @@ static MSSndCard *get_sound_card(MSSndCardManager *manager, const char* card_nam
 	return play;
 }
 
-void setup_media_streams(MediastreamDatas* args) {
+int setup_media_streams(MediastreamDatas* args) {
 	/*create the rtp session */
 #ifdef VIDEO_ENABLED
 	MSWebCam *cam=NULL;
@@ -749,7 +763,7 @@ void setup_media_streams(MediastreamDatas* args) {
 #endif
 	args->profile=rtp_profile_clone_full(&av_profile);
 	args->q=ortp_ev_queue_new();
-	
+
 	if (args->rc_algo == RCAlgoAdvanced){
 		args->bw_controller = ms_bandwidth_controller_new();
 	}
@@ -811,14 +825,14 @@ void setup_media_streams(MediastreamDatas* args) {
 		}
 	}
 
-	if (args->pt->type!=PAYLOAD_VIDEO){
+	if (args->pt->type!=PAYLOAD_VIDEO) {
 		MSSndCardManager *manager=ms_factory_get_snd_card_manager(factory);
 		MSSndCard *capt= args->capture_card==NULL ? ms_snd_card_manager_get_default_capture_card(manager) :
 				get_sound_card(manager,args->capture_card);
 		MSSndCard *play= args->playback_card==NULL ? ms_snd_card_manager_get_default_capture_card(manager) :
 				get_sound_card(manager,args->playback_card);
-		args->audio=audio_stream_new(factory, args->localport,args->localport+1,ms_is_ipv6(args->ip));
-		if (args->bw_controller){
+		args->audio=audio_stream_new3(factory, args->ip, args->localport,args->localport+1, args->stream_dir);
+		if (args->bw_controller) {
 			ms_bandwidth_controller_add_stream(args->bw_controller, (MediaStream*)args->audio);
 		}
 		audio_stream_enable_automatic_gain_control(args->audio,args->agc);
@@ -832,8 +846,11 @@ void setup_media_streams(MediastreamDatas* args) {
 			ms_snd_card_set_preferred_sample_rate(play,rtp_profile_get_payload(args->profile, args->payload)->clock_rate);
 		ms_message("Starting audio stream.\n");
 
-		audio_stream_start_full(args->audio,args->profile,args->ip,args->remoteport,args->ip,args->enable_rtcp?args->remoteport+1:-1, args->payload, args->jitter,args->infile,args->outfile,
-								args->outfile==NULL ? play : NULL ,args->infile==NULL ? capt : NULL,args->infile!=NULL ? FALSE: args->ec);
+		if (audio_stream_start_full(args->audio,args->profile,args->ip,args->remoteport,args->ip,args->enable_rtcp?args->remoteport+1:-1, args->payload, args->jitter,args->infile,args->outfile,
+					    args->outfile==NULL ? play : NULL ,args->infile==NULL ? capt : NULL,args->infile!=NULL ? FALSE: args->ec) < 0) {
+			ms_error("Failed to initialize audio stream.");
+			return -1;
+		}
 
 		if (args->ice_local_candidates_nb || args->ice_remote_candidates_nb) {
 			args->audio->ms.ice_check_list = ice_check_list_new();
@@ -915,7 +932,7 @@ void setup_media_streams(MediastreamDatas* args) {
 	#endif
 
 
-	}else{
+	} else {
 #ifdef VIDEO_ENABLED
 		float zoom[] = {
 			args->zoom,
@@ -924,10 +941,10 @@ void setup_media_streams(MediastreamDatas* args) {
 
 		if (args->eq){
 			ms_fatal("Cannot put an audio equalizer in a video stream !");
-			exit(-1);
+			return -1;
 		}
 		ms_message("Starting video stream.\n");
-		args->video=video_stream_new(factory, args->localport, args->localport+1, ms_is_ipv6(args->ip));
+		args->video=video_stream_new3(factory, args->ip, args->localport, args->localport+1, args->stream_dir);
 		if (args->bw_controller){
 			ms_bandwidth_controller_add_stream(args->bw_controller, (MediaStream*)args->video);
 		}
@@ -971,15 +988,19 @@ void setup_media_streams(MediastreamDatas* args) {
 			iodef.output.resource_arg = NULL;
 		}
 		rtp_session_set_jitter_compensation(args->video->ms.sessions.rtp_session, args->jitter);
-		video_stream_start_from_io(args->video, args->profile,
-					args->ip,args->remoteport,
-					args->ip,args->enable_rtcp?args->remoteport+1:-1,
-					args->payload,
-					&iodef
-					);
+		if (video_stream_start_from_io(args->video, args->profile,
+					       args->ip,args->remoteport,
+					       args->ip,args->enable_rtcp?args->remoteport+1:-1,
+					       args->payload,
+					       &iodef) < 0) {
+			ms_error("Failed to initialize video stream.");
+			return -1;
+		}
 		args->session=args->video->ms.sessions.rtp_session;
 
-		ms_filter_call_method(args->video->output,MS_VIDEO_DISPLAY_ZOOM, zoom);
+		if (args->video->output) {
+			ms_filter_call_method(args->video->output,MS_VIDEO_DISPLAY_ZOOM, zoom);
+		}
 		if (args->enable_srtp) {
 			ms_message("SRTP enabled: %d",
 				video_stream_enable_strp(
@@ -1001,6 +1022,7 @@ void setup_media_streams(MediastreamDatas* args) {
 	if (args->netsim.enabled){
 		rtp_session_enable_network_simulation(args->session,&args->netsim);
 	}
+	return 0;
 }
 
 
