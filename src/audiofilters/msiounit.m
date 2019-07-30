@@ -47,12 +47,6 @@ static AudioUnitElement inputBus = 1;
 static AudioUnitElement outputBus = 0;
 static id<NSObject> localAudioSessionObserver;
 
-static void reset_card(MSSndCard *obj){
-	if (obj && (ms_snd_card_get_capabilities(obj) & MS_SND_CARD_CAP_IS_SLOW)) {
-		ms_snd_card_set_usage_hint(obj, FALSE);
-	}
-}
-
 static void addAudioSessionObserver(MSSndCard *obj) {
 	ms_message("[IOS]Audio Session interruption notification added.");
 	localAudioSessionObserver=[NSNotificationCenter.defaultCenter addObserverForName:AVAudioSessionInterruptionNotification
@@ -62,7 +56,9 @@ static void addAudioSessionObserver(MSSndCard *obj) {
 						int interruptionType = [notification.userInfo[AVAudioSessionInterruptionTypeKey] intValue];
 						if (interruptionType == AVAudioSessionInterruptionTypeBegan) {
 							ms_message("[IOS]Sound interruption detected!");
-							reset_card(obj);
+							if (obj && (ms_snd_card_get_capabilities(obj) & MS_SND_CARD_CAP_IS_SLOW)) {
+								ms_snd_card_set_usage_hint(obj, FALSE);
+							}
 					}
 	       }];
 }
