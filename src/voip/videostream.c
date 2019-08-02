@@ -343,14 +343,7 @@ VideoStream *video_stream_new3(MSFactory* factory, const char* ip, int loc_rtp_p
 	obj=video_stream_new_with_sessions(factory, &sessions);
 	obj->ms.owns_sessions=TRUE;
 
-	//Set stream direction from rtp session
-	if (sessions.rtp_session->mode == RTP_SESSION_SENDONLY) {
-		video_stream_set_direction(obj, MediaStreamSendOnly);
-	} else if (sessions.rtp_session->mode == RTP_SESSION_SENDRECV) {
-		video_stream_set_direction(obj, MediaStreamSendRecv);
-	} else if (sessions.rtp_session->mode == RTP_SESSION_RECVONLY) {
-		video_stream_set_direction(obj, MediaStreamRecvOnly);
-	}
+	video_stream_set_direction(obj, stream_direction);
 	return obj;
 }
 
@@ -393,10 +386,8 @@ VideoStream *video_stream_new_with_sessions(MSFactory* factory, const MSMediaStr
 	 * In practice, these filters are needed only for audio+video recording.
 	 */
 	if (ms_factory_lookup_filter_by_id(stream->ms.factory, MS_MKV_RECORDER_ID)){
-
 		stream->tee3=ms_factory_create_filter(stream->ms.factory, MS_TEE_ID);
 		stream->recorder_output=ms_factory_create_filter(stream->ms.factory, MS_ITC_SINK_ID);
-
 	}
 
 	rtp_session_set_rtcp_xr_media_callbacks(stream->ms.sessions.rtp_session, &rtcp_xr_media_cbs);
@@ -672,14 +663,14 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate){
 	if ((encoder_supports_source_format.supported == TRUE) || (stream->source_performs_encoding == TRUE)) {
 		ms_filter_call_method(stream->ms.encoder, MS_FILTER_SET_PIX_FMT, &format);
 	} else {
-		if (format==MS_MJPEG){
+		if (format==MS_MJPEG) {
 			stream->pixconv=ms_factory_create_filter(stream->ms.factory, MS_MJPEG_DEC_ID);
 			if (stream->pixconv == NULL){
 				ms_error("Could not create mjpeg decoder, check your build options.");
 			}
-		}else if (format==MS_PIX_FMT_UNKNOWN && pf.fmt != NULL){
+		} else if (format==MS_PIX_FMT_UNKNOWN && pf.fmt != NULL) {
 			stream->pixconv = ms_factory_create_decoder(stream->ms.factory, pf.fmt->encoding);
-		}else{
+		} else {
 			stream->pixconv = ms_factory_create_filter(stream->ms.factory, MS_PIX_CONV_ID);
 			/*set it to the pixconv */
 			ms_filter_call_method(stream->pixconv,MS_FILTER_SET_PIX_FMT,&format);
@@ -871,11 +862,11 @@ int video_stream_start_from_io(VideoStream *stream, RtpProfile *profile, const c
 			break;
 			case MSResourceFile:
 				recorder = ms_factory_create_filter(stream->ms.factory, MS_MKV_RECORDER_ID);
-				if (!recorder){
+				if (!recorder) {
 					ms_error("Mediastreamer2 library compiled without libmastroska2");
 					return -1;
 				}
-				if (stream->recorder_output){
+				if (stream->recorder_output) {
 					ms_filter_destroy(stream->recorder_output);
 				}
 				stream->recorder_output = recorder;
@@ -884,7 +875,7 @@ int video_stream_start_from_io(VideoStream *stream, RtpProfile *profile, const c
 			break;
 			default:
 				/*will just display in all other cases*/
-				/*ms_error("Unhandled output resource type %s", ms_resource_type_to_string(io->output.type));*/
+				ms_error("Unhandled output resource type %s", ms_resource_type_to_string(io->output.type));
 			break;
 		}
 	}
@@ -998,15 +989,15 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 		source = stream->source;
 	}
 	rtp_source = (source && ms_filter_get_id(source) == MS_RTP_RECV_ID) ? TRUE : FALSE;
+
 	do_ts_adjustments = !rtp_source;
 
-	pt=rtp_profile_get_payload(profile,payload);
+	pt = rtp_profile_get_payload(profile, payload);
 	if (pt==NULL){
 		ms_error("videostream.c: undefined payload type %d.", payload);
 		return -1;
 	}
 	if (pt->flags & PAYLOAD_TYPE_RTCP_FEEDBACK_ENABLED) avpf_enabled = TRUE;
-
 
 	if ((cam != NULL) && (cam->desc->encode_to_mime_type != NULL) && (cam->desc->encode_to_mime_type(cam, pt->mime_type) == TRUE)) {
 		stream->source_performs_encoding = TRUE;
@@ -1054,17 +1045,17 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 
 	if (stream->dir == MediaStreamRecvOnly) {
 		/* Create a dummy sending stream to send the STUN packets to open firewall ports. */
-		MSConnectionHelper ch;
-		bool_t send_silence = FALSE;
-		stream->void_source = ms_factory_create_filter(stream->ms.factory, MS_VOID_SOURCE_ID);
-		ms_filter_call_method(stream->void_source, MS_VOID_SOURCE_SEND_SILENCE, &send_silence);
-		ms_connection_helper_start(&ch);
-		ms_connection_helper_link(&ch, stream->void_source, -1, 0);
-		ms_connection_helper_link(&ch, stream->ms.rtpsend, 0, -1);
+		/* MSConnectionHelper ch; */
+		/* bool_t send_silence = FALSE; */
+		/* stream->void_source = ms_factory_create_filter(stream->ms.factory, MS_VOID_SOURCE_ID); */
+		/* ms_filter_call_method(stream->void_source, MS_VOID_SOURCE_SEND_SILENCE, &send_silence); */
+		/* ms_connection_helper_start(&ch); */
+		/* ms_connection_helper_link(&ch, stream->void_source, -1, 0); */
+		/* ms_connection_helper_link(&ch, stream->ms.rtpsend, 0, -1); */
 	} else {
 		MSConnectionHelper ch;
 		if (stream->source_performs_encoding == TRUE) {
-			format = mime_type_to_pix_format(pt->mime_type);
+ 			format = mime_type_to_pix_format(pt->mime_type);
 			ms_filter_call_method(source, MS_FILTER_SET_PIX_FMT, &format);
 		} else if (!rtp_source) {
 			stream->ms.encoder=ms_factory_create_encoder(stream->ms.factory, pt->mime_type);
@@ -1116,7 +1107,9 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 		if ((stream->source_performs_encoding == FALSE) && !rtp_source) {
 			ms_connection_helper_link(&ch, stream->ms.encoder, 0, 0);
 		}
-		ms_connection_helper_link(&ch, stream->ms.rtpsend, 0, -1);
+		if (stream->dir != MediaStreamRecvOnly) {
+			ms_connection_helper_link(&ch, stream->ms.rtpsend, 0, -1);
+		}
 		if (stream->output2){
 			if (stream->preview_window_id!=0){
 				ms_filter_call_method(stream->output2, MS_VIDEO_DISPLAY_SET_NATIVE_WINDOW_ID,&stream->preview_window_id);
@@ -1247,7 +1240,7 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 		ms_connection_helper_start (&ch);
 		ms_connection_helper_link (&ch,stream->ms.rtprecv,-1,0);
 		if ((stream->output_performs_decoding == FALSE) && !rtp_output) {
-			if (stream->recorder_output){
+			if (stream->recorder_output) {
 				ms_connection_helper_link(&ch,stream->tee3,0,0);
 				ms_filter_link(stream->tee3,1,stream->recorder_output,0);
 				video_stream_enable_recording(stream, FALSE);/*until recorder is started, the tee3 is kept muted on pin 1*/

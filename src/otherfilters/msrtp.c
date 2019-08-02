@@ -489,7 +489,7 @@ static void _sender_process(MSFilter * f)
 			// Send STUN packet as RTP keep alive even if there is no input
 			check_stun_sending(f);
 		}
-	}while ((im = ms_queue_get(f->inputs[0])) != NULL);
+	} while ((im = ms_queue_get(f->inputs[0])) != NULL);
 
 	if (d->last_sent_time == -1) {
 		check_stun_sending(f);

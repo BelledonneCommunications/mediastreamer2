@@ -120,6 +120,9 @@ void ms_web_cam_manager_reload(MSWebCamManager *m){
 }
 
 MSWebCam * ms_web_cam_new(MSWebCamDesc *desc){
+	if (desc == NULL) {
+		return NULL;
+	}
 	MSWebCam *obj=(MSWebCam *)ms_new0(MSWebCam,1);
 	obj->desc=desc;
 	if (desc->init!=NULL)

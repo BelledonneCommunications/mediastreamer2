@@ -809,10 +809,6 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 	if (stream->ms.sessions.rtp_session->mode != RTP_SESSION_RECVONLY) {
 		ms_filter_call_method(stream->ms.rtpsend,MS_RTP_SEND_SET_SESSION,rtps);
 	}
-	if (stream->ms.sessions.rtp_session->mode != RTP_SESSION_SENDONLY) {
-		stream->ms.rtprecv=ms_factory_create_filter(stream->ms.factory,MS_RTP_RECV_ID);
-		ms_filter_call_method(stream->ms.rtprecv,MS_RTP_RECV_SET_SESSION,rtps);
-	}
 	stream->ms.sessions.rtp_session=rtps;
 
 	if((stream->features & AUDIO_STREAM_FEATURE_DTMF_ECHO) != 0)
@@ -837,29 +833,37 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 		/*we were using the dummy preload graph, destroy it but keep sound filters unless no soundcard is given*/
 		_audio_stream_unprepare_sound(stream, io->input.type == MSResourceSoundcard);
 	}
-	if (stream->ms.sessions.rtp_session->mode != RTP_SESSION_SENDONLY) {
+		//	if (stream->ms.sessions.rtp_session->mode != RTP_SESSION_RECVONLY) {
 		/* creates the local part */
-		if (io->input.type == MSResourceSoundcard){
-			if (stream->soundread==NULL)
-				stream->soundread = ms_snd_card_create_reader(io->input.soundcard);
-			has_builtin_ec=!!(ms_snd_card_get_capabilities(io->input.soundcard) & MS_SND_CARD_CAP_BUILTIN_ECHO_CANCELLER);
-		} else if (io->input.type == MSResourceRtp) {
-			stream->rtp_io_session = io->input.session;
-			pt = rtp_profile_get_payload(rtp_session_get_profile(stream->rtp_io_session),
-						     rtp_session_get_recv_payload_type(stream->rtp_io_session));
-			stream->soundread = ms_factory_create_filter(stream->ms.factory, MS_RTP_RECV_ID);
-			ms_filter_call_method(stream->soundread, MS_RTP_RECV_SET_SESSION, stream->rtp_io_session);
-			stream->read_decoder = ms_factory_create_decoder(stream->ms.factory, pt->mime_type);
+	if (io->input.type == MSResourceSoundcard){
+		if (stream->soundread==NULL)
+			stream->soundread = ms_snd_card_create_reader(io->input.soundcard);
+		has_builtin_ec=!!(ms_snd_card_get_capabilities(io->input.soundcard) & MS_SND_CARD_CAP_BUILTIN_ECHO_CANCELLER);
+	} else if (io->input.type == MSResourceRtp) {
+		stream->rtp_io_session = io->input.session;
+		pt = rtp_profile_get_payload(rtp_session_get_profile(stream->rtp_io_session),
+					     rtp_session_get_recv_payload_type(stream->rtp_io_session));
+		stream->soundread = ms_factory_create_filter(stream->ms.factory, MS_RTP_RECV_ID);
+		ms_filter_call_method(stream->soundread, MS_RTP_RECV_SET_SESSION, stream->rtp_io_session);
+		stream->read_decoder = ms_factory_create_decoder(stream->ms.factory, pt->mime_type);
+	} else {
+		stream->soundread=ms_factory_create_filter(stream->ms.factory, MS_FILE_PLAYER_ID);
+		stream->read_resampler=ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
+		resampler_missing = stream->read_resampler == NULL;
+	}
+	if (stream->ms.sessions.rtp_session->mode != RTP_SESSION_SENDONLY) {
+		if (io->input.type == MSResourceRtp) {
+			stream->ms.rtprecv = stream->soundread;
 		} else {
-			stream->soundread=ms_factory_create_filter(stream->ms.factory, MS_FILE_PLAYER_ID);
-			stream->read_resampler=ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
-			resampler_missing = stream->read_resampler == NULL;
+			stream->ms.rtprecv=ms_factory_create_filter(stream->ms.factory,MS_RTP_RECV_ID);
+			ms_filter_call_method(stream->ms.rtprecv,MS_RTP_RECV_SET_SESSION,rtps);
 		}
 	}
-	if (stream->ms.sessions.rtp_session->mode != RTP_SESSION_RECVONLY) {
+	if (stream->ms.sessions.rtp_session->mode != RTP_SESSION_SENDONLY) {
 		if (io->output.type == MSResourceSoundcard) {
-			if (stream->soundwrite==NULL)
-				stream->soundwrite=ms_snd_card_create_writer(io->output.soundcard);
+			if (stream->soundwrite == NULL) {
+				stream->soundwrite = ms_snd_card_create_writer(io->output.soundcard);
+			}
 		} else if (io->output.type == MSResourceRtp) {
 			stream->rtp_io_session = io->output.session;
 			pt = rtp_profile_get_payload(rtp_session_get_profile(stream->rtp_io_session),
@@ -887,16 +891,17 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 		// If no telephone-event payload is usable and pcma or pcmu is used, we will generate
 		// inband dtmf.
 		stream->dtmfgen_rtp=ms_factory_create_filter (stream->ms.factory, MS_DTMF_GEN_ID);
-
 	} else {
 		stream->dtmfgen_rtp=NULL;
 	}
 	if (tev_pt != -1)
 		rtp_session_set_send_telephone_event_payload_type(rtps, tev_pt);
 
-	if (ms_filter_call_method(stream->ms.rtpsend,MS_FILTER_GET_SAMPLE_RATE,&sample_rate)!=0){
-		ms_error("Sample rate is unknown for RTP side !");
-		return -1;
+	if (stream->ms.sessions.rtp_session->mode != RTP_SESSION_RECVONLY) {
+		if (ms_filter_call_method(stream->ms.rtpsend,MS_FILTER_GET_SAMPLE_RATE,&sample_rate)!=0){
+			ms_error("Sample rate is unknown for RTP side !");
+			return -1;
+		}
 	}
 
 	if (stream->features == 0) {
@@ -911,6 +916,7 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 		if (stream->ms.sessions.rtp_session->mode != RTP_SESSION_SENDONLY) {
 			ms_filter_call_method(stream->ms.rtprecv, MS_FILTER_GET_OUTPUT_FMT, &rtprecv_format);
 		}
+
 		ms_filter_call_method(stream->soundwrite, MS_FILTER_GET_OUTPUT_FMT, &sndwrite_format);
 		if (sndread_format.fmt && rtpsend_format.fmt && rtprecv_format.fmt && sndwrite_format.fmt) {
 			skip_encoder_and_decoder = ms_fmt_descriptor_equals(sndread_format.fmt, rtpsend_format.fmt) && ms_fmt_descriptor_equals(rtprecv_format.fmt, sndwrite_format.fmt);
@@ -989,10 +995,10 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 	audio_stream_enable_echo_limiter(stream,stream->el_type);
 	audio_stream_enable_noise_gate(stream,stream->use_ng);
 
-	if (ms_filter_implements_interface(stream->soundread,MSFilterPlayerInterface) && io->input.file){
+	if (io->input.file && stream->soundread && ms_filter_implements_interface(stream->soundread,MSFilterPlayerInterface)) {
 		audio_stream_play(stream,io->input.file);
 	}
-	if (ms_filter_implements_interface(stream->soundwrite,MSFilterRecorderInterface) && io->output.file){
+	if (io->output.file && stream->soundwrite && ms_filter_implements_interface(stream->soundwrite,MSFilterRecorderInterface)) {
 		audio_stream_record(stream,io->output.file);
 	}
 
@@ -1012,22 +1018,26 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 		ms_filter_call_method(stream->dtmfgen_rtp,MS_FILTER_SET_NCHANNELS,&nchannels);
 	}
 
-	/*don't put these two statements in a single if, because the second one will not be executed if the first one evaluates as true*/
-	err1 = ms_filter_call_method(stream->soundread, MS_FILTER_SET_SAMPLE_RATE, &sample_rate);
-	err2 = ms_filter_call_method(stream->soundread, MS_FILTER_SET_NCHANNELS, &nchannels);
-	/* give the sound filters some properties */
-	if (err1 != 0 || err2 != 0){
-		/* need to add resampler*/
-		if (stream->read_resampler == NULL) stream->read_resampler = ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
-		resampler_missing = stream->read_resampler == NULL;
+	if (stream->soundread) {
+		/*don't put these two statements in a single if, because the second one will not be executed if the first one evaluates as true*/
+		err1 = ms_filter_call_method(stream->soundread, MS_FILTER_SET_SAMPLE_RATE, &sample_rate);
+		err2 = ms_filter_call_method(stream->soundread, MS_FILTER_SET_NCHANNELS, &nchannels);
+		/* give the sound filters some properties */
+		if (err1 != 0 || err2 != 0){
+			/* need to add resampler*/
+			if (stream->read_resampler == NULL) stream->read_resampler = ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
+			resampler_missing = stream->read_resampler == NULL;
+		}
 	}
 
-	err1 = ms_filter_call_method(stream->soundwrite, MS_FILTER_SET_SAMPLE_RATE, &sample_rate);
-	err2 = ms_filter_call_method(stream->soundwrite, MS_FILTER_SET_NCHANNELS, &nchannels);
-	if (err1 !=0 || err2 != 0){
-		/* need to add resampler*/
-		if (stream->write_resampler == NULL) stream->write_resampler = ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
-		resampler_missing = stream->write_resampler == NULL;
+	if (stream->soundwrite) {
+		err1 = ms_filter_call_method(stream->soundwrite, MS_FILTER_SET_SAMPLE_RATE, &sample_rate);
+		err2 = ms_filter_call_method(stream->soundwrite, MS_FILTER_SET_NCHANNELS, &nchannels);
+		if (err1 !=0 || err2 != 0){
+			/* need to add resampler*/
+			if (stream->write_resampler == NULL) stream->write_resampler = ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
+			resampler_missing = stream->write_resampler == NULL;
+		}
 	}
 
 	if (resampler_missing){
@@ -1224,56 +1234,65 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 	/* tip: draw yourself the picture if you don't understand */
 
 	/*sending graph*/
-	ms_connection_helper_start(&h);
-	ms_connection_helper_link(&h,stream->soundread,-1,0);
-	if (stream->read_decoder)
-		ms_connection_helper_link(&h, stream->read_decoder, 0, 0);
-	if (stream->read_resampler)
-		ms_connection_helper_link(&h,stream->read_resampler,0,0);
-	if( stream->mic_equalizer)
-		ms_connection_helper_link(&h,stream->mic_equalizer, 0, 0);
-	if (stream->ec)
-		ms_connection_helper_link(&h,stream->ec,1,1);
-	if (stream->volsend)
-		ms_connection_helper_link(&h,stream->volsend,0,0);
-	if (stream->dtmfgen_rtp)
-		ms_connection_helper_link(&h,stream->dtmfgen_rtp,0,0);
-	if (stream->outbound_mixer)
-		ms_connection_helper_link(&h,stream->outbound_mixer,0,0);
-	if (stream->vaddtx)
-		ms_connection_helper_link(&h,stream->vaddtx,0,0);
-	if (!skip_encoder_and_decoder)
-		ms_connection_helper_link(&h,stream->ms.encoder,0,0);
-	ms_connection_helper_link(&h,stream->ms.rtpsend,0,-1);
+	if (stream->ms.sessions.rtp_session->mode != RTP_SESSION_RECVONLY) {
+		ms_connection_helper_start(&h);
+		ms_connection_helper_link(&h,stream->soundread,-1,0);
+		if (stream->read_decoder)
+			ms_connection_helper_link(&h, stream->read_decoder, 0, 0);
+		if (stream->read_resampler)
+			ms_connection_helper_link(&h,stream->read_resampler,0,0);
+		if( stream->mic_equalizer)
+			ms_connection_helper_link(&h,stream->mic_equalizer, 0, 0);
+		if (stream->ec)
+			ms_connection_helper_link(&h,stream->ec,1,1);
+		if (stream->volsend)
+			ms_connection_helper_link(&h,stream->volsend,0,0);
+		if (stream->dtmfgen_rtp)
+			ms_connection_helper_link(&h,stream->dtmfgen_rtp,0,0);
+		if (stream->outbound_mixer)
+			ms_connection_helper_link(&h,stream->outbound_mixer,0,0);
+		if (stream->vaddtx)
+			ms_connection_helper_link(&h,stream->vaddtx,0,0);
+		if (!skip_encoder_and_decoder)
+			ms_connection_helper_link(&h,stream->ms.encoder,0,0);
+		ms_connection_helper_link(&h,stream->ms.rtpsend,0,-1);
+	}
+
 
 	/*receiving graph*/
-	ms_connection_helper_start(&h);
-	ms_connection_helper_link(&h,stream->ms.rtprecv,-1,0);
-	if (!skip_encoder_and_decoder)
-		ms_connection_helper_link(&h,stream->ms.decoder,0,0);
-	if (stream->plc)
-		ms_connection_helper_link(&h,stream->plc,0,0);
-	if (stream->flowcontrol)
-		ms_connection_helper_link(&h, stream->flowcontrol, 0, 0);
-	if (stream->dtmfgen)
-		ms_connection_helper_link(&h,stream->dtmfgen,0,0);
-	if (stream->volrecv)
-		ms_connection_helper_link(&h,stream->volrecv,0,0);
-	if (stream->recv_tee)
-		ms_connection_helper_link(&h,stream->recv_tee,0,0);
-	if (stream->spk_equalizer)
-		ms_connection_helper_link(&h,stream->spk_equalizer,0,0);
-	if (stream->local_mixer){
-		ms_connection_helper_link(&h,stream->local_mixer,0,0);
-		setup_local_player(stream,sample_rate, nchannels);
+	if (stream->ms.sessions.rtp_session->mode != RTP_SESSION_SENDONLY) {
+		ms_connection_helper_start(&h);
+		ms_connection_helper_link(&h,stream->ms.rtprecv,-1,0);
+
+		if (!skip_encoder_and_decoder)
+			ms_connection_helper_link(&h,stream->ms.decoder,0,0);
+		if (stream->plc)
+			ms_connection_helper_link(&h,stream->plc,0,0);
+		if (stream->flowcontrol)
+			ms_connection_helper_link(&h, stream->flowcontrol, 0, 0);
+		if (stream->dtmfgen)
+			ms_connection_helper_link(&h,stream->dtmfgen,0,0);
+		if (stream->volrecv)
+			ms_connection_helper_link(&h,stream->volrecv,0,0);
+		if (stream->recv_tee)
+			ms_connection_helper_link(&h,stream->recv_tee,0,0);
+		if (stream->spk_equalizer)
+			ms_connection_helper_link(&h,stream->spk_equalizer,0,0);
+		if (stream->local_mixer){
+			ms_connection_helper_link(&h,stream->local_mixer,0,0);
+			setup_local_player(stream,sample_rate, nchannels);
+		}
+		if (stream->ec)
+			ms_connection_helper_link(&h,stream->ec,0,0);
+		if (stream->write_resampler)
+			ms_connection_helper_link(&h,stream->write_resampler,0,0);
+		if (stream->write_encoder)
+			ms_connection_helper_link(&h, stream->write_encoder, 0, 0);
+		if (stream->soundwrite) {
+			ms_error("LINKING TO OUTPUT CARD ?... %p :: %s", stream->soundwrite, ms_filter_get_name(stream->soundwrite));
+			ms_connection_helper_link(&h,stream->soundwrite,0,-1);
+		}
 	}
-	if (stream->ec)
-		ms_connection_helper_link(&h,stream->ec,0,0);
-	if (stream->write_resampler)
-		ms_connection_helper_link(&h,stream->write_resampler,0,0);
-	if (stream->write_encoder)
-		ms_connection_helper_link(&h, stream->write_encoder, 0, 0);
-	ms_connection_helper_link(&h,stream->soundwrite,0,-1);
 
 	/*call recording part, attached to both outgoing and incoming graphs*/
 	if (stream->av_recorder.recorder)
@@ -1284,11 +1303,13 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 		ms_filter_link(stream->recorder_mixer,0,stream->recorder,0);
 	}
 
-	/*to make sure all preprocess are done before befre processing audio*/
-	ms_ticker_attach_multiple(stream->ms.sessions.ticker
-				,stream->soundread
-				,stream->ms.rtprecv
-				,NULL);
+	if (stream->soundread && stream->soundread != stream->ms.rtprecv) {
+		/*to make sure all preprocess are done before befre processing audio*/
+		ms_ticker_attach_multiple(stream->ms.sessions.ticker
+					   ,stream->soundread
+					  ,stream->ms.rtprecv
+					  ,NULL);
+	}
 
 	stream->ms.start_time=stream->ms.last_packet_time=ms_time(NULL);
 	stream->ms.is_beginning=TRUE;
@@ -1308,19 +1329,30 @@ int audio_stream_start_full(AudioStream *stream, RtpProfile *profile, const char
 	MSSndCard *playcard, MSSndCard *captcard, bool_t use_ec){
 	MSMediaStreamIO io = MS_MEDIA_STREAM_IO_INITIALIZER;
 
-	if (playcard){
+	if (playcard) {
 		io.output.type = MSResourceSoundcard;
 		io.output.soundcard = playcard;
-	}else{
-		io.output.type = MSResourceFile;
-		io.output.file = outfile;
+	} else {
+		if (stream->ms.sessions.rtp_session->mode == RTP_SESSION_SENDONLY) {
+			io.output.type = MSResourceRtp;
+			io.output.resource_arg = stream->ms.sessions.rtp_session;
+		} else {
+			io.output.type = MSResourceFile;
+			io.output.file = outfile;
+		}
 	}
-	if (captcard){
+
+	if (captcard) {
 		io.input.type = MSResourceSoundcard;
 		io.input.soundcard = captcard;
-	}else{
-		io.input.type = MSResourceFile;
-		io.input.file = infile;
+	} else {
+		if (stream->ms.sessions.rtp_session->mode == RTP_SESSION_RECVONLY) {
+			io.input.type = MSResourceRtp;
+			io.input.resource_arg = stream->ms.sessions.rtp_session;
+		} else {
+			io.input.type = MSResourceFile;
+			io.input.file = infile;
+		}
 	}
 	if (jitt_comp != -1)
 		rtp_session_set_jitter_compensation(stream->ms.sessions.rtp_session, jitt_comp);

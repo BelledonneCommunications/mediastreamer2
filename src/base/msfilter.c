@@ -293,7 +293,7 @@ static void find_filters(bctbx_list_t **filters, MSFilter *f ){
 		}
 	}
 	if (f->desc->noutputs>=1 && found==0){
-		ms_fatal("Bad graph: filter %s has %i outputs, none is connected.",f->desc->name,f->desc->noutputs);
+		ms_fatal("Bad graph: filter %s:%p has %i outputs, none is connected.",f->desc->name,f,f->desc->noutputs);
 	}
 }
 

@@ -97,7 +97,8 @@ typedef struct _MediastreamIceCandidate {
 typedef struct _MediastreamDatas {
 	MSFactory *factory;
 	int localport,remoteport,payload;
-	char ip[64];
+	char local_ip[64];
+	char remote_ip[64];
 	char *send_fmtp;
 	char *recv_fmtp;
 	int jitter;
@@ -184,8 +185,9 @@ static void parse_events(RtpSession *session, OrtpEvQueue *q);
 static bool_t parse_window_ids(const char *ids, int* video_id, int* preview_id);
 static RcAlgo parse_rc_algo(const char *algo);
 
-const char *usage="mediastream --local <port>\n"
-								"--remote <ip:port> \n"
+const char *usage="mediastream"
+								"[--local <ip:port>]\n"
+								"[--remote <ip:port>]\n"
 								"[--help (display this help) ]\n"
 								"[--payload <payload type number or payload name like 'audio/pmcu/8000'> ]\n"
 								"[ --agc (enable automatic gain control) ]\n"
@@ -235,6 +237,7 @@ const char *usage="mediastream --local <port>\n"
 								"[ --width <pixels> ]\n"
 								"[ --zoom zoom factor ]\n"
 								"[ --zrtp (enable zrtp) ]\n"
+								"[ --stream-dir <dir> (Stream direction. Possible values: MediaStreamRecvOnly, MediaStreamSendOnly, MediaStreamSendRecv) ]\n"
 								#if TARGET_OS_IPHONE
 								"[ --speaker route audio to speaker ]\n"
 								#endif
@@ -299,7 +302,8 @@ MediastreamDatas* init_default_args(void) {
 	args->localport=0;
 	args->remoteport=0;
 	args->payload=0;
-	memset(args->ip, 0, sizeof(args->ip));
+	memset(args->remote_ip, 0, sizeof(args->remote_ip));
+	memset(args->local_ip, 0, sizeof(args->local_ip));
 	args->send_fmtp=NULL;
 	args->recv_fmtp=NULL;
 	args->jitter=50;
@@ -375,20 +379,19 @@ bool_t parse_args(int argc, char** argv, MediastreamDatas* out) {
 		if (strcmp(argv[i],"--help")==0 || strcmp(argv[i],"-h")==0) {
 			return FALSE;
 		}else if (strcmp(argv[i],"--local")==0){
-			char *is_invalid;
 			i++;
-			out->localport = strtol(argv[i],&is_invalid,10);
-			if (*is_invalid!='\0'){
-				ms_error("Failed to parse local port '%s'\n",argv[i]);
-				return 0;
+			if (!parse_addr(argv[i],out->local_ip,sizeof(out->local_ip),&out->localport)) {
+				ms_error("Failed to parse local address '%s'\n",argv[i]);
+				return FALSE;
 			}
+			ms_message("Local addr: ip=%s port=%i\n",out->local_ip,out->localport);
 		}else if (strcmp(argv[i],"--remote")==0){
 			i++;
-			if (!parse_addr(argv[i],out->ip,sizeof(out->ip),&out->remoteport)) {
+			if (!parse_addr(argv[i],out->remote_ip,sizeof(out->remote_ip),&out->remoteport)) {
 				ms_error("Failed to parse remote address '%s'\n",argv[i]);
 				return FALSE;
 			}
-			ms_message("Remote addr: ip=%s port=%i\n",out->ip,out->remoteport);
+			ms_message("Remote addr: ip=%s port=%i\n",out->remote_ip,out->remoteport);
 		}else if (strcmp(argv[i],"--ice-local-candidate")==0) {
 			MediastreamIceCandidate *candidate;
 			i++;
@@ -827,11 +830,17 @@ int setup_media_streams(MediastreamDatas* args) {
 
 	if (args->pt->type!=PAYLOAD_VIDEO) {
 		MSSndCardManager *manager=ms_factory_get_snd_card_manager(factory);
-		MSSndCard *capt= args->capture_card==NULL ? ms_snd_card_manager_get_default_capture_card(manager) :
+		MSSndCard *capt = NULL;
+		if (args->stream_dir != MediaStreamRecvOnly) {
+			capt = args->capture_card == NULL ? ms_snd_card_manager_get_default_capture_card(manager) :
 				get_sound_card(manager,args->capture_card);
-		MSSndCard *play= args->playback_card==NULL ? ms_snd_card_manager_get_default_capture_card(manager) :
+		}
+		MSSndCard *play = NULL;
+		if (args->stream_dir != MediaStreamSendOnly) {
+			play = args->playback_card == NULL ? ms_snd_card_manager_get_default_capture_card(manager) :
 				get_sound_card(manager,args->playback_card);
-		args->audio=audio_stream_new3(factory, args->ip, args->localport,args->localport+1, args->stream_dir);
+		}
+		args->audio=audio_stream_new3(factory, args->local_ip, args->localport,args->localport+1, args->stream_dir);
 		if (args->bw_controller) {
 			ms_bandwidth_controller_add_stream(args->bw_controller, (MediaStream*)args->audio);
 		}
@@ -846,7 +855,7 @@ int setup_media_streams(MediastreamDatas* args) {
 			ms_snd_card_set_preferred_sample_rate(play,rtp_profile_get_payload(args->profile, args->payload)->clock_rate);
 		ms_message("Starting audio stream.\n");
 
-		if (audio_stream_start_full(args->audio,args->profile,args->ip,args->remoteport,args->ip,args->enable_rtcp?args->remoteport+1:-1, args->payload, args->jitter,args->infile,args->outfile,
+		if (audio_stream_start_full(args->audio,args->profile,args->remote_ip,args->remoteport,args->remote_ip,args->enable_rtcp?args->remoteport+1:-1, args->payload, args->jitter,args->infile,args->outfile,
 					    args->outfile==NULL ? play : NULL ,args->infile==NULL ? capt : NULL,args->infile!=NULL ? FALSE: args->ec) < 0) {
 			ms_error("Failed to initialize audio stream.");
 			return -1;
@@ -944,8 +953,8 @@ int setup_media_streams(MediastreamDatas* args) {
 			return -1;
 		}
 		ms_message("Starting video stream.\n");
-		args->video=video_stream_new3(factory, args->ip, args->localport, args->localport+1, args->stream_dir);
-		if (args->bw_controller){
+		args->video = video_stream_new3(factory, args->local_ip, args->localport, args->localport+1, args->stream_dir);
+		if (args->bw_controller) {
 			ms_bandwidth_controller_add_stream(args->bw_controller, (MediaStream*)args->video);
 		}
 		if (args->video_display_filter)
@@ -976,21 +985,31 @@ int setup_media_streams(MediastreamDatas* args) {
 		if (args->infile){
 			iodef.input.type = MSResourceFile;
 			iodef.input.file = args->infile;
-		}else{
-			iodef.input.type = MSResourceCamera;
-			iodef.input.camera = cam;
+		} else {
+			if (args->stream_dir == MediaStreamRecvOnly) {
+				iodef.input.type = MSResourceRtp;
+				iodef.input.resource_arg = args->video->ms.sessions.rtp_session;
+			} else {
+				iodef.input.type = MSResourceCamera;
+				iodef.input.camera = cam;
+			}
 		}
-		if (args->outfile){
+		if (args->outfile) {
 			iodef.output.type = MSResourceFile;
 			iodef.output.file = args->outfile;
-		}else{
-			iodef.output.type = MSResourceDefault;
-			iodef.output.resource_arg = NULL;
+		} else {
+			if (args->stream_dir == MediaStreamSendOnly) {
+				iodef.output.type = MSResourceRtp;
+				iodef.output.resource_arg = args->video->ms.sessions.rtp_session;
+			} else {
+				iodef.output.type = MSResourceDefault;
+				iodef.output.resource_arg = NULL;
+			}
 		}
 		rtp_session_set_jitter_compensation(args->video->ms.sessions.rtp_session, args->jitter);
 		if (video_stream_start_from_io(args->video, args->profile,
-					       args->ip,args->remoteport,
-					       args->ip,args->enable_rtcp?args->remoteport+1:-1,
+					       args->remote_ip,args->remoteport,
+					       args->remote_ip,args->enable_rtcp?args->remoteport+1:-1,
 					       args->payload,
 					       &iodef) < 0) {
 			ms_error("Failed to initialize video stream.");
