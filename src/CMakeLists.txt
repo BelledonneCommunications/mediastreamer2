@@ -22,11 +22,6 @@
 
 find_library(LIBM NAMES m)
 
-if(ANDROID)
-	find_library(ANDROID_CPU_FEATURES_LIBRARY NAMES cpufeatures)
-	find_library(ANDROID_SUPPORT_LIBRARY NAMES support)
-endif()
-
 if(MSVC AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsPhone" AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
 	find_library(LIBGCC NAMES gcc)
 	find_library(LIBMINGWEX NAMES mingwex)
