@@ -48,6 +48,7 @@ struct v4mState;
 - (int)stop;
 - (void)setSize:(MSVideoSize) size;
 - (MSVideoSize)getSize;
+- (MSVideoSize)getUsedSize;
 - (void)initDevice:(NSString*)deviceId;
 - (void)openDevice:(NSString*) deviceId;
 - (int)getPixFmt;
@@ -288,8 +289,13 @@ static void capture_queue_cleanup(void* p) {
 	usedSize.width = max.width;
 	usedSize.height = max.height;
 }
+
 - (MSVideoSize)getSize {
 	return [self presetTovideoSize:session.sessionPreset];
+}
+
+- (MSVideoSize)getUsedSize {
+	return usedSize;
 }
 
 - (AVCaptureSession *)session {
@@ -374,7 +380,7 @@ static void v4m_process(MSFilter * obj){
 
 		if (om != NULL) {
 			YuvBuf frame_size;
-			MSVideoSize desired_size = [s->webcam usedSize];
+			MSVideoSize desired_size = [s->webcam getUsedSize];
 
 			ms_yuv_buf_init_from_mblk(&frame_size, om);
 
