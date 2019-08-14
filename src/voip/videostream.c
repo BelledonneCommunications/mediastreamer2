@@ -141,7 +141,8 @@ static void video_stream_process_rtcp(MediaStream *media_stream, mblk_t *m){
 
 	if (rtcp_is_PSFB(m) && (stream->ms.encoder != NULL)) {
 		/* The PSFB messages are to be notified to the encoder, so if we have no encoder simply ignore them. */
-		ms_message("RTCP video feedback for SSRC %x. Our SSRC is %x", 
+		ms_message("RTCP video PSFB feedback of type %d for SSRC %x. Our SSRC is %x", 
+			rtcp_PSFB_get_type(m),
 			rtcp_PSFB_get_media_source_ssrc(m), 
 			rtp_session_get_send_ssrc(stream->ms.sessions.rtp_session));
 
