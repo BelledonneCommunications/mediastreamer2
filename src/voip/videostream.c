@@ -152,14 +152,13 @@ static void video_stream_process_rtcp(MediaStream *media_stream, mblk_t *m){
 					/* TODO: manage seq_nr and ignore FIR repeats to avoid flooding the encoder */
 					ms_filter_call_method(stream->ms.encoder, MS_VIDEO_ENCODER_NOTIFY_FIR, &seq_nr);
 					stream->ms_video_stat.counter_rcvd_fir++;
-					ms_message("Got FIR on video stream [%p] SSRC [%x] count %d, seq %u", 
-						stream,  stream->ms_video_stat.counter_rcvd_fir,
-						rtcp_fb_fir_fci_get_ssrc(fci), seq_nr);
+					ms_message("Got RTCP FIR on video stream [%p] SSRC [%x] count %d, seq %u", 
+						stream, rtcp_fb_fir_fci_get_ssrc(fci), stream->ms_video_stat.counter_rcvd_fir, seq_nr);
 
 					break;
 				}
 				else {
-					ms_message("Ignoring FIR on SSRC [%x]. SSRC of video sender is [%x]",
+					ms_message("Ignoring RTCP FIR on SSRC [%x]. SSRC of video sender is [%x]",
 						rtcp_fb_fir_fci_get_seq_nr(fci),
 						rtp_session_get_send_ssrc(stream->ms.sessions.rtp_session));
 				}
@@ -173,7 +172,7 @@ static void video_stream_process_rtcp(MediaStream *media_stream, mblk_t *m){
 
                     stream->ms_video_stat.counter_rcvd_pli++;
 					ms_filter_call_method_noarg(stream->ms.encoder, MS_VIDEO_ENCODER_NOTIFY_PLI);
-                    ms_message("Got PLI on video stream [%p] SSRC [%x] count %d", 
+                    ms_message("Got RTCP PLI on video stream [%p] SSRC [%x] count %d", 
 						stream, rtcp_PSFB_get_media_source_ssrc(m), stream->ms_video_stat.counter_rcvd_pli);
 					break;
 				case RTCP_PSFB_SLI:
@@ -207,7 +206,7 @@ static void video_stream_process_rtcp(MediaStream *media_stream, mblk_t *m){
 			}
 		}
 		else {
-			ms_message("RTCP payload specific feedback of type %d for incorrect SSRC %x. Our SSRC is %x", 
+			ms_message("RTCP payload specific feedback of type %d for unknown SSRC %x was ignored. Our SSRC is %x", 
 			rtcp_PSFB_get_type(m),
 			rtcp_PSFB_get_media_source_ssrc(m), 
 			rtp_session_get_send_ssrc(stream->ms.sessions.rtp_session));
