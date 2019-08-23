@@ -736,11 +736,98 @@ static int get_nchannels(MSFilter *f, void *arg){
 	return 0;
 }
 
+static int ms_macsnd_get_volume(MSFilter *f, void *arg, bool isCapture)
+{
+    AUCommon *d = (AUCommon *) f->data;
+    float * pvolume = (float *)arg;
+    AudioObjectPropertyAddress volumeAddr =
+    {
+        kAudioHardwareServiceDeviceProperty_VirtualMasterVolume/*kAudioDevicePropertyVolumeScalar*/,
+        isCapture ? kAudioDevicePropertyScopeInput : kAudioDevicePropertyScopeOutput,
+        kAudioObjectPropertyElementMaster
+    };
+    
+    UInt32 size = sizeof(*pvolume);
+    
+    OSStatus err = AudioObjectGetPropertyData(d->dev, &volumeAddr, 0, NULL, &size, pvolume);
+    
+    if (err != noErr)
+    {
+        ms_warning("MacSound: cannot get capture volume from #[%d]. Err = %d", d->dev, err);
+        volume = 0.0f;
+    }
+    
+    return 0;
+}
+
+
+static int ms_macsnd_capture_get_volume(MSFilter *f, void *arg)
+{
+    return ms_macsnd_get_volume(f, arg, true);
+}
+
+static int ms_macsnd_playback_get_volume(MSFilter *f, void *arg)
+{
+    return ms_macsnd_get_volume(f, arg, false);
+}
+
+
+static int ms_macsnd_set_volume_gain(MSFilter *f, void *arg, bool isCapture)
+{
+    AUCommon *d = (AUCommon *) f->data;
+    float * pvolume = (float *)arg;
+    bool isWritable;
+    AudioObjectPropertyAddress  volumeAddr =
+    {
+        kAudioHardwareServiceDeviceProperty_VirtualMasterVolume,
+        isCapture ? kAudioDevicePropertyScopeInput : kAudioDevicePropertyScopeOutput,
+        kAudioObjectPropertyElementMaster
+    };
+    
+    OSStatus err = AudioObjectIsPropertySettable(mID, &volumeAddr, &isWritable);
+    
+    if ( err == noErr )
+    {
+        if ( isWritable )
+        {
+            err = AudioObjectSetPropertyData(d->dev, &volumeAddr, 0, NULL, sizeof(float), pvolume);
+            if (err != noErr)
+            {
+                ms_error("MacSnd: Could not set volume of device #[%d]. Err = %d",
+                          d->dev, err);
+            }
+        }
+        else
+        {
+            ms_error("MacSnd: volume of device #[%d] is not settable.",
+                     d->dev);
+        }
+    }
+    else
+    {
+        ms_error("MacSnd: Could not set volume of device #[%d]. Err = %d (step 2)",
+                  d->dev, err);
+    }
+    return 0;
+}
+
+static int ms_macsnd_capture_set_volume(MSFilter *f, void *arg)
+{
+    return ms_macsnd_set_volume(f, arg, true);
+}
+
+static int ms_macsnd_playback_get_volume(MSFilter *f, void *arg)
+{
+    return ms_macsnd_set_volume(f, arg, false);
+}
+
 static MSFilterMethod au_read_methods[]={
 	{	MS_FILTER_SET_SAMPLE_RATE	, set_rate	},
 	{	MS_FILTER_GET_SAMPLE_RATE	, get_rate },
 	{	MS_FILTER_SET_NCHANNELS		, read_set_nchannels	},
 	{	MS_FILTER_GET_NCHANNELS		, get_nchannels	},
+    {   MS_AUDIO_CAPTURE_SET_VOLUME_GAIN, ms_macsnd_capture_set_volume    },
+    {   MS_AUDIO_CAPTURE_GET_VOLUME_GAIN, ms_macsnd_capture_get_volume    },
 	{	0				, NULL		}
 };
 
@@ -749,6 +836,8 @@ static MSFilterMethod au_write_methods[]={
 	{	MS_FILTER_GET_SAMPLE_RATE	, get_rate },
 	{	MS_FILTER_SET_NCHANNELS		, write_set_nchannels	},
 	{	MS_FILTER_GET_NCHANNELS		, get_nchannels	},
+    {   MS_AUDIO_PLAYBACK_SET_VOLUME_GAIN, ms_macsnd_playback_set_volume    },
+    {   MS_AUDIO_PLAYBACK_GET_VOLUME_GAIN, ms_macsnd_playback_get_volume    },
 	{	0				, NULL		}
 };
 
