@@ -878,6 +878,9 @@ typedef struct DecState {
 	bool_t avpf_enabled;
 	bool_t freeze_on_error;
 	bool_t ready;
+	MSWorkerThread *process_thread;
+	MSQueue entry_q;
+	MSQueue exit_q;
 } DecState;
 
 
@@ -938,6 +941,9 @@ static void dec_preprocess(MSFilter* f) {
 		s->ready=TRUE;
 	}
 
+	s->process_thread = ms_worker_thread_new();
+	ms_queue_init(&s->entry_q);
+	ms_queue_init(&s->exit_q);
 }
 
 static void dec_uninit(MSFilter *f) {
@@ -949,7 +955,8 @@ static void dec_uninit(MSFilter *f) {
 	ms_free(s);
 }
 
-static void dec_process(MSFilter *f) {
+static void dec_process_frame_task(void *obj) {
+	MSFilter *f = (MSFilter*)obj;
 	DecState *s = (DecState *)f->data;
 	mblk_t *im;
 	vpx_codec_err_t err;
@@ -959,18 +966,20 @@ static void dec_process(MSFilter *f) {
 	MSQueue mtofree_queue;
 	Vp8RtpFmtFrameInfo frame_info;
 
-	if (!s->ready){
-		ms_queue_flush(f->inputs[0]);
-		return;
-	}
-
-	ms_filter_lock(f);
-
 	ms_queue_init(&frame);
 	ms_queue_init(&mtofree_queue);
 
+	ms_filter_lock(f);
+	if (ms_queue_empty(&s->entry_q)) {
+		ms_warning("VP8 async decoding process: No frame in entry queue");
+		ms_filter_unlock(f);
+		return;
+	}
+
 	/* Unpack RTP payload format for VP8. */
-	vp8rtpfmt_unpacker_feed(&s->unpacker, f->inputs[0]);
+	vp8rtpfmt_unpacker_feed(&s->unpacker, &s->entry_q);
+
+	ms_filter_unlock(f);
 
 	/* Decode unpacked VP8 frames. */
 	while (vp8rtpfmt_unpacker_get_frame(&s->unpacker, &frame, &frame_info) == 0) {
@@ -1017,7 +1026,10 @@ static void dec_process(MSFilter *f) {
 					src += img->stride[i];
 				}
 			}
-			ms_queue_put(f->outputs[0], dupmsg(s->yuv_msg));
+
+			ms_filter_lock(f);
+			ms_queue_put(&s->exit_q, dupmsg(s->yuv_msg));
+			ms_filter_unlock(f);
 
 			ms_average_fps_update(&s->fps, (uint32_t)f->ticker->time);
 			if (!s->first_image_decoded) {
@@ -1030,11 +1042,42 @@ static void dec_process(MSFilter *f) {
 			freemsg(im);
 		}
 	}
+}
+
+static void dec_process(MSFilter *f) {
+	DecState *s = (DecState *)f->data;
+	mblk_t *entry_f;
+	mblk_t *exit_f;
+
+	ms_filter_lock(f);
+
+#ifdef AVPF_DEBUG
+	ms_message("VP8 dec_process:");
+#endif
+
+	if (!s->ready) {
+		ms_queue_flush(f->inputs[0]);
+		ms_filter_unlock(f);
+		return;
+	}
+
+	while ((entry_f = ms_queue_get(f->inputs[0])) != NULL) {
+		ms_queue_put(&s->entry_q, entry_f);
+	}
+	ms_worker_thread_add_task(s->process_thread, dec_process_frame_task, (void*)f);
+
+	/* Put each frame we have in exit_q in f->output[0] */
+	while ((exit_f = ms_queue_get(&s->exit_q)) != NULL) {
+		ms_queue_put(f->outputs[0], exit_f);
+	}
 
 	ms_filter_unlock(f);
+	ms_queue_flush(f->inputs[0]);
 }
 
 static void dec_postprocess(MSFilter *f) {
+	DecState *s = (DecState *)f->data;
+	ms_worker_thread_destroy(s->process_thread, FALSE);
 }
 
 static int dec_reset_first_image(MSFilter* f, void *data) {
