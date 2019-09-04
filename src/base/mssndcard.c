@@ -140,7 +140,15 @@ void ms_snd_card_manager_prepend_cards(MSSndCardManager *m, bctbx_list_t *l) {
 	}
 }
 
+static bool_t bypass_sndcard_detection = FALSE;
+
+void ms_snd_card_manager_bypass_soundcard_detection(bool_t value) {
+	bypass_sndcard_detection = value;
+}
+
 static void card_detect(MSSndCardManager *m, MSSndCardDesc *desc){
+	if (bypass_sndcard_detection) return;
+
 	if (desc->detect!=NULL)
 		desc->detect(m);
 }
