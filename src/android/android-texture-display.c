@@ -45,6 +45,7 @@ typedef struct AndroidTextureDisplay {
 	EGLContext gl_context;
 	MSWorkerThread *process_thread;
 	queue_t entry_q;
+	jobject surfaceTexture;
 } AndroidTextureDisplay;
 
 static void android_texture_display_destroy_opengl(MSFilter *f) {
@@ -86,7 +87,7 @@ static void android_texture_display_destroy_opengl(MSFilter *f) {
 		if (result != EGL_TRUE) {
 			ms_error("[TextureView Display] eglTerminate failure: %u", result);
 		}
-
+		
 		ad->gl_display = NULL;
 		ms_message("[TextureView Display] EGL display destroyed");
 	}
@@ -187,6 +188,7 @@ static void android_texture_display_swap_buffers(MSFilter *f) {
 static void android_texture_display_init(MSFilter *f) {
 	AndroidTextureDisplay *ad = (AndroidTextureDisplay*)ms_new0(AndroidTextureDisplay, 1);
 	ad->surface = NULL;
+	ad->surfaceTexture = NULL;
 	ad->process_thread = ms_worker_thread_new();
 	qinit(&ad->entry_q);
 	f->data = ad;
@@ -234,23 +236,44 @@ static void android_texture_display_uninit(MSFilter *f) {
 	ms_free(ad);
 }
 
+static void android_texture_display_create_surface_from_surface_texture(AndroidTextureDisplay *d) {
+	ms_message("[TextureView Display] Creating Surface from SurfaceTexture");
+	JNIEnv *env = ms_get_jni_env();
+	jobject surface;
+	jclass klass = (*env)->FindClass(env, "android/view/Surface");
+	if (!klass) {
+		ms_error("[TextureView Display] Could not find android.view.Surface class");
+		return;
+	}
+
+	jmethodID ctor = (*env)->GetMethodID(env, klass, "<init>", "(Landroid/graphics/SurfaceTexture;)V");
+	surface = (*env)->NewObject(env, klass, ctor, d->surfaceTexture);
+	if (!surface) {
+		ms_error("[TextureView Display] Could not instanciate android.view.Surface object");
+		return;
+	}
+	d->surface = (jobject)(*env)->NewGlobalRef(env, surface);
+	ms_message("[TextureView Display] Surface created: %p", d->surface);
+}
+
 static int android_texture_display_set_window(MSFilter *f, void *arg) {
 	AndroidTextureDisplay *ad = (AndroidTextureDisplay*)f->data;
 
 	unsigned long id = *(unsigned long *)arg;
-	jobject surface = (jobject)id;
-	ms_message("[TextureView Display] New window jobject ptr is %p, current one is %p", surface, ad->surface);
+	jobject surfaceTexture = (jobject)id;
+	ms_message("[TextureView Display] New window jobject ptr is %p, current one is %p", surfaceTexture, ad->surfaceTexture);
 
 	ms_filter_lock(f);
 
 	if (id == 0) {
-		ad->surface = NULL;
+		ad->surfaceTexture = NULL;
 		ms_worker_thread_add_task(ad->process_thread, (MSTaskFunc)android_texture_display_destroy_opengl, (void*)f);
-	} else if (surface != ad->surface) {
-		if (ad->surface) {
+	} else if (surfaceTexture != ad->surfaceTexture) {
+		if (ad->surfaceTexture) {
 			ms_worker_thread_add_task(ad->process_thread, (MSTaskFunc)android_texture_display_destroy_opengl, (void*)f);
 		}
-		ad->surface = surface;
+		ad->surfaceTexture = surfaceTexture;
+		android_texture_display_create_surface_from_surface_texture(ad);
 	}
 
 	if (ad->surface && !ad->ogl) {
