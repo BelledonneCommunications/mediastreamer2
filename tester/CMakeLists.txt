@@ -113,7 +113,7 @@ set(SOURCE_FILES_C
 )
 
 if(SPEEXDSP_FOUND)
-	list(APPEND mediastreamer2_neon_tester.c)
+	list(APPEND SOURCE_FILES_C mediastreamer2_neon_tester.c)
 endif()
 
 set(SOURCE_FILES_CXX )
