@@ -302,6 +302,7 @@ MS2_PUBLIC void ms_factory_init_plugins(MSFactory *obj);
 **/
 MS2_PUBLIC void ms_factory_set_plugins_dir(MSFactory *obj, const char *path);
 
+MS2_PUBLIC int ms_factory_load_plugins_from_list(MSFactory *factory, const bctbx_list_t *plugins_list);
 MS2_PUBLIC int ms_factory_load_plugins(MSFactory *factory, const char *dir);
 
 MS2_PUBLIC void ms_factory_uninit_plugins(MSFactory *obj);
