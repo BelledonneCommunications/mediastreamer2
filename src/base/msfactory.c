@@ -515,6 +515,55 @@ void ms_factory_log_statistics(MSFactory *obj) {
 #endif
 typedef void (*init_func_t)(MSFactory *);
 
+int ms_factory_load_plugins_from_list(MSFactory *factory, const bctbx_list_t *plugins_list) {
+	int num = 0;
+
+	if (plugins_list == NULL || bctbx_list_size(plugins_list) == 0) {
+		ms_error("Couldn't load plugins from empty list");
+		return -1;
+	}
+
+	int plugins_list_size = bctbx_list_size(plugins_list);
+	const bctbx_list_t *it = plugins_list;
+
+	for(; it != NULL; it = bctbx_list_next(it)) {
+		const char *plugin_name = bctbx_list_get_data(it);
+		void *handle = NULL;
+		void *initroutine = NULL;
+		char *initroutine_name = ms_malloc0(strlen(plugin_name) + 10);
+		ms_message("Loading plugin %s...", plugin_name);
+
+		if ((handle = dlopen(plugin_name, RTLD_NOW)) == NULL) {
+			ms_warning("Fail to load plugin %s : %s", plugin_name, dlerror());
+		} else {
+			strcpy(initroutine_name, plugin_name);
+			char *p = strstr(initroutine_name, PLUGINS_EXT);
+			if (p != NULL) {
+				strcpy(p, "_init");
+			}
+			initroutine = dlsym(handle, initroutine_name);
+		}
+
+		if (initroutine != NULL) {
+			init_func_t func = (init_func_t)initroutine;
+			func(factory);
+			ms_message("Plugin loaded (%s)", plugin_name);
+			num++;
+		} else {
+			ms_warning("Could not locate init routine %s of plugin %s", initroutine_name, plugin_name);
+		}
+		ms_free(initroutine_name);
+	}
+
+	if (num != plugins_list_size) {
+		ms_warning("Couldn't load all plugins in list");
+	} else {
+		ms_message("All plugins in list correctly loaded");
+	}
+
+	return num;
+}
+
 int ms_factory_load_plugins(MSFactory *factory, const char *dir){
 	int num=0;
 #if defined(_WIN32) && !defined(_WIN32_WCE)
@@ -728,10 +777,22 @@ void ms_factory_init_plugins(MSFactory *obj) {
 		obj->plugins_dir = ms_strdup("");
 #endif
 	}
-	if (strlen(obj->plugins_dir) > 0) {
-		ms_message("Loading ms plugins from [%s]",obj->plugins_dir);
-		ms_factory_load_plugins(obj,obj->plugins_dir);
+#if defined(__ANDROID__)
+	bctbx_list_t *plugins_list = ms_get_android_plugins_list();
+	if (plugins_list != NULL && ms_get_android_sdk_version() >= 23) {
+		ms_message("Loading ms plugins from list");
+		ms_factory_load_plugins_from_list(obj, plugins_list);
+		ms_list_free_with_data(plugins_list, ms_free);
+	} else if (strlen(obj->plugins_dir) > 0) {
+		ms_message("Loading ms plugins from directory [%s]", obj->plugins_dir);
+		ms_factory_load_plugins(obj, obj->plugins_dir);
 	}
+#else
+	if (strlen(obj->plugins_dir) > 0) {
+		ms_message("Loading ms plugins from [%s]", obj->plugins_dir);
+		ms_factory_load_plugins(obj, obj->plugins_dir);
+	}
+#endif
 }
 
 void ms_factory_set_plugins_dir(MSFactory *obj, const char *path) {
