@@ -371,8 +371,8 @@ static void init_video_streams(video_stream_tester_t *vst1, video_stream_tester_
 	if (nack == TRUE) {
 		rtp_session_enable_avpf_feature(video_stream_get_rtp_session(vst2->vs), ORTP_AVPF_FEATURE_GENERIC_NACK, TRUE);
 		rtp_session_enable_avpf_feature(video_stream_get_rtp_session(vst2->vs), ORTP_AVPF_FEATURE_IMMEDIATE_NACK, TRUE);
-		video_stream_enable_retransmission_on_nack(vst1->vs);
-		video_stream_enable_retransmission_on_nack(vst2->vs);
+		video_stream_enable_retransmission_on_nack(vst1->vs, TRUE);
+		video_stream_enable_retransmission_on_nack(vst2->vs, TRUE);
 	}
 
 	BC_ASSERT_EQUAL(video_stream_start(vst1->vs, &rtp_profile, vst2->local_ip, vst2->local_rtp, vst2->local_ip, vst2->local_rtcp, payload_type, 50, vst1->cam), 0,int,"%d");
