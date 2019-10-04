@@ -637,13 +637,16 @@ add_definitions(
 #Setup framework structure and variables for ms2 plugins
 set(MS2_FRAMEWORK_VERSION "A")
 
-if(APPLE AND NOT IOS)
+if(APPLE)
 	set(MS2_PLUGINS_LOCATION "Frameworks/mediastreamer2.framework/Versions/${MS2_FRAMEWORK_VERSION}/Libraries")
 
 	install(DIRECTORY DESTINATION "${CMAKE_INSTALL_PREFIX}/${MS2_PLUGINS_LOCATION}")
 
 	if (NOT EXISTS "${CMAKE_INSTALL_PREFIX}/Frameworks/mediastreamer2.framework/Libraries")
 	     install(CODE "execute_process(COMMAND sh -c \"ln -sf Versions/Current/Libraries ${CMAKE_INSTALL_PREFIX}/Frameworks/mediastreamer2.framework/Libraries\")")
+	endif()
+	if (NOT EXISTS "${CMAKE_INSTALL_PREFIX}/Frameworks/mediastreamer2.framework/Versions/Current")
+	     install(CODE "execute_process(COMMAND sh -c \"ln -sf Versions/A ${CMAKE_INSTALL_PREFIX}/Frameworks/mediastreamer2.framework/Version/Current\")")
 	endif()
 else()
 	set(MS2_PLUGINS_LOCATION "${CMAKE_INSTALL_LIBDIR}/mediastreamer/plugins")
