@@ -303,6 +303,14 @@ void ms_factory_init_voip(MSFactory *obj){
 		wm->factory = obj;
 		obj->wbcmanager = wm;
 #ifdef VIDEO_ENABLED
+
+#if defined(__ANDROID__)
+		if (ms_get_android_sdk_version() >= 26) {
+			ms_warning("Android >= 9 detected, disabling legacy capture filter");
+			ms_web_cam_descs[0] = NULL;
+		}
+#endif
+
 		ms_message("Registering all webcam handlers");
 		for (i=0;ms_web_cam_descs[i]!=NULL;i++){
 			ms_web_cam_manager_register_desc(wm,ms_web_cam_descs[i]);
