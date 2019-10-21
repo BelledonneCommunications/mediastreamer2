@@ -168,8 +168,16 @@ MediaCodecDecoder::Status MediaCodecDecoder::fetch(mblk_t *&frame) {
 	}
 	
 	if (_curWidth && _curHeight && (_curWidth != image.crop_rect.w || _curHeight != image.crop_rect.h)){
+		/*
+		 * Sometimes (not all devices), we observe an insconsistency between the width/height announced by the MediaCodec.getOutputFormat()
+		 * and the width/height announced by the getOutputImage().
+		 * In some cases this also results in an garbled decoded image, but sometimes not.
+		 * We print out the information, but no further action can be done here.
+		 */
 		ms_error("Mismatch between decoder new format and output image detected: %ix%i vs %ix%i",
 			 _curWidth, _curHeight, image.crop_rect.w, image.crop_rect.h);
+		_curWidth = image.crop_rect.w;
+		_curHeight = image.crop_rect.h;
 	}
 
 	MSPicture pic;

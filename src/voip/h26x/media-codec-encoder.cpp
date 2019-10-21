@@ -42,6 +42,13 @@ MediaCodecEncoder::~MediaCodecEncoder() {
 	if (_impl) AMediaCodec_delete(_impl);
 }
 
+void MediaCodecEncoder::enableOutbufferDequeueLimit(bool enable){
+	if (enable){
+		ms_warning("Enabling the DEVICE_MCH265_LIMIT_DEQUEUE_OF_OUTPUT_BUFFERS hack on this device.");
+	}
+	_hasOutbufferDequeueLimit = enable;
+}
+
 void MediaCodecEncoder::setFps(float fps) {
 	_fps = fps;
 	if (isRunning() && _impl) {
@@ -107,13 +114,7 @@ void MediaCodecEncoder::feed(mblk_t *rawData, uint64_t time, bool requestIFrame)
 	// ensure that rawData is destroyed on function return
 	unique_ptr<mblk_t, void(*)(mblk_t *)> rawDataPtr(rawData, freemsg);
 
-	if (_impl == nullptr) return;
-
-	if (!_isRunning) {
-		ms_error("MediaCodecEncoder: encoder not running. Dropping buffer.");
-		return;
-	}
-
+	
 	if (_recoveryMode && time % 5000 == 0) {
 		try {
 			if (_impl == nullptr) createImpl();
@@ -123,7 +124,15 @@ void MediaCodecEncoder::feed(mblk_t *rawData, uint64_t time, bool requestIFrame)
 			ms_error("MediaCodecEncoder: %s", e.what());
 			ms_error("MediaCodecEncoder: AMediaCodec_reset() was not sufficient, will recreate the encoder in a moment...");
 			AMediaCodec_delete(_impl);
+			_impl = nullptr;
 		}
+	}
+	
+	if (_impl == nullptr) return;
+
+	if (!_isRunning) {
+		ms_error("MediaCodecEncoder: encoder not running. Dropping buffer.");
+		return;
 	}
 
 	MSPicture pic;

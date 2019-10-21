@@ -54,7 +54,11 @@ public:
 
 class MediaCodecH265EncoderFilterImpl: public H26xEncoderFilter {
 public:
-	MediaCodecH265EncoderFilterImpl(MSFilter *f): H26xEncoderFilter(f, new MediaCodecH265Encoder(), _media_codec_h265_conf_list) {}
+	MediaCodecH265EncoderFilterImpl(MSFilter *f): H26xEncoderFilter(f, new MediaCodecH265Encoder(), _media_codec_h265_conf_list) {
+		SoundDeviceDescription *info = ms_devices_info_get_sound_device_description(f->factory->devices_info);
+		auto &encoder = static_cast<MediaCodecEncoder &>(*_encoder);
+		encoder.enableOutbufferDequeueLimit(!!(info->flags & DEVICE_MCH265_LIMIT_DEQUEUE_OF_OUTPUT_BUFFERS));
+	}
 };
 
 }

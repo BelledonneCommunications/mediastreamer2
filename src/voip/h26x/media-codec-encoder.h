@@ -54,7 +54,7 @@ public:
 	 * This is generally not a good idea and is activated as workaround for these annoying drivers.
 	 * Indeed, an encoder may generate more output buffers than the number of input frames they are processing.
 	 **/
-	void enableOutbufferDequeueLimit(bool enable){ _hasOutbufferDequeueLimit = enable;}
+	void enableOutbufferDequeueLimit(bool enable);
 	
 	bool isRunning() override {return _isRunning;}
 	void start() override;
