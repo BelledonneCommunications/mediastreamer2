@@ -131,9 +131,9 @@
 }
 
 - (void)drawView {
-     	/* no opengl es call made when in background */
-	IOSUtils iOSUtils;
-    	if (!iOSUtils.isApplicationStateActive())
+        /* no opengl es call made when in background */
+        auto &iOSUtils = bctoolbox::IOSUtils::getUtils();
+        if (!iOSUtils.isApplicationStateActive())
 		return;
 	if([lock tryLock]) {
 		if(context == nil) {
