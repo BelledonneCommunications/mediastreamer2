@@ -303,21 +303,27 @@ static void android_texture_display_uninit(MSFilter *f) {
 
 static int android_texture_display_set_window(MSFilter *f, void *arg) {
 	AndroidTextureDisplay *ad = (AndroidTextureDisplay*)f->data;
-
 	unsigned long id = *(unsigned long *)arg;
 	jobject windowId = (jobject)id;
-	ms_message("[TextureView Display] New window jobject ptr is %p, current one is %p", windowId, ad->nativeWindowId);
+   	JNIEnv *env = ms_get_jni_env();
 
 	ms_filter_lock(f);
 
+	ms_message("[TextureView Display] New window jobject ptr is %p, current one is %p", windowId, ad->nativeWindowId);
 	if (id == 0) {
-		ad->nativeWindowId = NULL;
+		if (ad->nativeWindowId) {
+			(*env)->DeleteGlobalRef(env, ad->nativeWindowId);
+			ad->nativeWindowId = NULL;
+		}
 		ms_worker_thread_add_task(ad->process_thread, (MSTaskFunc)android_texture_display_destroy_opengl, (void*)f);
 	} else if (windowId != ad->nativeWindowId) {
 		if (ad->nativeWindowId) {
+			(*env)->DeleteGlobalRef(env, ad->nativeWindowId);
+			ad->nativeWindowId = NULL;
 			ms_worker_thread_add_task(ad->process_thread, (MSTaskFunc)android_texture_display_destroy_opengl, (void*)f);
 		}
-		ad->nativeWindowId = windowId;
+
+		ad->nativeWindowId = (*env)->NewGlobalRef(env, windowId);
 		ms_worker_thread_add_task(ad->process_thread, (MSTaskFunc)android_texture_display_init_opengl, (void*)f);
 	}
 	
