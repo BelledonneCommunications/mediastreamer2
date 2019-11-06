@@ -126,7 +126,8 @@ static void jpg_process(MSFilter *f) {
 #ifdef TURBOJPEG_USE_CONST_BUFFERS
 			(const unsigned char **)yuvbuf.planes,
 #else
-			(unsigned char **)yuvbuf.planes,
+//tmp for build with asan (added const)
+			(const unsigned char **)yuvbuf.planes,
 #endif
 			yuvbuf.w,
 			yuvbuf.strides,
