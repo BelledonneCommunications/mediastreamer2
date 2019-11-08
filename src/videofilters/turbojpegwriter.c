@@ -127,7 +127,7 @@ static void jpg_process(MSFilter *f) {
 			(const unsigned char **)yuvbuf.planes,
 #else
 //tmp for build with asan (added const)
-			(const unsigned char **)yuvbuf.planes,
+			(unsigned char **)yuvbuf.planes,
 #endif
 			yuvbuf.w,
 			yuvbuf.strides,
