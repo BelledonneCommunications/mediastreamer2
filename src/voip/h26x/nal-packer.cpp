@@ -30,9 +30,9 @@ void NalPacker::NaluAggregatorInterface::setMaxSize(size_t maxSize) {
 	_maxSize = maxSize;
 }
 
-NalPacker::NalPacker(NaluAggregatorInterface *naluAggregator, NaluSpliterInterface *naluSpliter, const MSFactory *factory):
+NalPacker::NalPacker(NaluAggregatorInterface *naluAggregator, NaluSpliterInterface *naluSpliter, size_t maxPayloadSize):
 	_naluSpliter(naluSpliter), _naluAggregator(naluAggregator) {
-	setMaxPayloadSize(ms_factory_get_payload_max_size(factory));
+	setMaxPayloadSize(maxPayloadSize);
 }
 
 void NalPacker::setMaxPayloadSize(size_t size) {
