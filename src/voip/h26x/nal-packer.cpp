@@ -39,6 +39,7 @@ void NalPacker::setMaxPayloadSize(size_t size) {
 	_maxSize = size;
 	_naluSpliter->setMaxSize(size);
 	_naluAggregator->setMaxSize(size);
+	ms_message("H26xNalPacker: max payload size set to %zu bytes", size);
 }
 
 void NalPacker::pack(MSQueue *naluq, MSQueue *rtpq, uint32_t ts) {
