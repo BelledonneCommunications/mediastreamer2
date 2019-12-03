@@ -398,7 +398,7 @@ static void capture_queue_cleanup(void* p) {
 	if (session.running) {
 		ms_mutex_lock(&mutex);
 		filterIsRunning = 1;
-
+		ms_warning("AVCaptureSession finally decided to start, great.");
 		[startSessionTimer invalidate];
 		startSessionTimer = nil;
 		ms_mutex_unlock(&mutex);
@@ -635,6 +635,7 @@ static void ioscapture_preprocess(MSFilter *f) {
 
 		AVCaptureSession *session = [(AVCaptureVideoPreviewLayer *)thiz.layer session];
 		if (!session.running) {
+			ms_warning("AVCaptureSession failed to start, will retry periodically in a moment.");
 			thiz->startSessionTimer = [NSTimer scheduledTimerWithTimeInterval:100 / 1000.0
 																	   target:thiz
 																	 selector:@selector(startSessionTimerFired:)
