@@ -98,6 +98,8 @@ typedef struct _MSFilter * (*MSSndCardCreateWriterFunc)(struct _MSSndCard *obj);
 typedef struct _MSSndCard * (*MSSndCardDuplicateFunc)(struct _MSSndCard *obj);
 typedef void (*MSSndCardSetUsageHintFunc)(struct _MSSndCard *obj, bool_t is_going_to_be_used);
 typedef void (*MSSndCardUnloadFunc)(MSSndCardManager *obj);
+typedef void (*MSSndCardAudioSessionFunc)(struct _MSSndCard *obj, bool_t actived);
+typedef void (*MSSndCardCallKitFunc)(struct _MSSndCard *obj, bool_t enabled);
 
 
 struct _MSSndCardDesc{
@@ -115,6 +117,8 @@ struct _MSSndCardDesc{
 	MSSndCardDuplicateFunc duplicate;
 	MSSndCardUnloadFunc unload;
 	MSSndCardSetUsageHintFunc usage_hint;
+	MSSndCardAudioSessionFunc audio_session_activated;
+	MSSndCardCallKitFunc callkit_enabled;
 };
 
 /**
@@ -541,6 +545,22 @@ MS2_PUBLIC int ms_snd_card_set_preferred_sample_rate(MSSndCard *obj,int rate);
  * This is recommended for cards which are known to be slow (see flag MS_SND_CARD_CAP_IS_SLOW ).
 **/
 MS2_PUBLIC void ms_snd_card_set_usage_hint(MSSndCard *obj, bool_t is_going_to_be_used);
+
+/**
+ * Tell MS_SND_CARD_CAPTURE if audio session is activated.
+ *
+ * @param obj      A sound card object.
+ * @param actived    TRUE if audio session is activated, FALSE otherwise.
+ */
+MS2_PUBLIC void ms_snd_card_audio_session_actived(MSSndCard *obj, bool_t actived);
+
+/**
+ * Tell MS_SND_CARD_CAPTURE if callKit is enabled.
+ *
+ * @param obj      A sound card object.
+ * @param enabled    TRUE if callKit is enabled, FALSE otherwise.
+ */
+MS2_PUBLIC void ms_snd_card_callkit_enabled(MSSndCard *obj, bool_t enabled);
 
 /**
  * Sets the stream type for this soundcard, default is VOICE
