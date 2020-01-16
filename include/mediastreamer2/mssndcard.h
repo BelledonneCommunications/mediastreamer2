@@ -146,6 +146,8 @@ typedef enum _MSSndCardStreamType MSSndCardStreamType;
 #define MS_SND_CARD_CAP_BUILTIN_ECHO_CANCELLER (1<<2) /**<This sound card has built-in echo cancellation*/
 #define MS_SND_CARD_CAP_IS_SLOW (1<<3) /**<This sound card is very slow to start*/
 
+#define DUMMY_AUDIO_SOUNDCARD "dummyAudio: dummy audio sound card"
+
 struct _MSSndCard{
 	MSSndCardDesc *desc;
 	MSSndCardManager* sndcardmanager;
@@ -270,6 +272,13 @@ MS2_PUBLIC const MSList * ms_snd_card_manager_get_list(MSSndCardManager *m);
  *
  */
 MS2_PUBLIC void ms_snd_card_manager_add_card(MSSndCardManager *m, MSSndCard *c);
+
+/**
+ * Add the dummy audio sound card object in a sound card manager's list.
+ *
+ * @param m    A sound card manager containing sound cards.
+ */
+MS2_PUBLIC void ms_snd_card_manager_add_dummy_audio_card(MSSndCardManager *m);
 
 /**
  * Prepend a sound card object in a sound card manager's list.

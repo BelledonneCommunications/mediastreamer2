@@ -124,6 +124,13 @@ void ms_snd_card_manager_add_card(MSSndCardManager *m, MSSndCard *c){
 	m->cards=bctbx_list_append(m->cards,c);
 }
 
+MSSndCard* create_new_dummy_audio_snd_card(void);
+
+void ms_snd_card_manager_add_dummy_audio_card(MSSndCardManager *m){
+	MSSndCard *c = create_new_dummy_audio_snd_card();
+	ms_snd_card_manager_add_card(m, c);
+}
+
 void ms_snd_card_manager_prepend_card(MSSndCardManager *m, MSSndCard *c){
 	ms_snd_card_set_manager(m,c);
 	ms_message("Card '%s' prepended with capabilities [%s]",ms_snd_card_get_string_id(c), cap_to_string(c->capabilities));
