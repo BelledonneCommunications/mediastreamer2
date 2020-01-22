@@ -668,6 +668,7 @@ public:
 	int getWrittenFrames() {
 		return writtenBytes/(nchannels*(bits/8));
 	}
+	MSSndCard *soundCard;
 };
 
 static void* msandroid_write_cb(msandroid_sound_write_data* d) {
@@ -796,9 +797,23 @@ void msandroid_sound_write_preprocess(MSFilter *f){
 				,d->write_chunk_size);
 		return;
 	}
+
+	MSSndCardStreamType type = ms_snd_card_get_stream_type(d->soundCard);
+	int stream = 0; // STREAM_VOICE_CALL
+	if (type == MS_SND_CARD_STREAM_RING) {
+		ms_message("AudioTrack configured to use AUDIO_STREAM_RING");
+		stream = 2; // STREAM_RING
+	} else if (type == MS_SND_CARD_STREAM_MEDIA) {
+		ms_message("AudioTrack configured to use AUDIO_STREAM_MUSIC");
+		stream = 3; // STREAM_MUSIC
+	} else if (type == MS_SND_CARD_STREAM_DTMF) {
+		ms_message("AudioTrackconfigured to use AUDIO_STREAM_DTMF");
+		stream = 8; // STREAM_DTMF
+	}
+
 	d->audio_track =  jni_env->NewObject(d->audio_track_class
 			,constructor_id
-			,0/*STREAM_VOICE_CALL*/
+			,stream
 			,d->rate
 			,2/*CHANNEL_CONFIGURATION_MONO*/
 			,2/*  ENCODING_PCM_16BIT */
@@ -920,6 +935,7 @@ MSFilter *msandroid_sound_write_new(MSSndCard *card){
 			ms_warning("Using forced sample rate %i", data->rate);
 		}
 	}
+	data->soundCard = card;
 	f->data = data;
 	return f;
 }
