@@ -3851,7 +3851,7 @@ static void ice_conclude_processing(IceCheckList *cl, RtpSession *rtp_session, b
 						}
 						if (rtcp_local_candidate) {
 							ms_turn_context_set_force_rtp_sending_via_relay(ice_get_turn_context_from_check_list_componentID(cl, 2), rtcp_local_candidate->type == ICT_RelayedCandidate);
-							if (rtcp_local_candidate->type == ICT_RelayedCandidate) {
+							if (rtcp_local_candidate->type == ICT_RelayedCandidate && rtcp_remote_candidate) {
 								rtp_session_get_transports(cl->rtp_session, NULL, &rtptp);
 								ice_check_list_create_turn_channel(cl, rtptp, (struct sockaddr *)&cl->rtp_session->rtcp.gs.loc_addr, cl->rtp_session->rtcp.gs.loc_addrlen, &rtcp_remote_candidate->taddr, 2);
 							} else {
