@@ -102,6 +102,10 @@ public class MediastreamerAndroidContext {
 
 	}
 
+	public static MediastreamerAudioBroadcastReceiver getBroadcastReceiver() {
+		return mMediastreamerReceiver;
+	}
+
 	@TargetApi(Build.VERSION_CODES.KITKAT)
 	public static void setContext(Object c) {
 		if (c == null)
