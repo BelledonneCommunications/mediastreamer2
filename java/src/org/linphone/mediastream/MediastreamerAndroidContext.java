@@ -21,9 +21,13 @@ package org.linphone.mediastream;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.content.IntentFilter;
 import java.io.File;
 import android.media.AudioManager;
+import android.media.AudioDeviceInfo;
 import android.os.Build;
+
+import org.linphone.mediastream.MediastreamerBroadcastReceiver;
 
 public class MediastreamerAndroidContext {
 	private static final int DEVICE_CHOICE = 0; // The device has the API to tell us it as or not a builtin AEC and we can trust it
@@ -72,6 +76,32 @@ public class MediastreamerAndroidContext {
 		return nativeLibDir;
 	}
 
+	private static MediastreamerBroadcastReceiver mMediastreamerReceiver;
+
+	private static  void deleteBroadcastReceiver(Context currContext) {
+		Log.i("[Mediastreamer Android Context] Unegistering mediastreamer receiver");
+		if (mMediastreamerReceiver != null) {
+			currContext.unregisterReceiver(mMediastreamerReceiver);
+			mMediastreamerReceiver = null;
+		}
+
+	}
+
+	private static MediastreamerBroadcastReceiver startBroadcastReceiver(Context currContext) {
+
+		deleteBroadcastReceiver(currContext);
+
+		if (mMediastreamerReceiver == null) {
+			Log.i("[Mediastreamer Android Context] Registering mediastreamer receiver");
+			mMediastreamerReceiver = new MediastreamerBroadcastReceiver();
+			IntentFilter filter = mMediastreamerReceiver.getIntentFilter();
+			currContext.registerReceiver(mMediastreamerReceiver, filter);
+		}
+
+		return mMediastreamerReceiver;
+
+	}
+
 	@TargetApi(Build.VERSION_CODES.KITKAT)
 	public static void setContext(Object c) {
 		if (c == null)
@@ -98,7 +128,7 @@ public class MediastreamerAndroidContext {
 			Log.i("[Device] Output frames per buffer: " + bufferSize + ", output sample rate: " + sampleRate + ".");
 			mDeviceFavoriteSampleRate = sampleRate;
 			mDeviceFavoriteBufferSize = bufferSize;
-			AudioDeviceMonitor mon = startAudioDeviceMonitor();
+			MediastreamerBroadcastReceiver rec = startBroadcastReceiver(mContext);
 		} else {
 			Log.i("Android < 4.4 detected, android context not used.");
 		}
@@ -217,7 +247,7 @@ public class MediastreamerAndroidContext {
 	}
 
 	public static int getDefaultPlayerDeviceId(final String streamType) {
-		AudioManager audiomanager = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
+		AudioManager audiomanager = (AudioManager)getContext().getSystemService(Context.AUDIO_SERVICE);
 		final AudioDeviceInfo[] devices = audiomanager.getDevices(AudioManager.GET_DEVICES_OUTPUTS);
 		final int[] deviceType = fillPlayerDeviceTypeArray(streamType);
 		final int deviceId = chooseDeviceId(devices, deviceType);
@@ -228,17 +258,17 @@ public class MediastreamerAndroidContext {
 	}
 
 	public static boolean isAudioRoutedToBluetooth() {
-		AudioManager audiomanager = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
+		AudioManager audiomanager = (AudioManager)getContext().getSystemService(Context.AUDIO_SERVICE);
 		return audiomanager.isBluetoothScoOn();
 	}
 
 	public static  boolean isAudioRoutedToSpeaker() {
-		AudioManager audiomanager = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
+		AudioManager audiomanager = (AudioManager)getContext().getSystemService(Context.AUDIO_SERVICE);
 		return audiomanager.isSpeakerphoneOn() && !isAudioRoutedToBluetooth();
 	}
 
 	public static boolean isAudioRoutedToEarpiece() {
-		AudioManager audiomanager = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
+		AudioManager audiomanager = (AudioManager)getContext().getSystemService(Context.AUDIO_SERVICE);
 		return audiomanager.isSpeakerphoneOn() && !isAudioRoutedToBluetooth();
 	}
 
@@ -257,7 +287,7 @@ public class MediastreamerAndroidContext {
 			deviceType[0] = AudioDeviceInfo.TYPE_UNKNOWN;
 		}
 
-		AudioManager audiomanager = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
+		AudioManager audiomanager = (AudioManager)getContext().getSystemService(Context.AUDIO_SERVICE);
 		final AudioDeviceInfo[] devices = audiomanager.getDevices(AudioManager.GET_DEVICES_OUTPUTS);
 		final int deviceId = chooseDeviceId(devices, deviceType);
 
