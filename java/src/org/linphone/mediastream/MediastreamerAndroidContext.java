@@ -98,6 +98,7 @@ public class MediastreamerAndroidContext {
 			Log.i("[Device] Output frames per buffer: " + bufferSize + ", output sample rate: " + sampleRate + ".");
 			mDeviceFavoriteSampleRate = sampleRate;
 			mDeviceFavoriteBufferSize = bufferSize;
+			AudioDeviceMonitor mon = startAudioDeviceMonitor();
 		} else {
 			Log.i("Android < 4.4 detected, android context not used.");
 		}
@@ -139,4 +140,128 @@ public class MediastreamerAndroidContext {
 	public static boolean filterFromNameEnabled(String name) {
 		return getInstance().filterFromNameEnabledImpl(name);
 	}
+
+	/* Device ID */
+
+	public static int[] fillDeviceIdArray(final AudioDeviceInfo[] devices, final int[] type) {
+		int[] id = new int[type.length];
+		for (int idx = 0; idx < id.length; idx++) {
+			// Initialize device ID to -1
+			id[idx] = -1;
+		}
+		for (AudioDeviceInfo device : devices) {
+			for (int idx = 0; idx < type.length; idx++) {
+				if (device.getType() == type[idx]) {
+					id[idx] = device.getId();
+				}
+			}
+		}
+
+		return id;
+	}
+
+	// Choose device type for the player based on the streamType
+	public static int[] fillPlayerDeviceTypeArray(final String streamType) {
+		int numDeviceType = 2;
+		int[] type = new int[numDeviceType];
+		for (int idx = 0; idx < type.length; idx++) {
+			// Initialize device type to unknown
+			type[idx] = AudioDeviceInfo.TYPE_UNKNOWN;
+		}
+
+		switch (streamType) {
+			case "VOICE":
+				type[0] = AudioDeviceInfo.TYPE_BLUETOOTH_SCO;
+				type[1] = AudioDeviceInfo.TYPE_BUILTIN_EARPIECE;
+				break;
+			case "RING":
+				type[0] = AudioDeviceInfo.TYPE_BLUETOOTH_SCO;
+				// Speaker specifically tuned for outputting sounds like notifiations and alarms
+				type[1] = AudioDeviceInfo.TYPE_BUILTIN_SPEAKER;
+				// type[1] = AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE;
+				break;
+			case "MEDIA":
+				type[0] = AudioDeviceInfo.TYPE_BLUETOOTH_SCO;
+				type[1] = AudioDeviceInfo.TYPE_BUILTIN_SPEAKER;
+				break;
+			case "DTMF":
+				type[0] = AudioDeviceInfo.TYPE_BUILTIN_SPEAKER;
+				// type[1] = AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE;
+				type[1] = AudioDeviceInfo.TYPE_BUILTIN_EARPIECE;
+				break;
+			default:
+				Log.e("[Audio Manager] [Get Player Device ID] Invalid stream type " + streamType);
+				break;
+		}
+
+		return type;
+	}
+
+	public static int chooseDeviceId(final AudioDeviceInfo[] devices, final int[] type) {
+
+		// fill devince id array based on device list and device type
+		final int[] deviceID = fillDeviceIdArray(devices, type);
+
+		int preferredDeviceID = -1;
+
+		// Devices are sorted by preference, therefore going through the list in reverse order in
+		// order to store the preferred one as last
+		for (int idx = (deviceID.length - 1); idx >= 0; idx--) {
+			int ID = deviceID[idx];
+			if (ID != -1) {
+				preferredDeviceID = ID;
+			}
+		}
+
+		return preferredDeviceID;
+	}
+
+	public static int getDefaultPlayerDeviceId(final String streamType) {
+		AudioManager audiomanager = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
+		final AudioDeviceInfo[] devices = audiomanager.getDevices(AudioManager.GET_DEVICES_OUTPUTS);
+		final int[] deviceType = fillPlayerDeviceTypeArray(streamType);
+		final int deviceId = chooseDeviceId(devices, deviceType);
+
+		Log.i("[Audio Manager] [Get Device ID] stream type " + streamType + " device ID " + deviceId);
+
+		return deviceId;
+	}
+
+	public static boolean isAudioRoutedToBluetooth() {
+		AudioManager audiomanager = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
+		return audiomanager.isBluetoothScoOn();
+	}
+
+	public static  boolean isAudioRoutedToSpeaker() {
+		AudioManager audiomanager = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
+		return audiomanager.isSpeakerphoneOn() && !isAudioRoutedToBluetooth();
+	}
+
+	public static boolean isAudioRoutedToEarpiece() {
+		AudioManager audiomanager = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
+		return audiomanager.isSpeakerphoneOn() && !isAudioRoutedToBluetooth();
+	}
+
+	public static int getOutputAudioDeviceId() {
+
+		int[] deviceType = new int[1];
+
+		if (isAudioRoutedToSpeaker()) {
+			deviceType[0] = AudioDeviceInfo.TYPE_BUILTIN_SPEAKER;
+		} else if (isAudioRoutedToEarpiece()) {
+			deviceType[0] = AudioDeviceInfo.TYPE_BUILTIN_EARPIECE;
+		} else if (isAudioRoutedToBluetooth()) {
+			deviceType[0] = AudioDeviceInfo.TYPE_BLUETOOTH_SCO;
+		} else {
+			Log.e("[Audio Manager] Unknown Audio routing");
+			deviceType[0] = AudioDeviceInfo.TYPE_UNKNOWN;
+		}
+
+		AudioManager audiomanager = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
+		final AudioDeviceInfo[] devices = audiomanager.getDevices(AudioManager.GET_DEVICES_OUTPUTS);
+		final int deviceId = chooseDeviceId(devices, deviceType);
+
+		return deviceId;
+	}
+
 }
