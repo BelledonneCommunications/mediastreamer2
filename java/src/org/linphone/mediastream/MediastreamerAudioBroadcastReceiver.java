@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2010-2020 Belledonne Communications SARL.
+ *
+ * This file is part of mediastreamer2.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package org.linphone.mediastream;
 
 import android.media.AudioManager;
@@ -9,8 +28,12 @@ import android.content.Intent;
 import android.content.IntentFilter;
 
 public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
+
+	long contextPtr;
+
 	public MediastreamerAudioBroadcastReceiver() {
 		super();
+		contextPtr = 0;
 		Log.i("MediastreamerAudioBroadcastReceiver created");
 	}
 
@@ -49,6 +72,7 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 				(((previousState == BluetoothAdapter.STATE_OFF) || (previousState == BluetoothAdapter.STATE_TURNING_OFF)) && ((currentState == BluetoothAdapter.STATE_ON) || (currentState == BluetoothAdapter.STATE_TURNING_ON)))
 			) {
 				Log.i("Bluetooth adapter detected a state change - recomputing device ID");
+				updateDeviceChangedFlag(contextPtr, true);
 			}
 
 		} else if (action.equals(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED)) {
@@ -63,6 +87,7 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 				(((previousState == BluetoothHeadset.STATE_DISCONNECTED) || (previousState == BluetoothHeadset.STATE_DISCONNECTING)) && ((currentState == BluetoothHeadset.STATE_CONNECTED) || (currentState == BluetoothHeadset.STATE_CONNECTING)))
 			) {
 				Log.i("Bluetooth headset detected a connection state change - recomputing device ID");
+				updateDeviceChangedFlag(contextPtr, true);
 			}
 		} else if (action.equals(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED)) {
 			int currentState = intent.getIntExtra(BluetoothHeadset.EXTRA_STATE, BluetoothHeadset.STATE_DISCONNECTED);
@@ -76,6 +101,7 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 				((previousState == BluetoothHeadset.STATE_AUDIO_DISCONNECTED) && (currentState == BluetoothHeadset.STATE_AUDIO_CONNECTED))
 			) {
 				Log.i("Bluetooth headset detected an audio state change - recomputing device ID");
+				updateDeviceChangedFlag(contextPtr, true);
 			}
 		} else if (action.equals(BluetoothHeadset.ACTION_VENDOR_SPECIFIC_HEADSET_EVENT)) {
 			String cmd = intent.getStringExtra(BluetoothHeadset.EXTRA_VENDOR_SPECIFIC_HEADSET_EVENT_CMD);
@@ -94,11 +120,22 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 				((previousState == AudioManager.SCO_AUDIO_STATE_DISCONNECTED) && ((currentState == AudioManager.SCO_AUDIO_STATE_CONNECTED) || (currentState == AudioManager.SCO_AUDIO_STATE_CONNECTING)))
 			) {
 				Log.i("Audio manager detected an audio state change - recomputing device ID");
+				Log.i("DEBUG Context pointer " + ptr);
+				updateDeviceChangedFlag(contextPtr, true);
 			}
 		} else {
 		    Log.w("[Mediastreamer Broadcast Receiver] Bluetooth unknown action: " + action);
 		}
 
 	}
+
+	public void setContextPtr(long ptr) {
+		Log.i("[MediastreamerAudioBroadcastReceiver] Set context pointer to " + ptr);
+		Log.i("DEBUG Set context pointer to " + ptr);
+		contextPtr = ptr;
+	}
+
+	public static native void updateDeviceChangedFlag(long ptr, boolean deviceChanged);
+
 }
 
