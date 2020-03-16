@@ -27,7 +27,7 @@ import android.media.AudioManager;
 import android.media.AudioDeviceInfo;
 import android.os.Build;
 
-import org.linphone.mediastream.MediastreamerBroadcastReceiver;
+import org.linphone.mediastream.MediastreamerAudioBroadcastReceiver;
 
 public class MediastreamerAndroidContext {
 	private static final int DEVICE_CHOICE = 0; // The device has the API to tell us it as or not a builtin AEC and we can trust it
@@ -76,7 +76,7 @@ public class MediastreamerAndroidContext {
 		return nativeLibDir;
 	}
 
-	private static MediastreamerBroadcastReceiver mMediastreamerReceiver;
+	private static MediastreamerAudioBroadcastReceiver mMediastreamerReceiver;
 
 	private static  void deleteBroadcastReceiver(Context currContext) {
 		Log.i("[Mediastreamer Android Context] Unegistering mediastreamer receiver");
@@ -87,13 +87,13 @@ public class MediastreamerAndroidContext {
 
 	}
 
-	private static MediastreamerBroadcastReceiver startBroadcastReceiver(Context currContext) {
+	private static MediastreamerAudioBroadcastReceiver startBroadcastReceiver(Context currContext) {
 
 		deleteBroadcastReceiver(currContext);
 
 		if (mMediastreamerReceiver == null) {
 			Log.i("[Mediastreamer Android Context] Registering mediastreamer receiver");
-			mMediastreamerReceiver = new MediastreamerBroadcastReceiver();
+			mMediastreamerReceiver = new MediastreamerAudioBroadcastReceiver();
 			IntentFilter filter = mMediastreamerReceiver.getIntentFilter();
 			currContext.registerReceiver(mMediastreamerReceiver, filter);
 		}
@@ -128,7 +128,7 @@ public class MediastreamerAndroidContext {
 			Log.i("[Device] Output frames per buffer: " + bufferSize + ", output sample rate: " + sampleRate + ".");
 			mDeviceFavoriteSampleRate = sampleRate;
 			mDeviceFavoriteBufferSize = bufferSize;
-			MediastreamerBroadcastReceiver rec = startBroadcastReceiver(mContext);
+			MediastreamerAudioBroadcastReceiver rec = startBroadcastReceiver(mContext);
 		} else {
 			Log.i("Android < 4.4 detected, android context not used.");
 		}
