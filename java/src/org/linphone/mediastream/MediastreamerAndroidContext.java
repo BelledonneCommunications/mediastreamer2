@@ -36,6 +36,22 @@ public class MediastreamerAndroidContext {
 	private static int mDeviceFavoriteSampleRate = 44100;
 	private static int mDeviceFavoriteBufferSize = 256;
 
+	private static boolean loadOptionalLibrary(String s) {
+		android.util.Log.w("MediastreamerAndroidContext", "Try to load optional library " + s);
+		try {
+			System.loadLibrary(s);
+			return true;
+		} catch (Throwable e) {
+			android.util.Log.w("MediastreamerAndroidContext", "Unable to load optional library " + s + ": " +e.getMessage());
+		}
+		return false;
+	}
+
+	static {
+		// Load libmsaaudio only if it is available - i.e. ignore exception thrown by the JAva VM
+		loadOptionalLibrary("msaaudio");
+	}
+
 	private MediastreamerAndroidContext() {
 	}
 
@@ -102,7 +118,7 @@ public class MediastreamerAndroidContext {
 
 	}
 
-	public static MediastreamerAudioBroadcastReceiver getBroadcastReceiver() {
+	public static MediastreamerAudioBroadcastReceiver getAudioBroadcastReceiver() {
 		return mMediastreamerReceiver;
 	}
 
