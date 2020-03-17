@@ -120,7 +120,7 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 				((previousState == AudioManager.SCO_AUDIO_STATE_DISCONNECTED) && ((currentState == AudioManager.SCO_AUDIO_STATE_CONNECTED) || (currentState == AudioManager.SCO_AUDIO_STATE_CONNECTING)))
 			) {
 				Log.i("Audio manager detected an audio state change - recomputing device ID");
-				Log.i("DEBUG Context pointer " + ptr);
+				Log.i("DEBUG Context pointer " + contextPtr);
 				updateDeviceChangedFlag(contextPtr, true);
 			}
 		} else {
