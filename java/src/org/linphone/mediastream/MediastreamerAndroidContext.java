@@ -289,7 +289,7 @@ public class MediastreamerAndroidContext {
 
 	public static boolean isAudioRoutedToEarpiece() {
 		AudioManager audiomanager = (AudioManager)getContext().getSystemService(Context.AUDIO_SERVICE);
-		return audiomanager.isSpeakerphoneOn() && !isAudioRoutedToBluetooth();
+		return !audiomanager.isSpeakerphoneOn() && !isAudioRoutedToBluetooth();
 	}
 
 	public static int getOutputAudioDeviceId() {
@@ -298,10 +298,13 @@ public class MediastreamerAndroidContext {
 
 		if (isAudioRoutedToSpeaker()) {
 			deviceType[0] = AudioDeviceInfo.TYPE_BUILTIN_SPEAKER;
+			Log.i("[Audio Manager] Audio routing -> speaker");
 		} else if (isAudioRoutedToEarpiece()) {
 			deviceType[0] = AudioDeviceInfo.TYPE_BUILTIN_EARPIECE;
+			Log.i("[Audio Manager] Audio routing -> earpiece");
 		} else if (isAudioRoutedToBluetooth()) {
 			deviceType[0] = AudioDeviceInfo.TYPE_BLUETOOTH_SCO;
+			Log.i("[Audio Manager] Audio routing -> bluetooth");
 		} else {
 			Log.e("[Audio Manager] Unknown Audio routing");
 			deviceType[0] = AudioDeviceInfo.TYPE_UNKNOWN;
