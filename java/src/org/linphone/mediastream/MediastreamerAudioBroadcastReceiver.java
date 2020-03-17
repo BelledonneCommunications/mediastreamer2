@@ -100,6 +100,7 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 			String cmd = intent.getStringExtra(BluetoothHeadset.EXTRA_VENDOR_SPECIFIC_HEADSET_EVENT_CMD);
 			String args = intent.getStringExtra(BluetoothHeadset.EXTRA_VENDOR_SPECIFIC_HEADSET_EVENT_ARGS);
 			int type = intent.getIntExtra(BluetoothHeadset.EXTRA_VENDOR_SPECIFIC_HEADSET_EVENT_CMD_TYPE, -1);
+			Log.i("Bluetooth headset vendor specific command:  type " + type + " cmd " + cmd + " args " + args);
 		} else if (action.equals(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED)) {
 			int currentState = intent.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_STATE, AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
 			int previousState = intent.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_PREVIOUS_STATE, AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
