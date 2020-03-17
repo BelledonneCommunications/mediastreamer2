@@ -76,6 +76,9 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 		}
 	}
 
+	// Only trigger a change in the output device when the current state is either CONNECTED or DISCONNECTED
+	// Transitional states are ignored because it bring about a race condition between when the new device is searched and if the initialization has already occurred
+	// No issues have been noticed for the built-in devices (speaker and earpiece) but an external device such as bluetooth speaker has a longer initialization sequence hence a transitional state may lead to an unwanted outcome
 	@Override
 	public void onReceive(Context context, Intent intent) {
 		String action = intent.getAction();
