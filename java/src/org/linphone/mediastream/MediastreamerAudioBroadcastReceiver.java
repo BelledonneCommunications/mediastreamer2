@@ -51,6 +51,31 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 		return intentFilter;
 	}
 
+	public static String BTStateToString(int state) {
+		switch(state) {
+			case BluetoothHeadset.STATE_AUDIO_DISCONNECTED:
+				return "DISCONNECTED";
+			case BluetoothHeadset.STATE_AUDIO_CONNECTED:
+				return "CONNECTED";
+			default:
+				return "BT UNKNOWN - ID" + state;
+		}
+	}
+
+
+	public static String AudioMgrStateToString(int state) {
+		switch(state) {
+			case AudioManager.SCO_AUDIO_STATE_DISCONNECTED:
+				return "DISCONNECTED";
+			case AudioManager.SCO_AUDIO_STATE_CONNECTED:
+				return "CONNECTED";
+			case AudioManager.SCO_AUDIO_STATE_CONNECTING:
+				return "CONNECTING";
+			default:
+				return "Audio Mgr UNKNOWN - ID" + state;
+		}
+	}
+
 	@Override
 	public void onReceive(Context context, Intent intent) {
 		String action = intent.getAction();
@@ -59,12 +84,16 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 		if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
 			int currentState = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
 			int previousState = intent.getIntExtra(BluetoothAdapter.EXTRA_PREVIOUS_STATE, BluetoothAdapter.ERROR);
-			if (
+/*			if (
 				// ON to OFF transition
 				(((previousState == BluetoothAdapter.STATE_ON) || (previousState == BluetoothAdapter.STATE_TURNING_ON)) && ((currentState == BluetoothAdapter.STATE_OFF) || (currentState == BluetoothAdapter.STATE_TURNING_OFF)))
 				||
 				// OFF to ON transition
 				(((previousState == BluetoothAdapter.STATE_OFF) || (previousState == BluetoothAdapter.STATE_TURNING_OFF)) && ((currentState == BluetoothAdapter.STATE_ON) || (currentState == BluetoothAdapter.STATE_TURNING_ON)))
+			) {
+*/
+			if (
+				((currentState == BluetoothAdapter.STATE_OFF) || (currentState == BluetoothAdapter.STATE_ON))
 			) {
 				Log.i("Bluetooth adapter detected a state change - recomputing device ID");
 				deviceIdNeeded = true;
@@ -73,12 +102,16 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 		} else if (action.equals(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED)) {
 			int currentState = intent.getIntExtra(BluetoothHeadset.EXTRA_STATE, BluetoothHeadset.STATE_AUDIO_DISCONNECTED);
 			int previousState = intent.getIntExtra(BluetoothHeadset.EXTRA_PREVIOUS_STATE, BluetoothHeadset.STATE_AUDIO_DISCONNECTED);
-			if (
+/*			if (
 				// ON to OFF transition
 				(((previousState == BluetoothHeadset.STATE_CONNECTED) || (previousState == BluetoothHeadset.STATE_CONNECTING)) && ((currentState == BluetoothHeadset.STATE_DISCONNECTED) || (currentState == BluetoothHeadset.STATE_DISCONNECTING)))
 				||
 				// OFF to ON transition
 				(((previousState == BluetoothHeadset.STATE_DISCONNECTED) || (previousState == BluetoothHeadset.STATE_DISCONNECTING)) && ((currentState == BluetoothHeadset.STATE_CONNECTED) || (currentState == BluetoothHeadset.STATE_CONNECTING)))
+			) {
+*/
+			if (
+				((currentState == BluetoothHeadset.STATE_CONNECTED) || (currentState == BluetoothHeadset.STATE_DISCONNECTED))
 			) {
 				Log.i("Bluetooth headset detected a connection state change - recomputing device ID");
 				deviceIdNeeded = true;
@@ -86,12 +119,17 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 		} else if (action.equals(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED)) {
 			int currentState = intent.getIntExtra(BluetoothHeadset.EXTRA_STATE, BluetoothHeadset.STATE_DISCONNECTED);
 			int previousState = intent.getIntExtra(BluetoothHeadset.EXTRA_PREVIOUS_STATE, BluetoothHeadset.STATE_DISCONNECTED);
-			if (
+			Log.i("DEBUG BT current state: " + BTStateToString(currentState) + " previous state " + BTStateToString(previousState));
+/*			if (
 				// ON to OFF transition
 				((previousState == BluetoothHeadset.STATE_AUDIO_CONNECTED) && (currentState == BluetoothHeadset.STATE_AUDIO_DISCONNECTED))
 				||
 				// OFF to ON transition
 				((previousState == BluetoothHeadset.STATE_AUDIO_DISCONNECTED) && (currentState == BluetoothHeadset.STATE_AUDIO_CONNECTED))
+			) {
+*/
+			if (
+				((currentState == BluetoothHeadset.STATE_AUDIO_CONNECTED) || (currentState == BluetoothHeadset.STATE_AUDIO_DISCONNECTED))
 			) {
 				Log.i("Bluetooth headset detected an audio state change - recomputing device ID");
 				deviceIdNeeded = true;
@@ -104,12 +142,17 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 		} else if (action.equals(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED)) {
 			int currentState = intent.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_STATE, AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
 			int previousState = intent.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_PREVIOUS_STATE, AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
-			if (
+			Log.i("DEBUG Audio Manager BT current state: " + AudioMgrStateToString(currentState) + " previous state " + AudioMgrStateToString(previousState));
+/*			if (
 				// ON to OFF transition
 				(((previousState == AudioManager.SCO_AUDIO_STATE_CONNECTING) || (previousState == AudioManager.SCO_AUDIO_STATE_CONNECTED)) && (currentState == AudioManager.SCO_AUDIO_STATE_DISCONNECTED))
 				||
 				// OFF to ON transition
 				((previousState == AudioManager.SCO_AUDIO_STATE_DISCONNECTED) && ((currentState == AudioManager.SCO_AUDIO_STATE_CONNECTED) || (currentState == AudioManager.SCO_AUDIO_STATE_CONNECTING)))
+			) {
+*/
+			if (
+				((currentState == AudioManager.SCO_AUDIO_STATE_DISCONNECTED) || (currentState == AudioManager.SCO_AUDIO_STATE_CONNECTED))
 			) {
 				Log.i("Audio manager detected an audio state change - recomputing device ID");
 				deviceIdNeeded = true;
