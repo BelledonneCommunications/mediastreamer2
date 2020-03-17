@@ -59,6 +59,8 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 
 		Log.i("DEBUG action=" + action);
 
+		boolean deviceIdNeeded = false;
+
 		if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
 			int currentState = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
 			int previousState = intent.getIntExtra(BluetoothAdapter.EXTRA_PREVIOUS_STATE, BluetoothAdapter.ERROR);
@@ -72,7 +74,7 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 				(((previousState == BluetoothAdapter.STATE_OFF) || (previousState == BluetoothAdapter.STATE_TURNING_OFF)) && ((currentState == BluetoothAdapter.STATE_ON) || (currentState == BluetoothAdapter.STATE_TURNING_ON)))
 			) {
 				Log.i("Bluetooth adapter detected a state change - recomputing device ID");
-				updateDeviceChangedFlag(contextPtr, true);
+				deviceIdNeeded = true;
 			}
 
 		} else if (action.equals(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED)) {
@@ -87,7 +89,7 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 				(((previousState == BluetoothHeadset.STATE_DISCONNECTED) || (previousState == BluetoothHeadset.STATE_DISCONNECTING)) && ((currentState == BluetoothHeadset.STATE_CONNECTED) || (currentState == BluetoothHeadset.STATE_CONNECTING)))
 			) {
 				Log.i("Bluetooth headset detected a connection state change - recomputing device ID");
-				updateDeviceChangedFlag(contextPtr, true);
+				deviceIdNeeded = true;
 			}
 		} else if (action.equals(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED)) {
 			int currentState = intent.getIntExtra(BluetoothHeadset.EXTRA_STATE, BluetoothHeadset.STATE_DISCONNECTED);
@@ -101,7 +103,7 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 				((previousState == BluetoothHeadset.STATE_AUDIO_DISCONNECTED) && (currentState == BluetoothHeadset.STATE_AUDIO_CONNECTED))
 			) {
 				Log.i("Bluetooth headset detected an audio state change - recomputing device ID");
-				updateDeviceChangedFlag(contextPtr, true);
+				deviceIdNeeded = true;
 			}
 		} else if (action.equals(BluetoothHeadset.ACTION_VENDOR_SPECIFIC_HEADSET_EVENT)) {
 			String cmd = intent.getStringExtra(BluetoothHeadset.EXTRA_VENDOR_SPECIFIC_HEADSET_EVENT_CMD);
@@ -121,10 +123,14 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 			) {
 				Log.i("Audio manager detected an audio state change - recomputing device ID");
 				Log.i("DEBUG Context pointer " + contextPtr);
-				updateDeviceChangedFlag(contextPtr, true);
+				deviceIdNeeded = true;
 			}
 		} else {
 		    Log.w("[Mediastreamer Broadcast Receiver] Bluetooth unknown action: " + action);
+		}
+
+		if (deviceIdNeeded == true) {
+			requestUpdateDeviceId(contextPtr);
 		}
 
 	}
@@ -135,7 +141,7 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 		contextPtr = ptr;
 	}
 
-	public static native void updateDeviceChangedFlag(long ptr, boolean deviceChanged);
+	public static native void requestUpdateDeviceId(long ptr);
 
 }
 
