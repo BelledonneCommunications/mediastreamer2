@@ -53,19 +53,12 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 
 	@Override
 	public void onReceive(Context context, Intent intent) {
-		Log.i("DEBUG onReceive: intent=" + intent);
-
 		String action = intent.getAction();
-
-		Log.i("DEBUG action=" + action);
-
 		boolean deviceIdNeeded = false;
 
 		if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
 			int currentState = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
 			int previousState = intent.getIntExtra(BluetoothAdapter.EXTRA_PREVIOUS_STATE, BluetoothAdapter.ERROR);
-			Log.i("DEBUG Bueltooth adapter state changed current extra state: " + currentState + " previous extra state " + previousState);
-
 			if (
 				// ON to OFF transition
 				(((previousState == BluetoothAdapter.STATE_ON) || (previousState == BluetoothAdapter.STATE_TURNING_ON)) && ((currentState == BluetoothAdapter.STATE_OFF) || (currentState == BluetoothAdapter.STATE_TURNING_OFF)))
@@ -80,7 +73,6 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 		} else if (action.equals(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED)) {
 			int currentState = intent.getIntExtra(BluetoothHeadset.EXTRA_STATE, BluetoothHeadset.STATE_AUDIO_DISCONNECTED);
 			int previousState = intent.getIntExtra(BluetoothHeadset.EXTRA_PREVIOUS_STATE, BluetoothHeadset.STATE_AUDIO_DISCONNECTED);
-			Log.i("DEBUG Bluetooth adapter connection state changed current extra state: " + currentState + " previous extra state " + previousState);
 			if (
 				// ON to OFF transition
 				(((previousState == BluetoothHeadset.STATE_CONNECTED) || (previousState == BluetoothHeadset.STATE_CONNECTING)) && ((currentState == BluetoothHeadset.STATE_DISCONNECTED) || (currentState == BluetoothHeadset.STATE_DISCONNECTING)))
@@ -94,7 +86,6 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 		} else if (action.equals(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED)) {
 			int currentState = intent.getIntExtra(BluetoothHeadset.EXTRA_STATE, BluetoothHeadset.STATE_DISCONNECTED);
 			int previousState = intent.getIntExtra(BluetoothHeadset.EXTRA_PREVIOUS_STATE, BluetoothHeadset.STATE_DISCONNECTED);
-			Log.i("DEBUG Bueltooth adapter state changed current extra state: " + currentState + " previous extra state " + previousState);
 			if (
 				// ON to OFF transition
 				((previousState == BluetoothHeadset.STATE_AUDIO_CONNECTED) && (currentState == BluetoothHeadset.STATE_AUDIO_DISCONNECTED))
@@ -109,11 +100,9 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 			String cmd = intent.getStringExtra(BluetoothHeadset.EXTRA_VENDOR_SPECIFIC_HEADSET_EVENT_CMD);
 			String args = intent.getStringExtra(BluetoothHeadset.EXTRA_VENDOR_SPECIFIC_HEADSET_EVENT_ARGS);
 			int type = intent.getIntExtra(BluetoothHeadset.EXTRA_VENDOR_SPECIFIC_HEADSET_EVENT_CMD_TYPE, -1);
-			Log.i("DEBUG vendor specific command:  type " + type + " cmd " + cmd + " args " + args);
 		} else if (action.equals(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED)) {
 			int currentState = intent.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_STATE, AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
 			int previousState = intent.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_PREVIOUS_STATE, AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
-			Log.i("DEBUG Audio Manager current state: " + currentState + " previous state " + previousState);
 			if (
 				// ON to OFF transition
 				(((previousState == AudioManager.SCO_AUDIO_STATE_CONNECTING) || (previousState == AudioManager.SCO_AUDIO_STATE_CONNECTED)) && (currentState == AudioManager.SCO_AUDIO_STATE_DISCONNECTED))
@@ -122,7 +111,6 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 				((previousState == AudioManager.SCO_AUDIO_STATE_DISCONNECTED) && ((currentState == AudioManager.SCO_AUDIO_STATE_CONNECTED) || (currentState == AudioManager.SCO_AUDIO_STATE_CONNECTING)))
 			) {
 				Log.i("Audio manager detected an audio state change - recomputing device ID");
-				Log.i("DEBUG Context pointer " + contextPtr);
 				deviceIdNeeded = true;
 			}
 		} else {
@@ -137,7 +125,6 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 
 	public void setContextPtr(long ptr) {
 		Log.i("[MediastreamerAudioBroadcastReceiver] Set context pointer to " + ptr);
-		Log.i("DEBUG Set context pointer to " + ptr);
 		contextPtr = ptr;
 	}
 
