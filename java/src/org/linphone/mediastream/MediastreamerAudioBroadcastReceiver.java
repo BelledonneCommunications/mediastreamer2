@@ -84,14 +84,6 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 		if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
 			int currentState = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
 			int previousState = intent.getIntExtra(BluetoothAdapter.EXTRA_PREVIOUS_STATE, BluetoothAdapter.ERROR);
-/*			if (
-				// ON to OFF transition
-				(((previousState == BluetoothAdapter.STATE_ON) || (previousState == BluetoothAdapter.STATE_TURNING_ON)) && ((currentState == BluetoothAdapter.STATE_OFF) || (currentState == BluetoothAdapter.STATE_TURNING_OFF)))
-				||
-				// OFF to ON transition
-				(((previousState == BluetoothAdapter.STATE_OFF) || (previousState == BluetoothAdapter.STATE_TURNING_OFF)) && ((currentState == BluetoothAdapter.STATE_ON) || (currentState == BluetoothAdapter.STATE_TURNING_ON)))
-			) {
-*/
 			if (
 				((currentState == BluetoothAdapter.STATE_OFF) || (currentState == BluetoothAdapter.STATE_ON))
 			) {
@@ -102,14 +94,6 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 		} else if (action.equals(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED)) {
 			int currentState = intent.getIntExtra(BluetoothHeadset.EXTRA_STATE, BluetoothHeadset.STATE_AUDIO_DISCONNECTED);
 			int previousState = intent.getIntExtra(BluetoothHeadset.EXTRA_PREVIOUS_STATE, BluetoothHeadset.STATE_AUDIO_DISCONNECTED);
-/*			if (
-				// ON to OFF transition
-				(((previousState == BluetoothHeadset.STATE_CONNECTED) || (previousState == BluetoothHeadset.STATE_CONNECTING)) && ((currentState == BluetoothHeadset.STATE_DISCONNECTED) || (currentState == BluetoothHeadset.STATE_DISCONNECTING)))
-				||
-				// OFF to ON transition
-				(((previousState == BluetoothHeadset.STATE_DISCONNECTED) || (previousState == BluetoothHeadset.STATE_DISCONNECTING)) && ((currentState == BluetoothHeadset.STATE_CONNECTED) || (currentState == BluetoothHeadset.STATE_CONNECTING)))
-			) {
-*/
 			if (
 				((currentState == BluetoothHeadset.STATE_CONNECTED) || (currentState == BluetoothHeadset.STATE_DISCONNECTED))
 			) {
@@ -120,14 +104,6 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 			int currentState = intent.getIntExtra(BluetoothHeadset.EXTRA_STATE, BluetoothHeadset.STATE_DISCONNECTED);
 			int previousState = intent.getIntExtra(BluetoothHeadset.EXTRA_PREVIOUS_STATE, BluetoothHeadset.STATE_DISCONNECTED);
 			Log.i("DEBUG BT current state: " + BTStateToString(currentState) + " previous state " + BTStateToString(previousState));
-/*			if (
-				// ON to OFF transition
-				((previousState == BluetoothHeadset.STATE_AUDIO_CONNECTED) && (currentState == BluetoothHeadset.STATE_AUDIO_DISCONNECTED))
-				||
-				// OFF to ON transition
-				((previousState == BluetoothHeadset.STATE_AUDIO_DISCONNECTED) && (currentState == BluetoothHeadset.STATE_AUDIO_CONNECTED))
-			) {
-*/
 			if (
 				((currentState == BluetoothHeadset.STATE_AUDIO_CONNECTED) || (currentState == BluetoothHeadset.STATE_AUDIO_DISCONNECTED))
 			) {
@@ -143,14 +119,6 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 			int currentState = intent.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_STATE, AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
 			int previousState = intent.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_PREVIOUS_STATE, AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
 			Log.i("DEBUG Audio Manager BT current state: " + AudioMgrStateToString(currentState) + " previous state " + AudioMgrStateToString(previousState));
-/*			if (
-				// ON to OFF transition
-				(((previousState == AudioManager.SCO_AUDIO_STATE_CONNECTING) || (previousState == AudioManager.SCO_AUDIO_STATE_CONNECTED)) && (currentState == AudioManager.SCO_AUDIO_STATE_DISCONNECTED))
-				||
-				// OFF to ON transition
-				((previousState == AudioManager.SCO_AUDIO_STATE_DISCONNECTED) && ((currentState == AudioManager.SCO_AUDIO_STATE_CONNECTED) || (currentState == AudioManager.SCO_AUDIO_STATE_CONNECTING)))
-			) {
-*/
 			if (
 				((currentState == AudioManager.SCO_AUDIO_STATE_DISCONNECTED) || (currentState == AudioManager.SCO_AUDIO_STATE_CONNECTED))
 			) {
