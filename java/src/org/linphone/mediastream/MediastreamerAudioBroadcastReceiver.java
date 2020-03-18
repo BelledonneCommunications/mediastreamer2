@@ -45,8 +45,9 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 		intentFilter.addAction(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED);
 		intentFilter.addAction(BluetoothHeadset.ACTION_VENDOR_SPECIFIC_HEADSET_EVENT);
 		intentFilter.addAction(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED);
-
-
+		intentFilter.addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
+		intentFilter.addAction(AudioManager.ACTION_HEADSET_PLUG);
+		intentFilter.addAction(AudioManager.ACTION_SPEAKERPHONE_STATE_CHANGED);
 
 		return intentFilter;
 	}
@@ -128,6 +129,15 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 				Log.i("Audio manager detected an audio state change - recomputing device ID");
 				deviceIdNeeded = true;
 			}
+		} else if (action.equals(AudioManager.ACTION_SPEAKERPHONE_STATE_CHANGED)) {
+			Log.i("Audio manager detected a change in the speakerphone state - recomputing device ID");
+			deviceIdNeeded = true;
+		} else if (action.equals(AudioManager.ACTION_HEADSET_PLUG)) {
+			Log.i("Audio manager detected an headset being plugged or unplugged - recomputing device ID");
+			deviceIdNeeded = true;
+		} else if (action.equals(AudioManager.ACTION_AUDIO_BECOMING_NOISY)) {
+			Log.i("Audio manager detected audio becoming noisy - recomputing device ID");
+			deviceIdNeeded = true;
 		} else {
 		    Log.w("[Mediastreamer Broadcast Receiver] Bluetooth unknown action: " + action);
 		}
