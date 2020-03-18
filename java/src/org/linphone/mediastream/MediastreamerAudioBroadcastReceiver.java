@@ -52,31 +52,6 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 		return intentFilter;
 	}
 
-	public static String BTStateToString(int state) {
-		switch(state) {
-			case BluetoothHeadset.STATE_AUDIO_DISCONNECTED:
-				return "DISCONNECTED";
-			case BluetoothHeadset.STATE_AUDIO_CONNECTED:
-				return "CONNECTED";
-			default:
-				return "BT UNKNOWN - ID" + state;
-		}
-	}
-
-
-	public static String AudioMgrStateToString(int state) {
-		switch(state) {
-			case AudioManager.SCO_AUDIO_STATE_DISCONNECTED:
-				return "DISCONNECTED";
-			case AudioManager.SCO_AUDIO_STATE_CONNECTED:
-				return "CONNECTED";
-			case AudioManager.SCO_AUDIO_STATE_CONNECTING:
-				return "CONNECTING";
-			default:
-				return "Audio Mgr UNKNOWN - ID" + state;
-		}
-	}
-
 	// Only trigger a change in the output device when the current state is either CONNECTED or DISCONNECTED
 	// Transitional states are ignored because it bring about a race condition between when the new device is searched and if the initialization has already occurred
 	// No issues have been noticed for the built-in devices (speaker and earpiece) but an external device such as bluetooth speaker has a longer initialization sequence hence a transitional state may lead to an unwanted outcome
@@ -107,7 +82,6 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 		} else if (action.equals(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED)) {
 			int currentState = intent.getIntExtra(BluetoothHeadset.EXTRA_STATE, BluetoothHeadset.STATE_DISCONNECTED);
 			int previousState = intent.getIntExtra(BluetoothHeadset.EXTRA_PREVIOUS_STATE, BluetoothHeadset.STATE_DISCONNECTED);
-			Log.i("DEBUG BT current state: " + BTStateToString(currentState) + " previous state " + BTStateToString(previousState));
 			if (
 				((currentState == BluetoothHeadset.STATE_AUDIO_CONNECTED) || (currentState == BluetoothHeadset.STATE_AUDIO_DISCONNECTED))
 			) {
@@ -122,7 +96,6 @@ public class MediastreamerAudioBroadcastReceiver extends BroadcastReceiver {
 		} else if (action.equals(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED)) {
 			int currentState = intent.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_STATE, AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
 			int previousState = intent.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_PREVIOUS_STATE, AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
-			Log.i("DEBUG Audio Manager BT current state: " + AudioMgrStateToString(currentState) + " previous state " + AudioMgrStateToString(previousState));
 			if (
 				((currentState == AudioManager.SCO_AUDIO_STATE_DISCONNECTED) || (currentState == AudioManager.SCO_AUDIO_STATE_CONNECTED))
 			) {
