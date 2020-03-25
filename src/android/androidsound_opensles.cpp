@@ -108,6 +108,7 @@ struct OpenSLESContext {
 		builtin_aec = false;
 		device_type = DeviceType::UNKNOWN;
 		device_id = -1;
+		device_id_changed = false;
 	}
 
 	int samplerate;
@@ -115,6 +116,7 @@ struct OpenSLESContext {
 	bool builtin_aec;
 	DeviceType device_type;
 	int32_t device_id;
+	bool device_id_changed;
 
 	SLObjectItf engineObject;
 	SLEngineItf engineEngine;
@@ -340,11 +342,12 @@ static SLresult opensles_recorder_init(OpenSLESInputContext *ictx) {
 	SLresult result;
 	SLuint32 sample_rate = convertSamplerate(ictx->opensles_context->samplerate);
 	SLuint32 channels = (SLuint32) ictx->opensles_context->nchannels;
+	SLuint32 device_id = ictx->opensles_context->device_id;
 
 	SLDataLocator_IODevice loc_dev = {
 		SL_DATALOCATOR_IODEVICE,
 		SL_IODEVICE_AUDIOINPUT,
-		SL_DEFAULTDEVICEID_AUDIOINPUT,
+		device_id,
 		NULL
 	};
 
@@ -540,40 +543,8 @@ static void android_snd_read_preprocess(MSFilter *obj) {
 	}
 }
 
-static void android_snd_read_process(MSFilter *obj) {
-	OpenSLESInputContext *ictx = (OpenSLESInputContext*) obj->data;
-	mblk_t *m;
-
-	if (obj->ticker->time % 1000 == 0) {
-	    if (ictx->recorderBufferQueue == NULL) {
-	        ms_message("[OpenSLES] Trying to init opensles recorder on process");
-	        if (SL_RESULT_SUCCESS != opensles_recorder_init(ictx)) {
-                ms_error("[OpenSLES] Problem when initialization of opensles recorder");
-            } else if (SL_RESULT_SUCCESS != opensles_recorder_callback_init(ictx)) {
-            	ms_error("[OpenSLES] Problem when initialization of opensles recorder callback");
-            }
-	    }
-	}
-
-	ms_mutex_lock(&ictx->mutex);
-	while ((m = getq(&ictx->q)) != NULL) {
-		ms_queue_put(obj->outputs[0], m);
-	}
-	ms_mutex_unlock(&ictx->mutex);
-	if (obj->ticker->time % 5000 == 0)
-			ms_message("[OpenSLES] sound/wall clock skew is average=%g ms", ictx->mAvSkew);
-
-}
-
-static void android_snd_read_postprocess(MSFilter *obj) {
+static void opensles_recorder_close(OpenSLESInputContext *ictx) {
 	SLresult result;
-	OpenSLESInputContext *ictx = (OpenSLESInputContext*)obj->data;
-
-	if (ictx->aec) {
-		JNIEnv *env = ms_get_jni_env();
-		env->DeleteGlobalRef(ictx->aec);
-		ictx->aec = NULL;
-	}
 
 	if (ictx->recorderRecord != NULL) {
 		result = (*ictx->recorderRecord)->SetRecordState(ictx->recorderRecord, SL_RECORDSTATE_STOPPED);
@@ -595,6 +566,49 @@ static void android_snd_read_postprocess(MSFilter *obj) {
 		ictx->recorderRecord = NULL;
 		ictx->recorderBufferQueue = NULL;
 	}
+}
+
+static void android_snd_read_process(MSFilter *obj) {
+	OpenSLESInputContext *ictx = (OpenSLESInputContext*) obj->data;
+	mblk_t *m;
+
+	if (obj->ticker->time % 1000 == 0) {
+
+		// Stop audio recording if device ID has changed
+		if (ictx->opensles_context->device_id_changed) {
+			opensles_recorder_close(ictx);
+		}
+
+		if (ictx->recorderBufferQueue == NULL) {
+			ms_message("[OpenSLES] Trying to init opensles recorder on process");
+			if (SL_RESULT_SUCCESS != opensles_recorder_init(ictx)) {
+				ms_error("[OpenSLES] Problem when initialization of opensles recorder");
+			} else if (SL_RESULT_SUCCESS != opensles_recorder_callback_init(ictx)) {
+				ms_error("[OpenSLES] Problem when initialization of opensles recorder callback");
+			}
+		}
+	}
+
+	ms_mutex_lock(&ictx->mutex);
+	while ((m = getq(&ictx->q)) != NULL) {
+		ms_queue_put(obj->outputs[0], m);
+	}
+	ms_mutex_unlock(&ictx->mutex);
+	if (obj->ticker->time % 5000 == 0)
+		ms_message("[OpenSLES] sound/wall clock skew is average=%g ms", ictx->mAvSkew);
+
+}
+
+static void android_snd_read_postprocess(MSFilter *obj) {
+	OpenSLESInputContext *ictx = (OpenSLESInputContext*)obj->data;
+
+	if (ictx->aec) {
+		JNIEnv *env = ms_get_jni_env();
+		env->DeleteGlobalRef(ictx->aec);
+		ictx->aec = NULL;
+	}
+
+	ms_error("[OpenSLES] Problem when initialization of opensles recorder");
 
 	ms_ticker_set_synchronizer(obj->ticker, NULL);
 	ms_mutex_lock(&ictx->mutex);
@@ -643,6 +657,24 @@ static int android_snd_read_get_nchannels(MSFilter *obj, void *data) {
 	return 0;
 }
 
+static int android_snd_read_set_device_id(MSFilter *obj, void *data) {
+	int *n = (int*)data;
+	OpenSLESInputContext *ictx = (OpenSLESInputContext*)obj->data;
+	// Change device ID only if the new value is different from the previous one
+	if (ictx->opensles_context->device_id != *n) {
+		ictx->opensles_context->device_id_changed = true;
+		ictx->opensles_context->device_id = *n;
+	}
+	return 0;
+}
+
+static int android_snd_read_get_device_id(MSFilter *obj, void *data) {
+	int *n = (int*)data;
+	OpenSLESInputContext *ictx = (OpenSLESInputContext*)obj->data;
+	*n = ictx->opensles_context->device_id;
+	return 0;
+}
+
 static int android_snd_read_hack_speaker_state(MSFilter *f, void *arg) {
 	return 0;
 }
@@ -653,6 +685,8 @@ static MSFilterMethod android_snd_read_methods[] = {
 	{MS_FILTER_SET_NCHANNELS, android_snd_read_set_nchannels},
 	{MS_FILTER_GET_NCHANNELS, android_snd_read_get_nchannels},
 	{MS_AUDIO_CAPTURE_FORCE_SPEAKER_STATE, android_snd_read_hack_speaker_state},
+	{MS_FILTER_SET_DEVICE_ID, android_snd_read_set_device_id},
+	{MS_FILTER_GET_DEVICE_ID, android_snd_read_get_device_id},
 	{0,NULL}
 };
 
@@ -723,6 +757,8 @@ static SLresult opensles_sink_init(OpenSLESOutputContext *octx) {
 	} else {
 		ms_error("[OpenSLES] Error trying to use %i channels", channels);
 	}
+
+	//SLuint32 device_id = octx->opensles_context->device_id;
 
 	SLDataLocator_AndroidSimpleBufferQueue loc_bufq = {
 		SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE,
@@ -914,6 +950,24 @@ static int android_snd_write_get_nchannels(MSFilter *obj, void *data) {
 	return 0;
 }
 
+static int android_snd_write_set_device_id(MSFilter *obj, void *data) {
+	int *n = (int*)data;
+	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
+	// Change device ID only if the new value is different from the previous one
+	if (octx->opensles_context->device_id != *n) {
+		octx->opensles_context->device_id_changed = true;
+		octx->opensles_context->device_id = *n;
+	}
+	return 0;
+}
+
+static int android_snd_write_get_device_id(MSFilter *obj, void *data) {
+	int *n = (int*)data;
+	OpenSLESInputContext *ictx = (OpenSLESInputContext*)obj->data;
+	*n = ictx->opensles_context->device_id;
+	return 0;
+}
+
 static void android_snd_write_preprocess(MSFilter *obj) {
 	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
 	SLresult result;
@@ -941,16 +995,8 @@ static void android_snd_write_preprocess(MSFilter *obj) {
 	octx->nbufs = 0;
 }
 
-static void android_snd_write_process(MSFilter *obj) {
-	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
-	ms_mutex_lock(&octx->mutex);
-	ms_flow_controlled_bufferizer_put_from_queue(&octx->buffer, obj->inputs[0]);
-	ms_mutex_unlock(&octx->mutex);
-}
-
-static void android_snd_write_postprocess(MSFilter *obj) {
+static void opensles_sink_close(OpenSLESOutputContext *octx) {
 	SLresult result;
-	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
 
 	if (octx->playerPlay){
 		result = (*octx->playerPlay)->SetPlayState(octx->playerPlay, SL_PLAYSTATE_STOPPED);
@@ -977,6 +1023,27 @@ static void android_snd_write_postprocess(MSFilter *obj) {
 		(*octx->outputMixObject)->Destroy(octx->outputMixObject);
 		octx->outputMixObject = NULL;
 	}
+}
+
+static void android_snd_write_process(MSFilter *obj) {
+	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
+	ms_mutex_lock(&octx->mutex);
+
+	// Stop audio player if device ID has changed
+	if (octx->opensles_context->device_id_changed) {
+		opensles_sink_close(octx);
+		opensles_sink_init(octx);
+	}
+
+	ms_flow_controlled_bufferizer_put_from_queue(&octx->buffer, obj->inputs[0]);
+	ms_mutex_unlock(&octx->mutex);
+}
+
+static void android_snd_write_postprocess(MSFilter *obj) {
+	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
+
+	opensles_sink_close(octx);
+
 	free(octx->playBuffer[0]);
 	octx->playBuffer[0]=NULL;
 	free(octx->playBuffer[1]);
@@ -988,6 +1055,8 @@ static MSFilterMethod android_snd_write_methods[] = {
 	{MS_FILTER_GET_SAMPLE_RATE, android_snd_write_get_sample_rate},
 	{MS_FILTER_SET_NCHANNELS, android_snd_write_set_nchannels},
 	{MS_FILTER_GET_NCHANNELS, android_snd_write_get_nchannels},
+	{MS_FILTER_SET_DEVICE_ID, android_snd_write_set_device_id},
+	{MS_FILTER_GET_DEVICE_ID, android_snd_write_get_device_id},
 	{0,NULL}
 };
 
