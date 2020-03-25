@@ -665,7 +665,7 @@ the method index (_cnt_) and the argument size */
 #define MS_FILTER_SET_MTU		MS_FILTER_BASE_METHOD(9,int)
 #define MS_FILTER_GET_MTU		MS_FILTER_BASE_METHOD(10,int)
 /**Filters can return their latency in milliseconds (if known) using this method:*/
-#define MS_FILTER_GET_LATENCY	MS_FILTER_BASE_METHOD(11,int)
+#define MS_FILTER_GET_LATENCY		MS_FILTER_BASE_METHOD(11,int)
 
 typedef struct _MSPinFormat{
 	uint16_t pin;
