@@ -97,7 +97,6 @@ static int DeviceFavoriteBufferSize = 256;
 
 using namespace fake_opensles;
 
-static MSSndCard *android_snd_card_new(MSSndCardManager *m);
 static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSndCardManager *m);
 static MSFilter *ms_android_snd_read_new(MSFactory *factory);
 static MSFilter *ms_android_snd_write_new(MSFactory* factory);
