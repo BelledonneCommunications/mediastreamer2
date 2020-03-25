@@ -20,6 +20,28 @@
 #include <mediastreamer2/mssndcard.h>
 #include <mediastreamer2/android_utils.h>
 
+int get_preferred_buffer_size() {
+	int DevicePreferredBufferSize = -1;
+	JNIEnv *env = ms_get_jni_env();
+	jclass mediastreamerAndroidContextClass = env->FindClass("org/linphone/mediastream/MediastreamerAndroidContext");
+	if (mediastreamerAndroidContextClass != NULL) {
+		jmethodID getBufferSize = env->GetStaticMethodID(mediastreamerAndroidContextClass, "getDeviceFavoriteBufferSize", "()I");
+		if (getBufferSize != NULL) {
+				jint ret = env->CallStaticIntMethod(mediastreamerAndroidContextClass, getBufferSize);
+				DevicePreferredBufferSize = (int)ret;
+				ms_message("[Android Audio Utils] Using %i for buffer size value", DevicePreferredBufferSize);
+		}
+		env->DeleteLocalRef(mediastreamerAndroidContextClass);
+	}
+
+	if (DevicePreferredBufferSize == -1) {
+		ms_error("[Android Audio Utils] Failed to retrive sample rate - keeping value %0d", DevicePreferredBufferSize);
+	}
+
+	return DevicePreferredBufferSize;
+}
+
+
 int get_preferred_sample_rate() {
 	int DevicePreferredSampleRate = -1;
 	JNIEnv *env = ms_get_jni_env();
