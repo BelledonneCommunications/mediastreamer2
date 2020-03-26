@@ -298,6 +298,16 @@ typedef enum _MSRecorderState MSRecorderState;
 	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 1, float)
 #define MS_AUDIO_CAPTURE_FORCE_SPEAKER_STATE \
 	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 255, bool_t)
+/**
+ * Set capture device ID
+ */
+#define MS_AUDIO_CAPTURE_SET_DEVICE_ID  \
+	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 4, int)
+/**
+ * Get capture device ID
+ */
+#define MS_AUDIO_CAPTURE_GET_DEVICE_ID  \
+	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 5, int)
 
 /** Interface definitions for audio playback */
 enum _MSAudioRoute{
@@ -314,6 +324,18 @@ typedef enum _MSAudioRoute MSAudioRoute;
 	MS_FILTER_METHOD(MSFilterAudioPlaybackInterface, 2, MSAudioRoute)
 #define MS_AUDIO_PLAYBACK_MUTE \
 	MS_FILTER_METHOD(MSFilterAudioPlaybackInterface, 3, int)
+
+/**
+ * Set playback device ID
+ */
+#define MS_AUDIO_PLAYBACK_SET_DEVICE_ID  \
+	MS_FILTER_METHOD(MSFilterAudioPlaybackInterface, 4, int)
+/**
+ * Get playback device ID
+ */
+#define MS_AUDIO_PLAYBACK_GET_DEVICE_ID  \
+	MS_FILTER_METHOD(MSFilterAudioPlaybackInterface, 5, int)
+
 
 /** Interface definitions for audio encoder */
 #define MS_AUDIO_ENCODER_SET_PTIME \
