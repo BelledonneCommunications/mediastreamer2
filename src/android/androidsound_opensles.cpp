@@ -662,8 +662,10 @@ static int android_snd_read_set_device_id(MSFilter *obj, void *data) {
 	OpenSLESInputContext *ictx = (OpenSLESInputContext*)obj->data;
 	// Change device ID only if the new value is different from the previous one
 	if (ictx->opensles_context->device_id != *n) {
+		ms_mutex_lock(&ictx->mutex);
 		ictx->opensles_context->device_id_changed = true;
 		ictx->opensles_context->device_id = *n;
+		ms_mutex_unlock(&ictx->mutex);
 	}
 	return 0;
 }
@@ -955,8 +957,10 @@ static int android_snd_write_set_device_id(MSFilter *obj, void *data) {
 	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
 	// Change device ID only if the new value is different from the previous one
 	if (octx->opensles_context->device_id != *n) {
+		ms_mutex_lock(&octx->mutex);
 		octx->opensles_context->device_id_changed = true;
 		octx->opensles_context->device_id = *n;
+		ms_mutex_unlock(&octx->mutex);
 	}
 	return 0;
 }
