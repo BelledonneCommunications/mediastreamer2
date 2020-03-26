@@ -577,6 +577,7 @@ static void android_snd_read_process(MSFilter *obj) {
 		// Stop audio recording if device ID has changed
 		if (ictx->opensles_context->device_id_changed) {
 			opensles_recorder_close(ictx);
+			ictx->opensles_context->device_id_changed = false;
 		}
 
 		if (ictx->recorderBufferQueue == NULL) {
@@ -687,8 +688,8 @@ static MSFilterMethod android_snd_read_methods[] = {
 	{MS_FILTER_SET_NCHANNELS, android_snd_read_set_nchannels},
 	{MS_FILTER_GET_NCHANNELS, android_snd_read_get_nchannels},
 	{MS_AUDIO_CAPTURE_FORCE_SPEAKER_STATE, android_snd_read_hack_speaker_state},
-	{MS_FILTER_SET_DEVICE_ID, android_snd_read_set_device_id},
-	{MS_FILTER_GET_DEVICE_ID, android_snd_read_get_device_id},
+	{MS_FILTER_SET_INTERNAL_ID, android_snd_read_set_device_id},
+	{MS_FILTER_GET_INTERNAL_ID, android_snd_read_get_device_id},
 	{0,NULL}
 };
 
@@ -1104,9 +1105,10 @@ static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSn
 	MSSndCard *card = ms_snd_card_new(&android_native_snd_opensles_card_desc);
 
 	card->name = ms_strdup(get_device_product_name(env, deviceInfo));
+	card->internal_id = get_device_id(env, deviceInfo);
 
 	OpenSLESContext *card_data = (OpenSLESContext*)card->data;
-	card_data->device_id = get_device_id(env, deviceInfo);
+	card->internal_id = card_data->device_id;
 	card_data->device_type = get_device_type(env, deviceInfo);
 
 	// Card capabilities
