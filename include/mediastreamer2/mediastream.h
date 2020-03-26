@@ -363,8 +363,8 @@ MS2_PUBLIC bool_t ms_media_stream_io_is_consistent(const MSMediaStreamIO *io);
 struct _AudioStream
 {
 	MediaStream ms;
-	MSSndCard *playcard,
-	MSSndCard *captcard,
+	MSSndCard *playcard;
+	MSSndCard *captcard;
 	MSFilter *soundread;
 	MSFilter *soundwrite;
 	MSFilter *dtmfgen;

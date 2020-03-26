@@ -175,9 +175,9 @@ static bool_t audio_stream_payload_type_changed(RtpSession *session, void *data)
  * note: Only AAudio and OpenSLES leverage internal ID for input streams.
  */
 static void audio_stream_configure_input_internal_id(AudioStream *stream, int id) {
-	if (stream->soundread)
+	if (stream->soundread) {
 		if(ms_filter_implements_interface(stream->soundread, MSFilterAudioCaptureInterface)) {
-			ms_filter_call_method(stream->soundread, MS_AUDIO_CAPTURE_SET_DEVICE_ID, &id);
+			ms_filter_call_method(stream->soundread, MS_AUDIO_CAPTURE_SET_INTERNAL_ID, &id);
 			ms_message("set internal ID for %s:%p to %0d", ms_filter_get_name(stream->soundread), stream->soundread, id);
 		}
 	}
@@ -189,7 +189,7 @@ static void audio_stream_configure_input_internal_id(AudioStream *stream, int id
 static void audio_stream_configure_output_internal_id(AudioStream *stream, int id) {
 	if (stream->soundwrite) {
 		if(ms_filter_implements_interface(stream->soundwrite, MSFilterAudioPlaybackInterface)) {
-			ms_filter_call_method(stream->soundwrite, MS_AUDIO_PLAYBACK_SET_DEVICE_ID, &id);
+			ms_filter_call_method(stream->soundwrite, MS_AUDIO_PLAYBACK_SET_INTERNAL_ID, &id);
 			ms_message("set internal ID for %s:%p to %0d", ms_filter_get_name(stream->soundwrite), stream->soundwrite, id);
 		}
 	}
@@ -1991,7 +1991,7 @@ void audio_stream_set_audio_route(AudioStream *stream, MSAudioRoute route) {
 void audio_stream_set_input_ms_snd_card(AudioStream *stream, MSSndCard * sndcard_capture) {
 	stream->captcard = sndcard_capture;
 	const int id = ms_snd_card_get_internal_id(sndcard_capture);
-	audio_stream_configure_input_device_id(stream, id);
+	audio_stream_configure_input_internal_id(stream, id);
 }
 
 void audio_stream_set_output_ms_snd_card(AudioStream *stream, MSSndCard * sndcard_playback) {

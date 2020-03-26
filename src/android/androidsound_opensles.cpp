@@ -688,8 +688,8 @@ static MSFilterMethod android_snd_read_methods[] = {
 	{MS_FILTER_SET_NCHANNELS, android_snd_read_set_nchannels},
 	{MS_FILTER_GET_NCHANNELS, android_snd_read_get_nchannels},
 	{MS_AUDIO_CAPTURE_FORCE_SPEAKER_STATE, android_snd_read_hack_speaker_state},
-	{MS_FILTER_SET_INTERNAL_ID, android_snd_read_set_device_id},
-	{MS_FILTER_GET_INTERNAL_ID, android_snd_read_get_device_id},
+	{MS_AUDIO_CAPTURE_SET_INTERNAL_ID, android_snd_read_set_device_id},
+	{MS_AUDIO_CAPTURE_GET_INTERNAL_ID, android_snd_read_get_device_id},
 	{0,NULL}
 };
 
@@ -1060,8 +1060,8 @@ static MSFilterMethod android_snd_write_methods[] = {
 	{MS_FILTER_GET_SAMPLE_RATE, android_snd_write_get_sample_rate},
 	{MS_FILTER_SET_NCHANNELS, android_snd_write_set_nchannels},
 	{MS_FILTER_GET_NCHANNELS, android_snd_write_get_nchannels},
-	{MS_FILTER_SET_DEVICE_ID, android_snd_write_set_device_id},
-	{MS_FILTER_GET_DEVICE_ID, android_snd_write_get_device_id},
+	{MS_AUDIO_PLAYBACK_SET_INTERNAL_ID, android_snd_write_set_device_id},
+	{MS_AUDIO_PLAYBACK_GET_INTERNAL_ID, android_snd_write_get_device_id},
 	{0,NULL}
 };
 
@@ -1108,7 +1108,7 @@ static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSn
 	card->internal_id = get_device_id(env, deviceInfo);
 
 	OpenSLESContext *card_data = (OpenSLESContext*)card->data;
-	card->internal_id = card_data->device_id;
+	card->internal_id = card->internal_id;
 	card_data->device_type = get_device_type(env, deviceInfo);
 
 	// Card capabilities
