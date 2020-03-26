@@ -172,6 +172,30 @@ static bool_t audio_stream_payload_type_changed(RtpSession *session, void *data)
 }
 
 /*
+ * note: Only AAudio and OpenSLES leverage device ID for input streams.
+ */
+static void audio_stream_configure_input_device_id(AudioStream *stream, int & id) {
+	if (stream->soundread)
+		if(ms_filter_implements_interface(stream->soundread, MSFilterAudioCaptureInterface)) {
+			ms_filter_call_method(stream->soundread, MS_AUDIO_CAPTURE_SET_DEVICE_ID, &id);
+			ms_message("set device ID for %s:%p to %0d", ms_filter_get_name(stream->soundread), stream->soundread, id);
+		}
+	}
+}
+
+/*
+ * note: Only AAudio and OpenSLES leverage device ID for output streams.
+ */
+static void audio_stream_configure_output_device_id(AudioStream *stream, int & id) {
+	if (stream->soundwrite) {
+		if(ms_filter_implements_interface(stream->soundwrite, MSFilterAudioPlaybackInterface)) {
+			ms_filter_call_method(stream->soundwrite, MS_AUDIO_PLAYBACK_SET_DEVICE_ID, &id);
+			ms_message("set device ID for %s:%p to %0d", ms_filter_get_name(stream->soundwrite), stream->soundwrite, id);
+		}
+	}
+}
+
+/*
  * note: since not all filters implement MS_FILTER_GET_SAMPLE_RATE and MS_FILTER_GET_NCHANNELS, the PayloadType passed here is used to guess this information.
  */
 static void audio_stream_configure_resampler(AudioStream *st, MSFilter *resampler,MSFilter *from, MSFilter *to) {
@@ -1962,4 +1986,20 @@ void audio_stream_set_audio_route(AudioStream *stream, MSAudioRoute route) {
 			ms_filter_call_method(stream->soundwrite, MS_AUDIO_PLAYBACK_SET_ROUTE, &route);
 		}
 	}
+}
+
+void audio_stream_set_input_ms_snd_card(MSSndCard * card) {
+	MSSndCardManager *m = ms_factory_get_snd_card_manager(factory)
+}
+
+void audio_stream_set_output_ms_snd_card(MSSndCard * card) {
+
+}
+
+MSSndCard * audio_stream_get_input_ms_snd_card() {
+
+}
+
+MSSndCard * audio_stream_get_output_ms_snd_card() {
+
 }
