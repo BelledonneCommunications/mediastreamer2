@@ -215,6 +215,14 @@ const char *ms_snd_card_get_string_id(MSSndCard *obj){
 	return obj->id;
 }
 
+void ms_snd_card_set_internal_id(MSSndCard *obj, int id){
+	obj->internal_id = id;
+}
+
+int ms_snd_card_get_internal_id(MSSndCard *obj){
+	return obj->internal_id;
+}
+
 void ms_snd_card_set_level(MSSndCard *obj, MSSndCardMixerElem e, int percent){
 	if (obj->desc->set_level!=NULL)
 		obj->desc->set_level(obj,e,percent);

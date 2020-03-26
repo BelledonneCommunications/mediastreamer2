@@ -156,6 +156,7 @@ struct _MSSndCard{
 	MSSndCardManager* sndcardmanager;
 	char *name;
 	char *id;
+	int  internal_id;
 	unsigned int capabilities;
 	void *data;
 	int preferred_sample_rate;
@@ -411,6 +412,14 @@ MS2_PUBLIC const char *ms_snd_card_get_name(const MSSndCard *obj);
  */
 MS2_PUBLIC const char *ms_snd_card_get_string_id(MSSndCard *obj);
 
+/**
+ * Retrieve sound card's internal ID.
+ *
+ * @param obj    A sound card object.
+ *
+ * Returns: An integer storing the internal ID value.
+ */
+MS2_PUBLIC int ms_snd_card_get_internal_id(MSSndCard *obj);
 
 /**
  * Retreive sound card's capabilities.
@@ -453,6 +462,15 @@ MS2_PUBLIC int ms_snd_card_get_minimal_latency(MSSndCard *obj);
  *
  */
 MS2_PUBLIC void ms_snd_card_set_level(MSSndCard *obj, MSSndCardMixerElem e, int percent);
+
+/**
+ * Set internal ID of the sound card.
+ *
+ * @param obj      A sound card object.
+ * @param id       A sound card internal ID.
+ *
+ */
+MS2_PUBLIC void ms_snd_card_set_internal_id(MSSndCard *obj, int id);
 
 /**
  * Get some mixer level value.
