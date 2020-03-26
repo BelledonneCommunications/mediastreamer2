@@ -42,6 +42,11 @@ enum _DeviceType{
 typedef enum _DeviceType DeviceType;
 
 /**
+ * Retrieve preferred buffer size from Mediastreamer Android Context.
+**/
+int get_preferred_buffer_size();
+
+/**
  * Retrieve preferred sample rate from Mediastreamer Android Context.
 **/
 int get_preferred_sample_rate();

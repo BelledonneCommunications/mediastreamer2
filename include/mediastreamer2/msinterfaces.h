@@ -305,6 +305,13 @@ typedef enum _MSRecorderState MSRecorderState;
 #define MS_AUDIO_CAPTURE_FORCE_SPEAKER_STATE \
 	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 255, bool_t)
 
+/** Set capture device ID */
+#define MS_AUDIO_CAPTURE_SET_DEVICE_ID \
+	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 2, int)
+/** Get capture device ID */
+#define MS_AUDIO_CAPTURE_GET_DEVICE_ID \
+	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 3, int)
+
 /** Interface definitions for audio playback */
 enum _MSAudioRoute{
 	MSAudioRouteEarpiece,
