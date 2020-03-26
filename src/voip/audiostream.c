@@ -174,7 +174,7 @@ static bool_t audio_stream_payload_type_changed(RtpSession *session, void *data)
 /*
  * note: Only AAudio and OpenSLES leverage internal ID for input streams.
  */
-static void audio_stream_configure_input_internal_id(AudioStream *stream, int & id) {
+static void audio_stream_configure_input_internal_id(AudioStream *stream, int id) {
 	if (stream->soundread)
 		if(ms_filter_implements_interface(stream->soundread, MSFilterAudioCaptureInterface)) {
 			ms_filter_call_method(stream->soundread, MS_AUDIO_CAPTURE_SET_DEVICE_ID, &id);
@@ -186,7 +186,7 @@ static void audio_stream_configure_input_internal_id(AudioStream *stream, int & 
 /*
  * note: Only AAudio and OpenSLES leverage internal ID for output streams.
  */
-static void audio_stream_configure_output_internal_id(AudioStream *stream, int & id) {
+static void audio_stream_configure_output_internal_id(AudioStream *stream, int id) {
 	if (stream->soundwrite) {
 		if(ms_filter_implements_interface(stream->soundwrite, MSFilterAudioPlaybackInterface)) {
 			ms_filter_call_method(stream->soundwrite, MS_AUDIO_PLAYBACK_SET_DEVICE_ID, &id);
@@ -1989,19 +1989,21 @@ void audio_stream_set_audio_route(AudioStream *stream, MSAudioRoute route) {
 }
 
 void audio_stream_set_input_ms_snd_card(AudioStream *stream, MSSndCard * sndcard_capture) {
-	int id = ms_snd_card_get_internal_id(sndcard_capture);
+	stream->captcard = sndcard_capture;
+	const int id = ms_snd_card_get_internal_id(sndcard_capture);
 	audio_stream_configure_input_device_id(stream, id);
 }
 
 void audio_stream_set_output_ms_snd_card(AudioStream *stream, MSSndCard * sndcard_playback) {
-	int id = ms_snd_card_get_internal_id(sndcard_playback);
+	stream->playcard = sndcard_playback;
+	const int id = ms_snd_card_get_internal_id(sndcard_playback);
 	audio_stream_configure_output_internal_id(stream, id);
 }
 
 MSSndCard * audio_stream_get_input_ms_snd_card(AudioStream *stream) {
-
+	return stream->playcard;
 }
 
 MSSndCard * audio_stream_get_output_ms_snd_card(AudioStream *stream) {
-
+	return stream->captcard;
 }
