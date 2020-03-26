@@ -172,6 +172,25 @@ static bool_t audio_stream_payload_type_changed(RtpSession *session, void *data)
 }
 
 /*
+ * note: Only AAudio and OpenSLES leverage device ID for input and output streams.
+ */
+static void audio_stream_configure_device_id(AudioStream *stream, int & id) {
+
+	int device_id = -1;
+	if (stream->soundwrite) {
+		if(ms_filter_implements_interface(stream->soundwrite, MSFilterAudioPlaybackInterface)) {
+			ms_filter_call_method(stream->soundwrite, MS_AUDIO_PLAYBACK_SET_DEVICE_ID, &id);
+			ms_message("set device ID for %s:%p to %0d", ms_filter_get_name(stream->soundwrite), stream->soundwrite, id);
+		}
+	} else if (stream->soundread) {
+		if(ms_filter_implements_interface(stream->soundread, MSFilterAudioCaptureInterface)) {
+			ms_filter_call_method(stream->soundread, MS_AUDIO_CAPTURE_SET_DEVICE_ID, &id);
+			ms_message("set device ID for %s:%p to %0d", ms_filter_get_name(stream->soundread), stream->soundread, id);
+		}
+	}
+}
+
+/*
  * note: since not all filters implement MS_FILTER_GET_SAMPLE_RATE and MS_FILTER_GET_NCHANNELS, the PayloadType passed here is used to guess this information.
  */
 static void audio_stream_configure_resampler(AudioStream *st, MSFilter *resampler,MSFilter *from, MSFilter *to) {
