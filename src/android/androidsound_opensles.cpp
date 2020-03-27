@@ -98,6 +98,7 @@ static int DeviceFavoriteBufferSize = 256;
 using namespace fake_opensles;
 
 static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSndCardManager *m);
+static void snd_card_device_create(const char * name, AudioDeviceType type, unsigned int capabilities, MSSndCardManager *m);
 static MSFilter *ms_android_snd_read_new(MSFactory *factory);
 static MSFilter *ms_android_snd_write_new(MSFactory* factory);
 
@@ -262,18 +263,29 @@ static void android_snd_card_add_devices(MSSndCardManager *m) {
 
 	JNIEnv *env = ms_get_jni_env();
 
-	// Get all devices
-	jobject devices = get_all_devices(env, "all");
+	int sdkVersion = get_sdk_version(env);
 
-	// extract required information from every device
-	jobjectArray deviceArray = (jobjectArray) devices;
-	jsize deviceNumber = (int) env->GetArrayLength(deviceArray);
+	//GetDevices is only available from API23
+	if (sdkVersion >= 23) {
+		// Get all devices
+		jobject devices = get_all_devices(env, "all");
 
-	ms_message("[OpenSLES] Create soundcards for %0d devices", deviceNumber);
+		// extract required information from every device
+		jobjectArray deviceArray = (jobjectArray) devices;
+		jsize deviceNumber = (int) env->GetArrayLength(deviceArray);
 
-	for (int idx=0; idx < deviceNumber; idx++) {
-		jobject deviceInfo = env->GetObjectArrayElement(deviceArray, idx);
-		android_snd_card_device_create(env, deviceInfo, m);
+		ms_message("[OpenSLES] Create soundcards for %0d devices", deviceNumber);
+
+		for (int idx=0; idx < deviceNumber; idx++) {
+			jobject deviceInfo = env->GetObjectArrayElement(deviceArray, idx);
+			android_snd_card_device_create(env, deviceInfo, m);
+		}
+	} else {
+
+		//For devices running API older than API23, only 3 devices are created: microphone, speaker and earpiece
+		snd_card_device_create("Microphone", AudioDeviceType::MICROPHONE, MS_SND_CARD_CAP_CAPTURE, m);
+		snd_card_device_create("Speaker", AudioDeviceType::SPEAKER, MS_SND_CARD_CAP_PLAYBACK, m);
+		snd_card_device_create("Earpiece", AudioDeviceType::EARPIECE, MS_SND_CARD_CAP_PLAYBACK, m);
 	}
 
 }
@@ -1075,19 +1087,10 @@ MSSndCardDesc android_native_snd_opensles_card_desc = {
 	android_native_snd_card_uninit
 };
 
-static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSndCardManager *m) {
-
-	MSSndCard *card = ms_snd_card_new(&android_native_snd_opensles_card_desc);
-
-	card->name = ms_strdup(get_device_product_name(env, deviceInfo));
-	card->internal_id = get_device_id(env, deviceInfo);
-	card->device_type = get_device_type(env, deviceInfo);
+static void snd_card_device_create_extra_fields(MSSndCardManager *m, MSSndCard *card) {
 
 	OpenSLESContext *card_data = (OpenSLESContext*)card->data;
-	card_data->device_id = card->internal_id;
 
-	// Card capabilities
-	card->capabilities |= get_device_capabilities(env, deviceInfo);
 	MSDevicesInfo *devices = ms_factory_get_devices_info(m->factory);
 	SoundDeviceDescription *d = ms_devices_info_get_sound_device_description(devices);
 	if (d->flags & DEVICE_HAS_BUILTIN_OPENSLES_AEC) {
@@ -1103,6 +1106,45 @@ static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSn
 	if (d->recommended_rate){
 		card_data->samplerate = d->recommended_rate;
 	}
+}
+
+static void snd_card_device_create(const char * name, AudioDeviceType type, unsigned int capabilities, MSSndCardManager *m) {
+
+	MSSndCard *card = ms_snd_card_new(&android_native_snd_opensles_card_desc);
+
+	card->name = ms_strdup(name);
+	card->internal_id = -1;
+	card->device_type = type;
+
+	OpenSLESContext *card_data = (OpenSLESContext*)card->data;
+	card_data->device_id = card->internal_id;
+
+	// Card capabilities
+	card->capabilities |= capabilities;
+
+	snd_card_device_create_extra_fields(m, card);
+
+	ms_snd_card_manager_add_card(m, card);
+
+	ms_message("[OpenSLES] Added card: name %s device ID %0d device_type %0d ", card->name, card_data->device_id, card->device_type);
+
+}
+
+static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSndCardManager *m) {
+
+	MSSndCard *card = ms_snd_card_new(&android_native_snd_opensles_card_desc);
+
+	card->name = ms_strdup(get_device_product_name(env, deviceInfo));
+	card->internal_id = get_device_id(env, deviceInfo);
+	card->device_type = get_device_type(env, deviceInfo);
+
+	OpenSLESContext *card_data = (OpenSLESContext*)card->data;
+	card_data->device_id = card->internal_id;
+
+	// Card capabilities
+	card->capabilities |= get_device_capabilities(env, deviceInfo);
+
+	snd_card_device_create_extra_fields(m, card);
 
 	ms_snd_card_manager_add_card(m, card);
 
