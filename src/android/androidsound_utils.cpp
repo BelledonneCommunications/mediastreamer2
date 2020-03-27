@@ -17,7 +17,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <mediastreamer2/mssndcard.h>
 #include <mediastreamer2/android_utils.h>
 
 int get_preferred_buffer_size() {
@@ -119,7 +118,7 @@ int getJVIntField(JNIEnv *env, const char * className, const char * fieldName) {
 	return value;
 }
 
-DeviceType get_device_type(JNIEnv *env, jobject deviceInfo) {
+AudioDeviceType get_device_type(JNIEnv *env, jobject deviceInfo) {
 
 	int typeID = -1;
 
@@ -134,27 +133,27 @@ DeviceType get_device_type(JNIEnv *env, jobject deviceInfo) {
 		env->DeleteLocalRef(audioDeviceInfoClass);
 	}
 
-	DeviceType deviceType = DeviceType::UNKNOWN;
+	AudioDeviceType deviceType = AudioDeviceType::UNKNOWN_DEVICE_TYPE;
 	if ((typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_BLUETOOTH_SCO")) || (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_BLUETOOTH_A2DP"))) {
-		deviceType = DeviceType::BLUETOOTH;
+		deviceType = AudioDeviceType::BLUETOOTH;
 	} else if (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_BUILTIN_EARPIECE")) {
-		deviceType = DeviceType::EARPIECE;
+		deviceType = AudioDeviceType::EARPIECE;
 	} else if (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_BUILTIN_SPEAKER")) {
-		deviceType = DeviceType::SPEAKER;
+		deviceType = AudioDeviceType::SPEAKER;
 	} else if (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_BUILTIN_MIC")) {
-		deviceType = DeviceType::MICROPHONE;
+		deviceType = AudioDeviceType::MICROPHONE;
 	} else if ((typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_USB_HEADSET")) || (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_WIRED_HEADSET"))) {
-		deviceType = DeviceType::HEADSET;
+		deviceType = AudioDeviceType::HEADSET;
 	} else if (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_WIRED_HEADPHONES")) {
-		deviceType = DeviceType::HEADPHONES;
+		deviceType = AudioDeviceType::HEADPHONES;
 	} else if (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_USB_DEVICE")) {
-		deviceType = DeviceType::GENERIC_USB;
+		deviceType = AudioDeviceType::GENERIC_USB;
 	} else if (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_AUX_LINE")) {
-		deviceType = DeviceType::AUX_LINE;
+		deviceType = AudioDeviceType::AUX_LINE;
 	} else if (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_TELEPHONY")) {
-		deviceType = DeviceType::TELEPHONY;
+		deviceType = AudioDeviceType::TELEPHONY;
 	} else {
-		deviceType = DeviceType::UNKNOWN;
+		deviceType = AudioDeviceType::UNKNOWN_DEVICE_TYPE;
 		ms_error("[Android Audio Utils] Unknown device type for type ID %0d", typeID);
 	}
 

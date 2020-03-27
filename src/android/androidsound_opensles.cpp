@@ -106,7 +106,6 @@ struct OpenSLESContext {
 		samplerate = DeviceFavoriteSampleRate;
 		nchannels = 1;
 		builtin_aec = false;
-		device_type = DeviceType::UNKNOWN;
 		device_id = -1;
 		device_id_changed = false;
 	}
@@ -114,7 +113,6 @@ struct OpenSLESContext {
 	int samplerate;
 	int nchannels;
 	bool builtin_aec;
-	DeviceType device_type;
 	int32_t device_id;
 	bool device_id_changed;
 
@@ -1106,10 +1104,10 @@ static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSn
 
 	card->name = ms_strdup(get_device_product_name(env, deviceInfo));
 	card->internal_id = get_device_id(env, deviceInfo);
+	card->device_type = get_device_type(env, deviceInfo);
 
 	OpenSLESContext *card_data = (OpenSLESContext*)card->data;
 	card->internal_id = card->internal_id;
-	card_data->device_type = get_device_type(env, deviceInfo);
 
 	// Card capabilities
 	card->capabilities |= get_device_capabilities(env, deviceInfo);
@@ -1131,6 +1129,6 @@ static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSn
 
 	ms_snd_card_manager_add_card(m, card);
 
-	ms_message("[OpenSLES] Added card: name %s device ID %0d device_type %0d ", card->name, card_data->device_id, card_data->device_type);
+	ms_message("[OpenSLES] Added card: name %s device ID %0d device_type %0d ", card->name, card_data->device_id, card->device_type);
 
 }

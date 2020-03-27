@@ -20,26 +20,9 @@
 #ifndef android_utils_h
 #define android_utils_h
 
+#include <mediastreamer2/mssndcard.h>
 #include <mediastreamer2/msfilter.h>
 #include <jni.h>
-
-enum _DeviceType{
-	TELEPHONY,
-	AUX_LINE,
-	GENERIC_USB,
-	HEADSET,
-	MICROPHONE,
-	EARPIECE,
-	HEADPHONES,
-	SPEAKER,
-	BLUETOOTH,
-	UNKNOWN
-};
-
-/**
- * Android device type enum.
-**/
-typedef enum _DeviceType DeviceType;
 
 /**
  * Retrieve preferred buffer size from Mediastreamer Android Context.
@@ -70,7 +53,7 @@ int getJVIntField(JNIEnv *env, const char * className, const char * fieldName);
 /**
  * Retrieve device type for the device deviceInfo.
 **/
-DeviceType get_device_type(JNIEnv *env, jobject deviceInfo);
+AudioDeviceType get_device_type(JNIEnv *env, jobject deviceInfo);
 
 /**
  * Retrieve device capabilities (recorder or playback) for the device deviceInfo.
