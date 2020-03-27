@@ -340,13 +340,11 @@ static SLresult opensles_recorder_init(OpenSLESInputContext *ictx) {
 	SLresult result;
 	SLuint32 sample_rate = convertSamplerate(ictx->opensles_context->samplerate);
 	SLuint32 channels = (SLuint32) ictx->opensles_context->nchannels;
-//	SLuint32 device_id = ictx->opensles_context->device_id;
 
 	SLDataLocator_IODevice loc_dev = {
 		SL_DATALOCATOR_IODEVICE,
 		SL_IODEVICE_AUDIOINPUT,
 		SL_DEFAULTDEVICEID_AUDIOINPUT,
-//		device_id,
 		NULL
 	};
 
@@ -543,43 +541,11 @@ static void android_snd_read_preprocess(MSFilter *obj) {
 	}
 }
 
-static void opensles_recorder_close(OpenSLESInputContext *ictx) {
-	SLresult result;
-
-	if (ictx->recorderRecord != NULL) {
-		result = (*ictx->recorderRecord)->SetRecordState(ictx->recorderRecord, SL_RECORDSTATE_STOPPED);
-		if (SL_RESULT_SUCCESS != result) {
-			ms_error("[OpenSLES] Error %u while stopping the audio recorder", result);
-		}
-	}
-
-	if (ictx->recorderBufferQueue != NULL) {
-		result = (*ictx->recorderBufferQueue)->Clear(ictx->recorderBufferQueue);
-		if (SL_RESULT_SUCCESS != result) {
-			ms_error("[OpenSLES] Error %u while clearing the audio recorder buffer queue", result);
-		}
-	}
-
-	if (ictx->recorderObject != NULL) {
-		(*ictx->recorderObject)->Destroy(ictx->recorderObject);
-		ictx->recorderObject = NULL;
-		ictx->recorderRecord = NULL;
-		ictx->recorderBufferQueue = NULL;
-	}
-}
-
 static void android_snd_read_process(MSFilter *obj) {
 	OpenSLESInputContext *ictx = (OpenSLESInputContext*) obj->data;
 	mblk_t *m;
 
 	if (obj->ticker->time % 1000 == 0) {
-
-		// Stop audio recording if device ID has changed
-		if (ictx->opensles_context->device_id_changed) {
-			opensles_recorder_close(ictx);
-			ictx->opensles_context->device_id_changed = false;
-		}
-
 		if (ictx->recorderBufferQueue == NULL) {
 			ms_message("[OpenSLES] Trying to init opensles recorder on process");
 			if (SL_RESULT_SUCCESS != opensles_recorder_init(ictx)) {
@@ -601,6 +567,7 @@ static void android_snd_read_process(MSFilter *obj) {
 }
 
 static void android_snd_read_postprocess(MSFilter *obj) {
+	SLresult result;
 	OpenSLESInputContext *ictx = (OpenSLESInputContext*)obj->data;
 
 	if (ictx->aec) {
@@ -609,7 +576,26 @@ static void android_snd_read_postprocess(MSFilter *obj) {
 		ictx->aec = NULL;
 	}
 
-	ms_error("[OpenSLES] Problem when initialization of opensles recorder");
+	if (ictx->recorderRecord != NULL) {
+		result = (*ictx->recorderRecord)->SetRecordState(ictx->recorderRecord, SL_RECORDSTATE_STOPPED);
+		if (SL_RESULT_SUCCESS != result) {
+			ms_error("[OpenSLES] Error %u while stopping the audio recorder", result);
+		}
+	}
+
+	if (ictx->recorderBufferQueue != NULL) {
+		result = (*ictx->recorderBufferQueue)->Clear(ictx->recorderBufferQueue);
+		if (SL_RESULT_SUCCESS != result) {
+			ms_error("[OpenSLES] Error %u while clearing the audio recorder buffer queue", result);
+		}
+	}
+
+	if (ictx->recorderObject != NULL) {
+		(*ictx->recorderObject)->Destroy(ictx->recorderObject);
+		ictx->recorderObject = NULL;
+		ictx->recorderRecord = NULL;
+		ictx->recorderBufferQueue = NULL;
+	}
 
 	ms_ticker_set_synchronizer(obj->ticker, NULL);
 	ms_mutex_lock(&ictx->mutex);
@@ -1000,8 +986,17 @@ static void android_snd_write_preprocess(MSFilter *obj) {
 	octx->nbufs = 0;
 }
 
-static void opensles_sink_close(OpenSLESOutputContext *octx) {
+static void android_snd_write_process(MSFilter *obj) {
+	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
+	ms_mutex_lock(&octx->mutex);
+
+	ms_flow_controlled_bufferizer_put_from_queue(&octx->buffer, obj->inputs[0]);
+	ms_mutex_unlock(&octx->mutex);
+}
+
+static void android_snd_write_postprocess(MSFilter *obj) {
 	SLresult result;
+	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
 
 	if (octx->playerPlay){
 		result = (*octx->playerPlay)->SetPlayState(octx->playerPlay, SL_PLAYSTATE_STOPPED);
@@ -1028,26 +1023,6 @@ static void opensles_sink_close(OpenSLESOutputContext *octx) {
 		(*octx->outputMixObject)->Destroy(octx->outputMixObject);
 		octx->outputMixObject = NULL;
 	}
-}
-
-static void android_snd_write_process(MSFilter *obj) {
-	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
-	ms_mutex_lock(&octx->mutex);
-
-	// Stop audio player if device ID has changed
-	if (octx->opensles_context->device_id_changed) {
-		opensles_sink_close(octx);
-		opensles_sink_init(octx);
-	}
-
-	ms_flow_controlled_bufferizer_put_from_queue(&octx->buffer, obj->inputs[0]);
-	ms_mutex_unlock(&octx->mutex);
-}
-
-static void android_snd_write_postprocess(MSFilter *obj) {
-	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
-
-	opensles_sink_close(octx);
 
 	free(octx->playBuffer[0]);
 	octx->playBuffer[0]=NULL;
