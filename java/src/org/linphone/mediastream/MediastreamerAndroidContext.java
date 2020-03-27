@@ -183,18 +183,6 @@ public class MediastreamerAndroidContext {
 
 	public synchronized static void enableBluetooth() {
 		AudioManager audioManager = (AudioManager)getContext().getSystemService(Context.AUDIO_SERVICE);
-
-		if (audioManager.getMode() != AudioManager.MODE_IN_COMMUNICATION) {
-			Log.w("[MS Android Context] [Bluetooth] Changing audio mode to MODE_IN_COMMUNICATION and requesting STREAM_VOICE_CALL focus");
-			audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
-			int res = audioManager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE);
-			if (res == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-				Log.i("[MS Android Context] [Bluetooth] Request to change focus to STREAM_VOICE_CALL has been granted");
-			} else {
-				Log.i("[MS Android Context] [Bluetooth] Request to change focus to STREAM_VOICE_CALL has not been granted");
-			}
-		}
-
 		audioManager.startBluetoothSco();
 	}
 
