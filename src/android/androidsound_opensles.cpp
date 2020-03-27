@@ -456,6 +456,7 @@ static void opensles_recorder_callback(SLAndroidSimpleBufferQueueItf bq, void *c
 	m->b_wptr += ictx->inBufSize;
 
 	ms_mutex_lock(&ictx->mutex);
+
 	ictx->mAvSkew = ms_ticker_synchronizer_update(ictx->mTickerSynchronizer, ictx->read_samples, (unsigned int)ictx->opensles_context->samplerate);
 	putq(&ictx->q, m);
 	ms_mutex_unlock(&ictx->mutex);
@@ -1107,7 +1108,7 @@ static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSn
 	card->device_type = get_device_type(env, deviceInfo);
 
 	OpenSLESContext *card_data = (OpenSLESContext*)card->data;
-	card->internal_id = card->internal_id;
+	card_data->device_id = card->internal_id;
 
 	// Card capabilities
 	card->capabilities |= get_device_capabilities(env, deviceInfo);
