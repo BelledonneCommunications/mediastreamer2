@@ -118,6 +118,32 @@ int getJVIntField(JNIEnv *env, const char * className, const char * fieldName) {
 	return value;
 }
 
+void change_device(JNIEnv *env, AudioDeviceType type) {
+
+	std::string methodName;
+	if (type == AudioDeviceType::SPEAKER) {
+		methodName = "enableSpeaker";
+	} else if (type == AudioDeviceType::BLUETOOTH) {
+		methodName = "enableBluetooth";
+	} else if (type == AudioDeviceType::EARPIECE) {
+		methodName = "enableEarpiece";
+	}
+
+	if (methodName.empty()) {
+		ms_error("[Android Audio Utils] Unable to find method to enable device type %0d", static_cast<int>(type));
+	} else {
+		jclass mediastreamerAndroidContextClass = env->FindClass("org/linphone/mediastream/MediastreamerAndroidContext");
+		if (mediastreamerAndroidContextClass != NULL) {
+			jmethodID getBufferSize = env->GetStaticMethodID(mediastreamerAndroidContextClass, methodName.c_str(), "()V");
+			if (getBufferSize != NULL) {
+					env->CallStaticVoidMethod(mediastreamerAndroidContextClass, getBufferSize);
+					ms_message("[Android Audio Utils] method %s has been called succesfully", methodName.c_str());
+			}
+			env->DeleteLocalRef(mediastreamerAndroidContextClass);
+		}
+	}
+}
+
 AudioDeviceType get_device_type(JNIEnv *env, jobject deviceInfo) {
 
 	int typeID = -1;

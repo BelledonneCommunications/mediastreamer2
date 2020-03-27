@@ -27,43 +27,53 @@
 /**
  * Retrieve preferred buffer size from Mediastreamer Android Context.
 **/
-int get_preferred_buffer_size();
+MS2_PUBLIC int get_preferred_buffer_size();
 
 /**
  * Retrieve preferred sample rate from Mediastreamer Android Context.
 **/
-int get_preferred_sample_rate();
+MS2_PUBLIC int get_preferred_sample_rate();
 
 /**
  * Retrieve all devices in a given direction.
  * Valid values for string dir are "all" "output" "input"
 **/
-jobject get_all_devices(JNIEnv *env, const char * dir);
+MS2_PUBLIC jobject get_all_devices(JNIEnv *env, const char * dir);
 
 /**
  * Retrieve device ID for the device deviceInfo.
 **/
-unsigned int get_device_id(JNIEnv *env, jobject deviceInfo);
+MS2_PUBLIC unsigned int get_device_id(JNIEnv *env, jobject deviceInfo);
 
 /**
  * Retrieve the value of a JV class field fieldName.
 **/
-int getJVIntField(JNIEnv *env, const char * className, const char * fieldName);
+MS2_PUBLIC int getJVIntField(JNIEnv *env, const char * className, const char * fieldName);
 
 /**
  * Retrieve device type for the device deviceInfo.
 **/
-AudioDeviceType get_device_type(JNIEnv *env, jobject deviceInfo);
+MS2_PUBLIC AudioDeviceType get_device_type(JNIEnv *env, jobject deviceInfo);
 
 /**
  * Retrieve device capabilities (recorder or playback) for the device deviceInfo.
 **/
-unsigned int get_device_capabilities(JNIEnv *env, jobject deviceInfo);
+MS2_PUBLIC unsigned int get_device_capabilities(JNIEnv *env, jobject deviceInfo);
 
 /**
  * Retrieve product name for the device deviceInfo.
 **/
-char * get_device_product_name(JNIEnv *env, jobject deviceInfo);
+MS2_PUBLIC char * get_device_product_name(JNIEnv *env, jobject deviceInfo);
+
+/**
+ * Retrieve SDK version the app is running on.
+**/
+MS2_PUBLIC int get_sdk_version(JNIEnv *env);
+
+/**
+ * Make upcalls to change device from mediastreamer.
+**/
+MS2_PUBLIC void change_device(JNIEnv *env, AudioDeviceType type);
 
 #ifdef __cplusplus
 extern "C"{

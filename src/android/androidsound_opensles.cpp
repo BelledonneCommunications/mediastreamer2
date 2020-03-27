@@ -108,14 +108,16 @@ struct OpenSLESContext {
 		nchannels = 1;
 		builtin_aec = false;
 		device_id = -1;
-		device_id_changed = false;
+		device_type = AudioDeviceType::UNKNOWN_DEVICE_TYPE;
+		device_changed = false;
 	}
 
 	int samplerate;
 	int nchannels;
 	bool builtin_aec;
 	int32_t device_id;
-	bool device_id_changed;
+	AudioDeviceType device_type;
+	bool device_changed;
 
 	SLObjectItf engineObject;
 	SLEngineItf engineEngine;
@@ -239,8 +241,7 @@ static SLuint32 convertSamplerate(int samplerate)
     case 8000:
         return SL_SAMPLINGRATE_8;
         break;
-    case 16000:
-        return SL_SAMPLINGRATE_16;
+    case 16000: return SL_SAMPLINGRATE_16;
         break;
     case 22050:
         return SL_SAMPLINGRATE_22_05;
@@ -656,14 +657,16 @@ static int android_snd_read_get_nchannels(MSFilter *obj, void *data) {
 	return 0;
 }
 
-static int android_snd_read_set_device_id(MSFilter *obj, void *data) {
-	int *n = (int*)data;
+static int android_snd_read_configure_soundcard(MSFilter *obj, void *data) {
+	MSSndCard *card = (MSSndCard*)data;
 	OpenSLESInputContext *ictx = (OpenSLESInputContext*)obj->data;
-	// Change device ID only if the new value is different from the previous one
-	if (ictx->opensles_context->device_id != *n) {
+	// Check if device_id is different and/or device_type is different
+	// For API < 23, all device ID are identical but the device type is different
+	if ((ictx->opensles_context->device_id != card->internal_id) || (ictx->opensles_context->device_type != card->device_type)) {
 		ms_mutex_lock(&ictx->mutex);
-		ictx->opensles_context->device_id_changed = true;
-		ictx->opensles_context->device_id = *n;
+		ictx->opensles_context->device_changed = true;
+		ictx->opensles_context->device_id = card->internal_id;
+		ictx->opensles_context->device_type = card->device_type;
 		ms_mutex_unlock(&ictx->mutex);
 	}
 	return 0;
@@ -686,7 +689,7 @@ static MSFilterMethod android_snd_read_methods[] = {
 	{MS_FILTER_SET_NCHANNELS, android_snd_read_set_nchannels},
 	{MS_FILTER_GET_NCHANNELS, android_snd_read_get_nchannels},
 	{MS_AUDIO_CAPTURE_FORCE_SPEAKER_STATE, android_snd_read_hack_speaker_state},
-	{MS_AUDIO_CAPTURE_SET_INTERNAL_ID, android_snd_read_set_device_id},
+	{MS_AUDIO_CAPTURE_CONFIGURE_SOUNDCARD, android_snd_read_configure_soundcard},
 	{MS_AUDIO_CAPTURE_GET_INTERNAL_ID, android_snd_read_get_device_id},
 	{0,NULL}
 };
@@ -951,14 +954,16 @@ static int android_snd_write_get_nchannels(MSFilter *obj, void *data) {
 	return 0;
 }
 
-static int android_snd_write_set_device_id(MSFilter *obj, void *data) {
-	int *n = (int*)data;
+static int android_snd_write_configure_soundcard(MSFilter *obj, void *data) {
+	MSSndCard *card = (MSSndCard*)data;
 	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
-	// Change device ID only if the new value is different from the previous one
-	if (octx->opensles_context->device_id != *n) {
+	// Check if device_id is different and/or device_type is different
+	// For API < 23, all device ID are identical but the device type is different
+	if ((octx->opensles_context->device_id != card->internal_id) || (octx->opensles_context->device_type != card->device_type)) {
 		ms_mutex_lock(&octx->mutex);
-		octx->opensles_context->device_id_changed = true;
-		octx->opensles_context->device_id = *n;
+		octx->opensles_context->device_changed = true;
+		octx->opensles_context->device_id = card->internal_id;
+		octx->opensles_context->device_type = card->device_type;
 		ms_mutex_unlock(&octx->mutex);
 	}
 	return 0;
@@ -966,8 +971,8 @@ static int android_snd_write_set_device_id(MSFilter *obj, void *data) {
 
 static int android_snd_write_get_device_id(MSFilter *obj, void *data) {
 	int *n = (int*)data;
-	OpenSLESInputContext *ictx = (OpenSLESInputContext*)obj->data;
-	*n = ictx->opensles_context->device_id;
+	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
+	*n = octx->opensles_context->device_id;
 	return 0;
 }
 
@@ -1001,6 +1006,11 @@ static void android_snd_write_preprocess(MSFilter *obj) {
 static void android_snd_write_process(MSFilter *obj) {
 	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
 	ms_mutex_lock(&octx->mutex);
+
+	if (octx->opensles_context->device_changed) {
+		JNIEnv *env = ms_get_jni_env();
+		change_device(env, octx->opensles_context->device_type);
+	}
 
 	ms_flow_controlled_bufferizer_put_from_queue(&octx->buffer, obj->inputs[0]);
 	ms_mutex_unlock(&octx->mutex);
@@ -1047,7 +1057,7 @@ static MSFilterMethod android_snd_write_methods[] = {
 	{MS_FILTER_GET_SAMPLE_RATE, android_snd_write_get_sample_rate},
 	{MS_FILTER_SET_NCHANNELS, android_snd_write_set_nchannels},
 	{MS_FILTER_GET_NCHANNELS, android_snd_write_get_nchannels},
-	{MS_AUDIO_PLAYBACK_SET_INTERNAL_ID, android_snd_write_set_device_id},
+	{MS_AUDIO_PLAYBACK_CONFIGURE_SOUNDCARD, android_snd_write_configure_soundcard},
 	{MS_AUDIO_PLAYBACK_GET_INTERNAL_ID, android_snd_write_get_device_id},
 	{0,NULL}
 };
@@ -1118,6 +1128,7 @@ static void snd_card_device_create(const char * name, AudioDeviceType type, unsi
 
 	OpenSLESContext *card_data = (OpenSLESContext*)card->data;
 	card_data->device_id = card->internal_id;
+	card_data->device_type = card->device_type;
 
 	// Card capabilities
 	card->capabilities |= capabilities;
@@ -1140,6 +1151,7 @@ static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSn
 
 	OpenSLESContext *card_data = (OpenSLESContext*)card->data;
 	card_data->device_id = card->internal_id;
+	card_data->device_type = card->device_type;
 
 	// Card capabilities
 	card->capabilities |= get_device_capabilities(env, deviceInfo);
