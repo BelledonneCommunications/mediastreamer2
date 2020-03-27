@@ -340,12 +340,13 @@ static SLresult opensles_recorder_init(OpenSLESInputContext *ictx) {
 	SLresult result;
 	SLuint32 sample_rate = convertSamplerate(ictx->opensles_context->samplerate);
 	SLuint32 channels = (SLuint32) ictx->opensles_context->nchannels;
-	SLuint32 device_id = ictx->opensles_context->device_id;
+//	SLuint32 device_id = ictx->opensles_context->device_id;
 
 	SLDataLocator_IODevice loc_dev = {
 		SL_DATALOCATOR_IODEVICE,
 		SL_IODEVICE_AUDIOINPUT,
-		device_id,
+		SL_DEFAULTDEVICEID_AUDIOINPUT,
+//		device_id,
 		NULL
 	};
 
