@@ -216,3 +216,20 @@ char * get_device_product_name(JNIEnv *env, jobject deviceInfo) {
 
 	return productName;
 }
+
+int get_sdk_version(JNIEnv *env) {
+
+	int sdkVersion = -1;
+
+	jclass versionClass = env->FindClass("android/os/Build$VERSION");
+	if (versionClass != NULL) {
+		jfieldID fid = env->GetStaticFieldID(versionClass, "SDK_INT", "I");
+		if (fid != NULL) {
+			sdkVersion=env->GetStaticIntField(versionClass, fid);
+			ms_message("SDK version [%i] detected",sdkVersion);
+		}
+		env->DeleteLocalRef(versionClass);
+	}
+
+	return sdkVersion;
+}
