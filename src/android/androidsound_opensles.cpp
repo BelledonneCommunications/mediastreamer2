@@ -689,7 +689,7 @@ static MSFilterMethod android_snd_read_methods[] = {
 	{MS_FILTER_SET_NCHANNELS, android_snd_read_set_nchannels},
 	{MS_FILTER_GET_NCHANNELS, android_snd_read_get_nchannels},
 	{MS_AUDIO_CAPTURE_FORCE_SPEAKER_STATE, android_snd_read_hack_speaker_state},
-	{MS_AUDIO_CAPTURE_CONFIGURE_SOUNDCARD, android_snd_read_configure_soundcard},
+	{MS_AUDIO_CAPTURE_SET_INTERNAL_ID, android_snd_read_configure_soundcard},
 	{MS_AUDIO_CAPTURE_GET_INTERNAL_ID, android_snd_read_get_device_id},
 	{0,NULL}
 };
@@ -1057,7 +1057,7 @@ static MSFilterMethod android_snd_write_methods[] = {
 	{MS_FILTER_GET_SAMPLE_RATE, android_snd_write_get_sample_rate},
 	{MS_FILTER_SET_NCHANNELS, android_snd_write_set_nchannels},
 	{MS_FILTER_GET_NCHANNELS, android_snd_write_get_nchannels},
-	{MS_AUDIO_PLAYBACK_CONFIGURE_SOUNDCARD, android_snd_write_configure_soundcard},
+	{MS_AUDIO_PLAYBACK_SET_INTERNAL_ID, android_snd_write_configure_soundcard},
 	{MS_AUDIO_PLAYBACK_GET_INTERNAL_ID, android_snd_write_get_device_id},
 	{0,NULL}
 };

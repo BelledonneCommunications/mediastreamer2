@@ -297,7 +297,7 @@ typedef enum _MSRecorderState MSRecorderState;
 #define MS_AUDIO_CAPTURE_GET_VOLUME_GAIN \
 	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 1, float)
 /** Set capture device ID */
-#define MS_AUDIO_CAPTURE_CONFIGURE_SOUNDCARD \
+#define MS_AUDIO_CAPTURE_SET_INTERNAL_ID \
 	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 2, int)
 /** Get capture device ID */
 #define MS_AUDIO_CAPTURE_GET_INTERNAL_ID \
@@ -321,7 +321,7 @@ typedef enum _MSAudioRoute MSAudioRoute;
 #define MS_AUDIO_PLAYBACK_MUTE \
 	MS_FILTER_METHOD(MSFilterAudioPlaybackInterface, 3, int)
 /** Set playback device ID */
-#define MS_AUDIO_PLAYBACK_CONFIGURE_SOUNDCARD \
+#define MS_AUDIO_PLAYBACK_SET_INTERNAL_ID \
 	MS_FILTER_METHOD(MSFilterAudioPlaybackInterface, 4, int)
 /** Get playback device ID */
 #define MS_AUDIO_PLAYBACK_GET_INTERNAL_ID \

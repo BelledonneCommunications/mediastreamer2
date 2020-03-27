@@ -177,7 +177,7 @@ static bool_t audio_stream_payload_type_changed(RtpSession *session, void *data)
 static void audio_stream_configure_input_snd_card(AudioStream *stream, MSSndCard * card) {
 	if (stream->soundread) {
 		if(ms_filter_implements_interface(stream->soundread, MSFilterAudioCaptureInterface)) {
-			ms_filter_call_method(stream->soundread, MS_AUDIO_CAPTURE_CONFIGURE_SOUNDCARD, card);
+			ms_filter_call_method(stream->soundread, MS_AUDIO_CAPTURE_SET_INTERNAL_ID, card);
 			ms_message("set sound card for %s:%p to %s", ms_filter_get_name(stream->soundread), stream->soundread, card->name);
 		}
 	}
@@ -189,7 +189,7 @@ static void audio_stream_configure_input_snd_card(AudioStream *stream, MSSndCard
 static void audio_stream_configure_output_snd_card(AudioStream *stream, MSSndCard * card) {
 	if (stream->soundwrite) {
 		if(ms_filter_implements_interface(stream->soundwrite, MSFilterAudioPlaybackInterface)) {
-			ms_filter_call_method(stream->soundwrite, MS_AUDIO_PLAYBACK_CONFIGURE_SOUNDCARD, card);
+			ms_filter_call_method(stream->soundwrite, MS_AUDIO_PLAYBACK_SET_INTERNAL_ID, card);
 			ms_message("set sound card for %s:%p to %s", ms_filter_get_name(stream->soundwrite), stream->soundwrite, card->name);
 		}
 	}
