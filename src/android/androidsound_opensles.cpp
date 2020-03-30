@@ -109,7 +109,6 @@ struct OpenSLESContext {
 		builtin_aec = false;
 		device_id = -1;
 		device_type = MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_UNKNOWN;
-		device_changed = false;
 	}
 
 	int samplerate;
@@ -117,7 +116,6 @@ struct OpenSLESContext {
 	bool builtin_aec;
 	int32_t device_id;
 	MSSndCardDeviceType device_type;
-	bool device_changed;
 
 	SLObjectItf engineObject;
 	SLEngineItf engineEngine;
@@ -664,9 +662,10 @@ static int android_snd_read_configure_soundcard(MSFilter *obj, void *data) {
 	// For API < 23, all device ID are identical but the device type is different
 	if ((ictx->opensles_context->device_id != card->internal_id) || (ictx->opensles_context->device_type != card->device_type)) {
 		ms_mutex_lock(&ictx->mutex);
-		ictx->opensles_context->device_changed = true;
 		ictx->opensles_context->device_id = card->internal_id;
 		ictx->opensles_context->device_type = card->device_type;
+		JNIEnv *env = ms_get_jni_env();
+		change_device(env, ictx->opensles_context->device_type);
 		ms_mutex_unlock(&ictx->mutex);
 	}
 	return 0;
@@ -961,9 +960,10 @@ static int android_snd_write_configure_soundcard(MSFilter *obj, void *data) {
 	// For API < 23, all device ID are identical but the device type is different
 	if ((octx->opensles_context->device_id != card->internal_id) || (octx->opensles_context->device_type != card->device_type)) {
 		ms_mutex_lock(&octx->mutex);
-		octx->opensles_context->device_changed = true;
 		octx->opensles_context->device_id = card->internal_id;
 		octx->opensles_context->device_type = card->device_type;
+		JNIEnv *env = ms_get_jni_env();
+		change_device(env, octx->opensles_context->device_type);
 		ms_mutex_unlock(&octx->mutex);
 	}
 	return 0;
@@ -1006,11 +1006,6 @@ static void android_snd_write_preprocess(MSFilter *obj) {
 static void android_snd_write_process(MSFilter *obj) {
 	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
 	ms_mutex_lock(&octx->mutex);
-
-	if (octx->opensles_context->device_changed) {
-		JNIEnv *env = ms_get_jni_env();
-		change_device(env, octx->opensles_context->device_type);
-	}
 
 	ms_flow_controlled_bufferizer_put_from_queue(&octx->buffer, obj->inputs[0]);
 	ms_mutex_unlock(&octx->mutex);
