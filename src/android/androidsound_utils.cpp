@@ -118,14 +118,14 @@ int getJVIntField(JNIEnv *env, const char * className, const char * fieldName) {
 	return value;
 }
 
-void change_device(JNIEnv *env, AudioDeviceType type) {
+void change_device(JNIEnv *env, MSSndCardDeviceType type) {
 
 	std::string methodName;
-	if (type == AudioDeviceType::SPEAKER) {
+	if (type == MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_SPEAKER) {
 		methodName = "enableSpeaker";
-	} else if (type == AudioDeviceType::BLUETOOTH) {
+	} else if (type == MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_BLUETOOTH) {
 		methodName = "enableBluetooth";
-	} else if (type == AudioDeviceType::EARPIECE) {
+	} else if (type == MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_EARPIECE) {
 		methodName = "enableEarpiece";
 	}
 
@@ -144,7 +144,7 @@ void change_device(JNIEnv *env, AudioDeviceType type) {
 	}
 }
 
-AudioDeviceType get_device_type(JNIEnv *env, jobject deviceInfo) {
+MSSndCardDeviceType get_device_type(JNIEnv *env, jobject deviceInfo) {
 
 	int typeID = -1;
 
@@ -159,27 +159,27 @@ AudioDeviceType get_device_type(JNIEnv *env, jobject deviceInfo) {
 		env->DeleteLocalRef(audioDeviceInfoClass);
 	}
 
-	AudioDeviceType deviceType = AudioDeviceType::UNKNOWN_DEVICE_TYPE;
+	MSSndCardDeviceType deviceType = MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_UNKNOWN;
 	if ((typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_BLUETOOTH_SCO")) || (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_BLUETOOTH_A2DP"))) {
-		deviceType = AudioDeviceType::BLUETOOTH;
+		deviceType = MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_BLUETOOTH;
 	} else if (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_BUILTIN_EARPIECE")) {
-		deviceType = AudioDeviceType::EARPIECE;
+		deviceType = MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_EARPIECE;
 	} else if (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_BUILTIN_SPEAKER")) {
-		deviceType = AudioDeviceType::SPEAKER;
+		deviceType = MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_SPEAKER;
 	} else if (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_BUILTIN_MIC")) {
-		deviceType = AudioDeviceType::MICROPHONE;
+		deviceType = MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_MICROPHONE;
 	} else if ((typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_USB_HEADSET")) || (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_WIRED_HEADSET"))) {
-		deviceType = AudioDeviceType::HEADSET;
+		deviceType = MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_HEADSET;
 	} else if (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_WIRED_HEADPHONES")) {
-		deviceType = AudioDeviceType::HEADPHONES;
+		deviceType = MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_HEADPHONES;
 	} else if (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_USB_DEVICE")) {
-		deviceType = AudioDeviceType::GENERIC_USB;
+		deviceType = MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_GENERIC_USB;
 	} else if (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_AUX_LINE")) {
-		deviceType = AudioDeviceType::AUX_LINE;
+		deviceType = MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_AUX_LINE;
 	} else if (typeID == getJVIntField(env, audioDeviceInfoClassName, "TYPE_TELEPHONY")) {
-		deviceType = AudioDeviceType::TELEPHONY;
+		deviceType = MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_TELEPHONY;
 	} else {
-		deviceType = AudioDeviceType::UNKNOWN_DEVICE_TYPE;
+		deviceType = MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_UNKNOWN;
 		ms_error("[Android Audio Utils] Unknown device type for type ID %0d", typeID);
 	}
 

@@ -53,7 +53,7 @@ MS2_PUBLIC int getJVIntField(JNIEnv *env, const char * className, const char * f
 /**
  * Retrieve device type for the device deviceInfo.
 **/
-MS2_PUBLIC AudioDeviceType get_device_type(JNIEnv *env, jobject deviceInfo);
+MS2_PUBLIC MSSndCardDeviceType get_device_type(JNIEnv *env, jobject deviceInfo);
 
 /**
  * Retrieve device capabilities (recorder or playback) for the device deviceInfo.
@@ -73,7 +73,7 @@ MS2_PUBLIC int get_sdk_version(JNIEnv *env);
 /**
  * Make upcalls to change device from mediastreamer.
 **/
-MS2_PUBLIC void change_device(JNIEnv *env, AudioDeviceType type);
+MS2_PUBLIC void change_device(JNIEnv *env, MSSndCardDeviceType type);
 
 #ifdef __cplusplus
 extern "C"{

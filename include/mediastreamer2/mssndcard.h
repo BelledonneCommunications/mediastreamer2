@@ -145,24 +145,24 @@ enum _MSSndCardStreamType{
  */
 typedef enum _MSSndCardStreamType MSSndCardStreamType;
 
-enum _AudioDeviceType{
-	TELEPHONY,
-	AUX_LINE,
-	GENERIC_USB,
-	HEADSET,
-	MICROPHONE,
-	EARPIECE,
-	HEADPHONES,
-	SPEAKER,
-	BLUETOOTH,
-	UNKNOWN_DEVICE_TYPE
+enum _MSSndCardDeviceType {
+	MS_SND_CARD_DEVICE_TYPE_TELEPHONY,
+	MS_SND_CARD_DEVICE_TYPE_AUX_LINE,
+	MS_SND_CARD_DEVICE_TYPE_GENERIC_USB,
+	MS_SND_CARD_DEVICE_TYPE_HEADSET,
+	MS_SND_CARD_DEVICE_TYPE_MICROPHONE,
+	MS_SND_CARD_DEVICE_TYPE_EARPIECE,
+	MS_SND_CARD_DEVICE_TYPE_HEADPHONES,
+	MS_SND_CARD_DEVICE_TYPE_SPEAKER,
+	MS_SND_CARD_DEVICE_TYPE_BLUETOOTH,
+	MS_SND_CARD_DEVICE_TYPE_UNKNOWN
 };
 
 /**
  * device type enum.
  * @var DeviceType
 **/
-typedef enum _AudioDeviceType AudioDeviceType;
+typedef enum _MSSndCardDeviceType MSSndCardDeviceType;
 
 #define MS_SND_CARD_CAP_DISABLED (0) /**<This soundcard is disabled.*/
 #define MS_SND_CARD_CAP_CAPTURE (1) /**<This sound card can capture sound */
@@ -177,7 +177,7 @@ struct _MSSndCard{
 	char *id;
 	int  internal_id;
 	unsigned int capabilities;
-	AudioDeviceType device_type;
+	MSSndCardDeviceType device_type;
 	void *data;
 	int preferred_sample_rate;
 	int latency;
@@ -408,10 +408,10 @@ MS2_PUBLIC MSSndCard * ms_snd_card_dup(MSSndCard *card);
  *
  * @param obj   A sound card object.
  *
- * Returns: an AudioDeviceType enum type.
- * Default value is AudioDeviceType::UNKNOWN.
+ * Returns: an MSSndCardDeviceType enum type.
+ * Default value is MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_UNKNOWN.
  */
-MS2_PUBLIC AudioDeviceType ms_snd_card_get_device_type(const MSSndCard *obj);
+MS2_PUBLIC MSSndCardDeviceType ms_snd_card_get_device_type(const MSSndCard *obj);
 
 /**
  * Retreive a sound card's driver type string.

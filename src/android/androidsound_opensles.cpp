@@ -98,7 +98,7 @@ static int DeviceFavoriteBufferSize = 256;
 using namespace fake_opensles;
 
 static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSndCardManager *m);
-static void snd_card_device_create(const char * name, AudioDeviceType type, unsigned int capabilities, MSSndCardManager *m);
+static void snd_card_device_create(const char * name, MSSndCardDeviceType type, unsigned int capabilities, MSSndCardManager *m);
 static MSFilter *ms_android_snd_read_new(MSFactory *factory);
 static MSFilter *ms_android_snd_write_new(MSFactory* factory);
 
@@ -108,7 +108,7 @@ struct OpenSLESContext {
 		nchannels = 1;
 		builtin_aec = false;
 		device_id = -1;
-		device_type = AudioDeviceType::UNKNOWN_DEVICE_TYPE;
+		device_type = MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_UNKNOWN;
 		device_changed = false;
 	}
 
@@ -116,7 +116,7 @@ struct OpenSLESContext {
 	int nchannels;
 	bool builtin_aec;
 	int32_t device_id;
-	AudioDeviceType device_type;
+	MSSndCardDeviceType device_type;
 	bool device_changed;
 
 	SLObjectItf engineObject;
@@ -284,9 +284,9 @@ static void android_snd_card_add_devices(MSSndCardManager *m) {
 	} else {
 
 		//For devices running API older than API23, only 3 devices are created: microphone, speaker and earpiece
-		snd_card_device_create("Microphone", AudioDeviceType::MICROPHONE, MS_SND_CARD_CAP_CAPTURE, m);
-		snd_card_device_create("Speaker", AudioDeviceType::SPEAKER, MS_SND_CARD_CAP_PLAYBACK, m);
-		snd_card_device_create("Earpiece", AudioDeviceType::EARPIECE, MS_SND_CARD_CAP_PLAYBACK, m);
+		snd_card_device_create("Microphone", MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_MICROPHONE, MS_SND_CARD_CAP_CAPTURE, m);
+		snd_card_device_create("Speaker", MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_SPEAKER, MS_SND_CARD_CAP_PLAYBACK, m);
+		snd_card_device_create("Earpiece", MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_EARPIECE, MS_SND_CARD_CAP_PLAYBACK, m);
 	}
 
 }
@@ -1118,7 +1118,7 @@ static void snd_card_device_create_extra_fields(MSSndCardManager *m, MSSndCard *
 	}
 }
 
-static void snd_card_device_create(const char * name, AudioDeviceType type, unsigned int capabilities, MSSndCardManager *m) {
+static void snd_card_device_create(const char * name, MSSndCardDeviceType type, unsigned int capabilities, MSSndCardManager *m) {
 
 	MSSndCard *card = ms_snd_card_new(&android_native_snd_opensles_card_desc);
 
