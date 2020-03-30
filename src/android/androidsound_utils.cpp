@@ -134,9 +134,9 @@ void change_device(JNIEnv *env, MSSndCardDeviceType type) {
 	} else {
 		jclass mediastreamerAndroidContextClass = env->FindClass("org/linphone/mediastream/MediastreamerAndroidContext");
 		if (mediastreamerAndroidContextClass != NULL) {
-			jmethodID getBufferSize = env->GetStaticMethodID(mediastreamerAndroidContextClass, methodName.c_str(), "()V");
-			if (getBufferSize != NULL) {
-					env->CallStaticVoidMethod(mediastreamerAndroidContextClass, getBufferSize);
+			jmethodID changeDevice = env->GetStaticMethodID(mediastreamerAndroidContextClass, methodName.c_str(), "()V");
+			if (changeDevice != NULL) {
+					env->CallStaticVoidMethod(mediastreamerAndroidContextClass, changeDevice);
 					ms_message("[Android Audio Utils] method %s has been called succesfully", methodName.c_str());
 			}
 			env->DeleteLocalRef(mediastreamerAndroidContextClass);
