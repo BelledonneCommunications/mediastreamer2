@@ -174,11 +174,12 @@ static bool_t audio_stream_payload_type_changed(RtpSession *session, void *data)
 /*
  * note: Only AAudio and OpenSLES leverage internal ID for input streams.
  */
-static void audio_stream_configure_input_snd_card(AudioStream *stream, MSSndCard * card) {
+static void audio_stream_configure_input_snd_card(AudioStream *stream) {
+	MSSndCard * card = stream->captcard;
 	if (stream->soundread) {
 		if(ms_filter_implements_interface(stream->soundread, MSFilterAudioCaptureInterface)) {
 			ms_filter_call_method(stream->soundread, MS_AUDIO_CAPTURE_SET_INTERNAL_ID, card);
-			ms_message("set sound card for %s:%p to %s", ms_filter_get_name(stream->soundread), stream->soundread, card->name);
+			ms_message("[AudioSteam] set input sound card for %s:%p to %s", ms_filter_get_name(stream->soundread), stream->soundread, card->name);
 		}
 	}
 }
@@ -186,11 +187,12 @@ static void audio_stream_configure_input_snd_card(AudioStream *stream, MSSndCard
 /*
  * note: Only AAudio and OpenSLES leverage internal ID for output streams.
  */
-static void audio_stream_configure_output_snd_card(AudioStream *stream, MSSndCard * card) {
+static void audio_stream_configure_output_snd_card(AudioStream *stream) {
+	MSSndCard * card = stream->playcard;
 	if (stream->soundwrite) {
 		if(ms_filter_implements_interface(stream->soundwrite, MSFilterAudioPlaybackInterface)) {
 			ms_filter_call_method(stream->soundwrite, MS_AUDIO_PLAYBACK_SET_INTERNAL_ID, card);
-			ms_message("set sound card for %s:%p to %s", ms_filter_get_name(stream->soundwrite), stream->soundwrite, card->name);
+			ms_message("[AudioStream] set output sound card for %s:%p to %s", ms_filter_get_name(stream->soundwrite), stream->soundwrite, card->name);
 		}
 	}
 }
@@ -1990,18 +1992,18 @@ void audio_stream_set_audio_route(AudioStream *stream, MSAudioRoute route) {
 
 void audio_stream_set_input_ms_snd_card(AudioStream *stream, MSSndCard * sndcard_capture) {
 	stream->captcard = sndcard_capture;
-	audio_stream_configure_input_snd_card(stream, sndcard_capture);
+	audio_stream_configure_input_snd_card(stream);
 }
 
 void audio_stream_set_output_ms_snd_card(AudioStream *stream, MSSndCard * sndcard_playback) {
 	stream->playcard = sndcard_playback;
-	audio_stream_configure_output_snd_card(stream, sndcard_playback);
+	audio_stream_configure_output_snd_card(stream);
 }
 
 MSSndCard * audio_stream_get_input_ms_snd_card(AudioStream *stream) {
-	return stream->playcard;
+	return stream->captcard;
 }
 
 MSSndCard * audio_stream_get_output_ms_snd_card(AudioStream *stream) {
-	return stream->captcard;
+	return stream->playcard;
 }
