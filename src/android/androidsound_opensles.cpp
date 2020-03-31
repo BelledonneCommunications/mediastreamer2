@@ -1142,23 +1142,31 @@ static void snd_card_device_create(const char * name, MSSndCardDeviceType type, 
 
 static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSndCardManager *m) {
 
-	MSSndCard *card = ms_snd_card_new(&android_native_snd_opensles_card_desc);
+	MSSndCardDeviceType type = get_device_type(env, deviceInfo);
+	if (
+		(type == MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_BLUETOOTH) ||
+		(type == MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_EARPIECE) ||
+		(type == MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_SPEAKER) ||
+		(type == MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_MICROPHONE)
+	) {
+		MSSndCard *card = ms_snd_card_new(&android_native_snd_opensles_card_desc);
 
-	card->name = ms_strdup(get_device_product_name(env, deviceInfo));
-	card->internal_id = get_device_id(env, deviceInfo);
-	card->device_type = get_device_type(env, deviceInfo);
+		card->name = ms_strdup(get_device_product_name(env, deviceInfo));
+		card->internal_id = get_device_id(env, deviceInfo);
+		card->device_type = type;
 
-	OpenSLESContext *card_data = (OpenSLESContext*)card->data;
-	card_data->device_id = card->internal_id;
-	card_data->device_type = card->device_type;
+		OpenSLESContext *card_data = (OpenSLESContext*)card->data;
+		card_data->device_id = card->internal_id;
+		card_data->device_type = card->device_type;
 
-	// Card capabilities
-	card->capabilities = get_device_capabilities(env, deviceInfo);
+		// Card capabilities
+		card->capabilities = get_device_capabilities(env, deviceInfo);
 
-	snd_card_device_create_extra_fields(m, card);
+		snd_card_device_create_extra_fields(m, card);
 
-	ms_snd_card_manager_add_card(m, card);
+		ms_snd_card_manager_add_card(m, card);
 
-	ms_message("[OpenSLES] Added card: id %s name %s device ID %0d device_type %0d capabilities 0'h%0X", card->id, card->name, card_data->device_id, card->device_type, card->capabilities);
+		ms_message("[OpenSLES] Added card: id %s name %s device ID %0d device_type %s capabilities 0'h%0X", card->id, card->name, card_data->device_id, ms_snd_card_device_type_to_string(card->device_type), card->capabilities);
+	}
 
 }
