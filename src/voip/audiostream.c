@@ -179,7 +179,7 @@ static void audio_stream_configure_input_snd_card(AudioStream *stream) {
 	if (stream->soundread) {
 		if(ms_filter_implements_interface(stream->soundread, MSFilterAudioCaptureInterface)) {
 			ms_filter_call_method(stream->soundread, MS_AUDIO_CAPTURE_SET_INTERNAL_ID, card);
-			ms_message("[AudioSteam] set input sound card for %s:%p to %s", ms_filter_get_name(stream->soundread), stream->soundread, card->name);
+			ms_message("[AudioSteam] set input sound card for %s:%p to %s", ms_filter_get_name(stream->soundread), stream->soundread, card->id);
 		}
 	}
 }
@@ -192,7 +192,7 @@ static void audio_stream_configure_output_snd_card(AudioStream *stream) {
 	if (stream->soundwrite) {
 		if(ms_filter_implements_interface(stream->soundwrite, MSFilterAudioPlaybackInterface)) {
 			ms_filter_call_method(stream->soundwrite, MS_AUDIO_PLAYBACK_SET_INTERNAL_ID, card);
-			ms_message("[AudioStream] set output sound card for %s:%p to %s", ms_filter_get_name(stream->soundwrite), stream->soundwrite, card->name);
+			ms_message("[AudioStream] set output sound card for %s:%p to %s", ms_filter_get_name(stream->soundwrite), stream->soundwrite, card->id);
 		}
 	}
 }
@@ -865,6 +865,7 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 		if (stream->soundread==NULL)
 			stream->soundread = ms_snd_card_create_reader(io->input.soundcard);
 		has_builtin_ec=!!(ms_snd_card_get_capabilities(io->input.soundcard) & MS_SND_CARD_CAP_BUILTIN_ECHO_CANCELLER);
+		stream->captcard = io->input.soundcard;
 	} else if (io->input.type == MSResourceRtp) {
 		stream->rtp_io_session = io->input.session;
 		pt = rtp_profile_get_payload(rtp_session_get_profile(stream->rtp_io_session),
@@ -880,6 +881,8 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 	if (io->output.type == MSResourceSoundcard) {
 		if (stream->soundwrite==NULL)
 			stream->soundwrite=ms_snd_card_create_writer(io->output.soundcard);
+
+		stream->playcard = io->output.soundcard;
 	} else if (io->output.type == MSResourceRtp) {
 		stream->rtp_io_session = io->output.session;
 		pt = rtp_profile_get_payload(rtp_session_get_profile(stream->rtp_io_session),
