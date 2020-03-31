@@ -1132,7 +1132,7 @@ static void snd_card_device_create(const char * name, MSSndCardDeviceType type, 
 
 	ms_snd_card_manager_add_card(m, card);
 
-	ms_message("[OpenSLES] Added card: name %s device ID %0d device_type %0d ", card->name, card_data->device_id, card->device_type);
+	ms_message("[OpenSLES] Added card: name [%s] device ID [%0d] type [%s]", card->name, card_data->device_id, ms_snd_card_device_type_to_string(card->device_type));
 
 }
 
@@ -1155,6 +1155,6 @@ static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSn
 
 	ms_snd_card_manager_add_card(m, card);
 
-	ms_message("[OpenSLES] Added card: name %s device ID %0d device_type %0d ", card->name, card_data->device_id, card->device_type);
+	ms_message("[OpenSLES] Added card: name [%s] device ID [%0d] type [%s]", card->name, card_data->device_id, ms_snd_card_device_type_to_string(card->device_type));
 
 }

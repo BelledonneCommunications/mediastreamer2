@@ -642,6 +642,11 @@ MS2_PUBLIC MSSndCard * ms_alsa_card_new_custom(const char *pcmdev, const char *m
 **/
 MS2_PUBLIC void ms_alsa_card_set_forced_sample_rate(int samplerate);
 
+/**
+ * Returns a string value of the given MSSndCardDeviceType enum
+ */
+MS2_PUBLIC const char* ms_snd_card_device_type_to_string(MSSndCardDeviceType type);
+
 /** @} */
 
 #ifdef __cplusplus

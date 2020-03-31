@@ -346,3 +346,29 @@ MSSndCardManager* ms_snd_card_manager_get(void) {
 	return ms_factory_get_snd_card_manager(ms_factory_get_fallback());
 }
 
+const char* ms_snd_card_device_type_to_string(MSSndCardDeviceType type) {
+	switch (type) {
+		case MS_SND_CARD_DEVICE_TYPE_BLUETOOTH:
+			return "Bluetooth";
+		case MS_SND_CARD_DEVICE_TYPE_EARPIECE:
+			return "Earpiece";
+		case MS_SND_CARD_DEVICE_TYPE_SPEAKER:
+			return "Speaker";
+		case MS_SND_CARD_DEVICE_TYPE_MICROPHONE:
+			return "Microphone";
+		case MS_SND_CARD_DEVICE_TYPE_HEADSET:
+			return "Headset";
+		case MS_SND_CARD_DEVICE_TYPE_HEADPHONES:
+			return "Headphones";
+		case MS_SND_CARD_DEVICE_TYPE_GENERIC_USB:
+			return "Generic USB";
+		case MS_SND_CARD_DEVICE_TYPE_AUX_LINE:
+			return "Aux Line";
+		case MS_SND_CARD_DEVICE_TYPE_TELEPHONY:
+			return "Telephony";
+		case MS_SND_CARD_DEVICE_TYPE_UNKNOWN:
+		default:
+			return "Unknown";
+	}
+	return "Unknown";
+}
