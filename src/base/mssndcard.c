@@ -43,7 +43,7 @@ void ms_snd_card_manager_destroy(MSSndCardManager* scm){
 			if (desc->unload!=NULL)
 				desc->unload(scm);
 		}
-		bctbx_list_for_each(scm->cards,(void (*)(void*))ms_snd_card_destroy);
+		bctbx_list_for_each(scm->cards,(void (*)(void*))ms_snd_card_unref);
 		bctbx_list_free(scm->cards);
 		bctbx_list_free(scm->descs);
 	}
@@ -121,13 +121,13 @@ static const char *cap_to_string(unsigned int cap){
 void ms_snd_card_manager_add_card(MSSndCardManager *m, MSSndCard *c){
 	ms_snd_card_set_manager(m,c);
 	ms_message("Card '%s' added with capabilities [%s]",ms_snd_card_get_string_id(c), cap_to_string(c->capabilities));
-	m->cards=bctbx_list_append(m->cards,c);
+	m->cards=bctbx_list_append(m->cards, ms_snd_card_ref(c));
 }
 
 void ms_snd_card_manager_prepend_card(MSSndCardManager *m, MSSndCard *c){
 	ms_snd_card_set_manager(m,c);
 	ms_message("Card '%s' prepended with capabilities [%s]",ms_snd_card_get_string_id(c), cap_to_string(c->capabilities));
-	m->cards=bctbx_list_prepend(m->cards,c);
+	m->cards=bctbx_list_prepend(m->cards, ms_snd_card_ref(c));
 }
 
 void ms_snd_card_manager_prepend_cards(MSSndCardManager *m, bctbx_list_t *l) {
@@ -162,14 +162,15 @@ void ms_snd_card_manager_register_desc(MSSndCardManager *m, MSSndCardDesc *desc)
 
 void ms_snd_card_manager_reload(MSSndCardManager *m){
 	bctbx_list_t *elem;
-	bctbx_list_for_each(m->cards,(void (*)(void*))ms_snd_card_destroy);
+	bctbx_list_for_each(m->cards, (void (*)(void*))ms_snd_card_unref);
 	bctbx_list_free(m->cards);
-	m->cards=NULL;
-	for(elem=m->descs;elem!=NULL;elem=elem->next)
-		card_detect(m,(MSSndCardDesc*)elem->data);
+	m->cards = NULL;
+	for (elem = m->descs; elem != NULL; elem = elem->next) {
+		card_detect(m, (MSSndCardDesc*)elem->data);
+	}
 }
 
-MSSndCard * ms_snd_card_dup(MSSndCard *card){
+MSSndCard* ms_snd_card_dup(MSSndCard *card){
 	MSSndCard *obj=NULL;
 	if (card->desc->duplicate!=NULL)
 		obj=card->desc->duplicate(card);
@@ -300,10 +301,7 @@ void ms_snd_card_app_notifies_activation(MSSndCard *obj, bool_t yesno) {
 }
 
 void ms_snd_card_destroy(MSSndCard *obj){
-	if (obj->desc->uninit!=NULL) obj->desc->uninit(obj);
-	if (obj->name!=NULL) ms_free(obj->name);
-	if (obj->id!=NULL)	ms_free(obj->id);
-	ms_free(obj);
+	ms_snd_card_unref(obj);
 }
 
 int ms_snd_card_get_preferred_sample_rate(const MSSndCard *obj) {
@@ -371,4 +369,19 @@ const char* ms_snd_card_device_type_to_string(MSSndCardDeviceType type) {
 			return "Unknown";
 	}
 	return "Unknown";
+}
+
+MSSndCard* ms_snd_card_ref(MSSndCard *sndCard) {
+	sndCard->ref_count++;
+	return sndCard;
+}
+
+void ms_snd_card_unref(MSSndCard *sndCard) {
+	sndCard->ref_count--;
+	if (sndCard->ref_count <= 0) {
+		if (sndCard->desc->uninit) sndCard->desc->uninit(sndCard);
+		if (sndCard->name != NULL) ms_free(sndCard->name);
+		if (sndCard->id != NULL) ms_free(sndCard->id);
+		ms_free(sndCard);
+	}
 }
