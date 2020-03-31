@@ -62,23 +62,21 @@ int get_preferred_sample_rate() {
 	return DevicePreferredSampleRate;
 }
 
-jobject get_all_devices(JNIEnv *env, const char * dir) {
+jobjectArray get_all_devices(JNIEnv *env, const char * dir) {
 	jclass mediastreamerAndroidContextClass = env->FindClass("org/linphone/mediastream/MediastreamerAndroidContext");
 
-	jobject audioDevices = NULL;
+	jobjectArray audioDevices = NULL;
 
 	if (mediastreamerAndroidContextClass != NULL) {
 		jmethodID getAudioDevicesId = env->GetStaticMethodID(mediastreamerAndroidContextClass, "getAudioDevices", "(Ljava/lang/String;)[Landroid/media/AudioDeviceInfo;");
 		if (getAudioDevicesId != NULL) {
 			jstring device_dir = env->NewStringUTF(dir);
-			jobject deviceInfoObj = env->CallStaticObjectMethod(mediastreamerAndroidContextClass, getAudioDevicesId, device_dir);
+			audioDevices = reinterpret_cast<jobjectArray>(env->CallStaticObjectMethod(mediastreamerAndroidContextClass, getAudioDevicesId, device_dir));
 
-			audioDevices = env->NewGlobalRef(deviceInfoObj);
 			if (audioDevices == NULL) {
 				ms_error("[Android Audio Utils] Failed to convert local ref to audio devices to global ref");
 			}
 
-			env->DeleteLocalRef(deviceInfoObj);
 		}
 		env->DeleteLocalRef(mediastreamerAndroidContextClass);
 	}

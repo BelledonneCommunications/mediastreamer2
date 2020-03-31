@@ -425,6 +425,15 @@ MS2_PUBLIC MSSndCardDeviceType ms_snd_card_get_device_type(const MSSndCard *obj)
 MS2_PUBLIC const char *ms_snd_card_get_driver_type(const MSSndCard *obj);
 
 /**
+ * Retreive a sound card's device type string.
+ *
+ * @param type   A sound card type.
+ *
+ * Returns: a string if successfull, "bad type" otherwise.
+ */
+MS2_PUBLIC const char * ms_snd_card_device_type_to_string(const MSSndCardDeviceType type);
+
+/**
  * Retreive a sound card's name.
  *
  * @param obj   A sound card object.

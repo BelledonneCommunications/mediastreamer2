@@ -38,7 +38,7 @@ MS2_PUBLIC int get_preferred_sample_rate();
  * Retrieve all devices in a given direction.
  * Valid values for string dir are "all" "output" "input"
 **/
-MS2_PUBLIC jobject get_all_devices(JNIEnv *env, const char * dir);
+MS2_PUBLIC jobjectArray get_all_devices(JNIEnv *env, const char * dir);
 
 /**
  * Retrieve device ID for the device deviceInfo.

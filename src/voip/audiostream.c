@@ -862,10 +862,12 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 
 	/* creates the local part */
 	if (io->input.type == MSResourceSoundcard){
+		MSSndCard * card = io->input.soundcard;
 		if (stream->soundread==NULL)
-			stream->soundread = ms_snd_card_create_reader(io->input.soundcard);
+			stream->soundread = ms_snd_card_create_reader(card);
 		has_builtin_ec=!!(ms_snd_card_get_capabilities(io->input.soundcard) & MS_SND_CARD_CAP_BUILTIN_ECHO_CANCELLER);
-		stream->captcard = io->input.soundcard;
+		stream->captcard = card;
+		ms_message("DEBUG capture card id %s name %s device ID %0d device_type %s ", card->id, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
 	} else if (io->input.type == MSResourceRtp) {
 		stream->rtp_io_session = io->input.session;
 		pt = rtp_profile_get_payload(rtp_session_get_profile(stream->rtp_io_session),
@@ -879,10 +881,12 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 		resampler_missing = stream->read_resampler == NULL;
 	}
 	if (io->output.type == MSResourceSoundcard) {
+		MSSndCard * card = io->output.soundcard;
 		if (stream->soundwrite==NULL)
-			stream->soundwrite=ms_snd_card_create_writer(io->output.soundcard);
+			stream->soundwrite=ms_snd_card_create_writer(card);
 
-		stream->playcard = io->output.soundcard;
+		stream->playcard = card;
+		ms_message("DEBUG playcard id %s name %s device ID %0d device_type %s ", card->id, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
 	} else if (io->output.type == MSResourceRtp) {
 		stream->rtp_io_session = io->output.session;
 		pt = rtp_profile_get_payload(rtp_session_get_profile(stream->rtp_io_session),
@@ -1342,6 +1346,7 @@ int audio_stream_start_full(AudioStream *stream, RtpProfile *profile, const char
 	if (jitt_comp != -1)
 		rtp_session_set_jitter_compensation(stream->ms.sessions.rtp_session, jitt_comp);
 	audio_stream_enable_echo_canceller(stream, use_ec);
+	ms_message("DEBUG audio_stream_start_full");
 	return audio_stream_start_from_io(stream, profile, rem_rtp_ip, rem_rtp_port, rem_rtcp_ip, rem_rtcp_port, payload, &io);
 }
 
@@ -1361,6 +1366,7 @@ AudioStream *audio_stream_start(MSFactory* factory, RtpProfile *prof,int locport
 	if (sndcard_capture==NULL || sndcard_playback==NULL)
 		return NULL;
 	stream=audio_stream_new(factory, locport, locport+1, ms_is_ipv6(remip));
+	ms_message("DEBUG audio_stream_start");
 	if (audio_stream_start_full(stream,prof,remip,remport,remip,remport+1,profile,jitt_comp,NULL,NULL,sndcard_playback,sndcard_capture,use_ec)==0) return stream;
 	audio_stream_free(stream);
 	return NULL;
@@ -1378,6 +1384,7 @@ AudioStream *audio_stream_start_with_sndcards(MSFactory* factory, RtpProfile *pr
 		return NULL;
 	}
 	stream=audio_stream_new(factory, locport, locport+1, ms_is_ipv6(remip));
+	ms_message("DEBUG audio_stream_start_with_sndcards");
 	if (audio_stream_start_full(stream,prof,remip,remport,remip,remport+1,profile,jitt_comp,NULL,NULL,playcard,captcard,use_ec)==0) return stream;
 	audio_stream_free(stream);
 	return NULL;

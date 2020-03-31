@@ -270,7 +270,7 @@ static void android_snd_card_add_devices(MSSndCardManager *m) {
 		jobject devices = get_all_devices(env, "all");
 
 		// extract required information from every device
-		jobjectArray deviceArray = (jobjectArray) devices;
+		jobjectArray deviceArray = reinterpret_cast<jobjectArray>(devices);
 		jsize deviceNumber = (int) env->GetArrayLength(deviceArray);
 
 		ms_message("[OpenSLES] Create soundcards for %0d devices", deviceNumber);
@@ -658,6 +658,8 @@ static int android_snd_read_get_nchannels(MSFilter *obj, void *data) {
 static int android_snd_read_configure_soundcard(MSFilter *obj, void *data) {
 	MSSndCard *card = (MSSndCard*)data;
 	OpenSLESInputContext *ictx = (OpenSLESInputContext*)obj->data;
+	ms_message("[OpenSLES] [Read configure soundcard] DEBUG deviceID: current %0d requested %0d Type: current %0d requested %0d", ictx->opensles_context->device_id, card->internal_id, ictx->opensles_context->device_type, card->device_type);
+
 	// Check if device_id is different and/or device_type is different
 	// For API < 23, all device ID are identical but the device type is different
 	if ((ictx->opensles_context->device_id != card->internal_id) || (ictx->opensles_context->device_type != card->device_type)) {
@@ -956,6 +958,8 @@ static int android_snd_write_get_nchannels(MSFilter *obj, void *data) {
 static int android_snd_write_configure_soundcard(MSFilter *obj, void *data) {
 	MSSndCard *card = (MSSndCard*)data;
 	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
+
+	ms_message("[OpenSLES] [Write configure soundcard] DEBUG deviceID: current %0d requested %0d Type: current %0d requested %0d", octx->opensles_context->device_id, card->internal_id, octx->opensles_context->device_type, card->device_type);
 	// Check if device_id is different and/or device_type is different
 	// For API < 23, all device ID are identical but the device type is different
 	if ((octx->opensles_context->device_id != card->internal_id) || (octx->opensles_context->device_type != card->device_type)) {
@@ -1132,7 +1136,7 @@ static void snd_card_device_create(const char * name, MSSndCardDeviceType type, 
 
 	ms_snd_card_manager_add_card(m, card);
 
-	ms_message("[OpenSLES] Added card: name %s device ID %0d device_type %0d ", card->name, card_data->device_id, card->device_type);
+	ms_message("[OpenSLES] Added card: id %s name %s device ID %0d device_type %0d capabilities 0'h%0X", card->id, card->name, card_data->device_id, card->device_type, card->capabilities);
 
 }
 
@@ -1149,12 +1153,12 @@ static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSn
 	card_data->device_type = card->device_type;
 
 	// Card capabilities
-	card->capabilities |= get_device_capabilities(env, deviceInfo);
+	card->capabilities = get_device_capabilities(env, deviceInfo);
 
 	snd_card_device_create_extra_fields(m, card);
 
 	ms_snd_card_manager_add_card(m, card);
 
-	ms_message("[OpenSLES] Added card: name %s device ID %0d device_type %0d ", card->name, card_data->device_id, card->device_type);
+	ms_message("[OpenSLES] Added card: id %s name %s device ID %0d device_type %0d capabilities 0'h%0X", card->id, card->name, card_data->device_id, card->device_type, card->capabilities);
 
 }

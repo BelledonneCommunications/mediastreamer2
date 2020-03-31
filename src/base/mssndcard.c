@@ -200,6 +200,33 @@ MSSndCardDeviceType ms_snd_card_get_device_type(const MSSndCard *obj){
 	return obj->device_type;
 }
 
+const char * ms_snd_card_device_type_to_string(const MSSndCardDeviceType type){
+	switch(type) {
+		case MS_SND_CARD_DEVICE_TYPE_TELEPHONY:
+			return "Telephony";
+		case MS_SND_CARD_DEVICE_TYPE_AUX_LINE:
+			return "Aux line";
+		case MS_SND_CARD_DEVICE_TYPE_GENERIC_USB:
+			return "USB device";
+		case MS_SND_CARD_DEVICE_TYPE_HEADSET:
+			return "Headset";
+		case MS_SND_CARD_DEVICE_TYPE_MICROPHONE:
+			return "Microphone";
+		case MS_SND_CARD_DEVICE_TYPE_EARPIECE:
+			return "Earpiece";
+		case MS_SND_CARD_DEVICE_TYPE_HEADPHONES:
+			return "Headphones";
+		case MS_SND_CARD_DEVICE_TYPE_SPEAKER:
+			return "Speaker";
+		case MS_SND_CARD_DEVICE_TYPE_BLUETOOTH:
+			return "Bluetooth";
+		case MS_SND_CARD_DEVICE_TYPE_UNKNOWN:
+			return "Unknown";
+	}
+
+	return "bad type";
+}
+
 const char *ms_snd_card_get_driver_type(const MSSndCard *obj){
 	return obj->desc->driver_type;
 }
@@ -217,7 +244,7 @@ MS2_PUBLIC int ms_snd_card_get_minimal_latency(MSSndCard *obj){
 }
 
 const char *ms_snd_card_get_string_id(MSSndCard *obj){
-	if (obj->id==NULL)	obj->id=ms_strdup_printf("%s: %s",obj->desc->driver_type,obj->name);
+	if (obj->id==NULL)	obj->id=ms_strdup_printf("%s %s: %s",obj->desc->driver_type,ms_snd_card_device_type_to_string(obj->device_type),obj->name);
 	return obj->id;
 }
 

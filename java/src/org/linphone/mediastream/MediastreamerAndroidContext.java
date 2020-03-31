@@ -123,6 +123,9 @@ public class MediastreamerAndroidContext {
 
 		AudioManager audiomanager = (AudioManager)getContext().getSystemService(Context.AUDIO_SERVICE);
 		final AudioDeviceInfo[] devices = audiomanager.getDevices(flag);
+		for (AudioDeviceInfo device : devices) {
+			Log.i("[getAudioDevices] DEBUG Found device: name " + device.getProductName() + " ID " + device.getId() + " type " + device.getType() + " isSource " + device.isSource() + " isSink " + device.isSink() + ".");
+		}
 		return devices;
 	}
 
