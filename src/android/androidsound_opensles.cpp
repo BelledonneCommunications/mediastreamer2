@@ -107,15 +107,11 @@ struct OpenSLESContext {
 		samplerate = DeviceFavoriteSampleRate;
 		nchannels = 1;
 		builtin_aec = false;
-		device_id = -1;
-		device_type = MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_UNKNOWN;
 	}
 
 	int samplerate;
 	int nchannels;
 	bool builtin_aec;
-	int32_t device_id;
-	MSSndCardDeviceType device_type;
 
 	SLObjectItf engineObject;
 	SLEngineItf engineEngine;
@@ -339,7 +335,7 @@ static void android_native_snd_card_init(MSSndCard *card) {
 
 static void android_native_snd_card_uninit(MSSndCard *card) {
 	OpenSLESContext *ctx = (OpenSLESContext*)card->data;
-	ms_message("[OpenSLES] Deleting card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, ctx->device_id, ms_snd_card_device_type_to_string(card->device_type));
+	ms_message("[OpenSLES] Deleting card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
 	
 	if (ctx->engineObject != NULL) {
 		(*ctx->engineObject)->Destroy(ctx->engineObject);
@@ -1152,10 +1148,6 @@ static void snd_card_device_create(const char * name, MSSndCardDeviceType type, 
 	card->internal_id = -1;
 	card->device_type = type;
 
-	OpenSLESContext *card_data = (OpenSLESContext*)card->data;
-	card_data->device_id = card->internal_id;
-	card_data->device_type = card->device_type;
-
 	// Card capabilities
 	card->capabilities |= capabilities;
 
@@ -1163,7 +1155,7 @@ static void snd_card_device_create(const char * name, MSSndCardDeviceType type, 
 
 	ms_snd_card_manager_add_card(m, card);
 
-	ms_message("[OpenSLES] Added card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card_data->device_id, ms_snd_card_device_type_to_string(card->device_type));
+	ms_message("[OpenSLES] Added card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
 }
 
 static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSndCardManager *m) {
@@ -1181,10 +1173,6 @@ static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSn
 		card->internal_id = get_device_id(env, deviceInfo);
 		card->device_type = type;
 
-		OpenSLESContext *card_data = (OpenSLESContext*)card->data;
-		card_data->device_id = card->internal_id;
-		card_data->device_type = card->device_type;
-
 		// Card capabilities
 		card->capabilities = get_device_capabilities(env, deviceInfo);
 
@@ -1192,6 +1180,6 @@ static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSn
 
 		ms_snd_card_manager_add_card(m, card);
 
-		ms_message("[OpenSLES] Added card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card_data->device_id, ms_snd_card_device_type_to_string(card->device_type));
+		ms_message("[OpenSLES] Added card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
 	}
 }
