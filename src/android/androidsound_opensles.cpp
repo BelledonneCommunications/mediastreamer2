@@ -223,6 +223,7 @@ struct OpenSLESInputContext {
 	queue_t q;
 	ms_mutex_t mutex;
 	MSTickerSynchronizer *mTickerSynchronizer;
+	MSSndCard *soundCard;
 	MSFilter *mFilter;
 	int64_t read_samples;
 	jobject aec;
@@ -672,6 +673,8 @@ static int android_snd_read_configure_soundcard(MSFilter *obj, void *data) {
 		ms_mutex_lock(&ictx->mutex);
 		ictx->opensles_context->device_id = card->internal_id;
 		ictx->opensles_context->device_type = card->device_type;
+		ictx->soundCard = ms_snd_card_ref(card);
+		ictx->setContext((OpenSLESContext*)card->data);
 		JNIEnv *env = ms_get_jni_env();
 		change_device(env, ictx->opensles_context->device_type);
 		ms_mutex_unlock(&ictx->mutex);
@@ -725,6 +728,7 @@ static MSFilter* ms_android_snd_read_new(MSFactory *factory) {
 static MSFilter *android_snd_card_create_reader(MSSndCard *card) {
 	MSFilter *f = ms_android_snd_read_new(ms_snd_card_get_factory(card));
 	OpenSLESInputContext *ictx = static_cast<OpenSLESInputContext*>(f->data);
+	ictx->soundCard = ms_snd_card_ref(card);
 	ictx->setContext((OpenSLESContext*)card->data);
 	return f;
 }
@@ -910,7 +914,7 @@ static SLresult opensles_player_callback_init(OpenSLESOutputContext *octx) {
 static MSFilter *android_snd_card_create_writer(MSSndCard *card) {
 	MSFilter *f = ms_android_snd_write_new(ms_snd_card_get_factory(card));
 	OpenSLESOutputContext *octx = static_cast<OpenSLESOutputContext*>(f->data);
-	octx->soundCard = card;
+	octx->soundCard = ms_snd_card_ref(card);
 	octx->setContext((OpenSLESContext*)card->data);
 	return f;
 }
@@ -972,10 +976,15 @@ static int android_snd_write_configure_soundcard(MSFilter *obj, void *data) {
 		ms_mutex_lock(&octx->mutex);
 		octx->opensles_context->device_id = card->internal_id;
 		octx->opensles_context->device_type = card->device_type;
+
+		if (!octx->soundCard) ms_message("[OpenSLES] [Write configure soundcard] DEBUG soundCard points to null");
+		octx->soundCard = ms_snd_card_ref(card);
+		octx->setContext((OpenSLESContext*)card->data);
 		JNIEnv *env = ms_get_jni_env();
 		change_device(env, octx->opensles_context->device_type);
 		ms_mutex_unlock(&octx->mutex);
 	}
+	ms_message("[OpenSLES] [Write configure soundcard after change] DEBUG deviceID: current %0d requested %0d Type: current %0d requested %0d", octx->opensles_context->device_id, card->internal_id, octx->opensles_context->device_type, card->device_type);
 	return 0;
 }
 
