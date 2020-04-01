@@ -225,10 +225,10 @@ MS2_PUBLIC MSSndCardManager * ms_snd_card_manager_new(void);
 MS2_PUBLIC void ms_snd_card_manager_destroy(MSSndCardManager* sndcardmanager);
 
 /**
- * Retreive a sound card object based on its name.
+ * Retreive a sound card object based on its id.
  *
  * @param m    A sound card manager containing sound cards.
- * @param id   A name for card to search.
+ * @param id   An id for card to search.
  *
  * Returns: MSSndCard if successfull, NULL otherwise.
  */
@@ -243,6 +243,16 @@ MS2_PUBLIC MSSndCard * ms_snd_card_manager_get_card(MSSndCardManager *m, const c
  * Returns: MSSndCard if successfull, NULL otherwise.
  */
 MS2_PUBLIC MSSndCard * ms_snd_card_manager_get_playback_card(MSSndCardManager *m, const char *id);
+
+/**
+ * Retreive all sound cards having the name provided as input.
+ *
+ * @param m      A sound card manager containing sound cards.
+ * @param name   A name for card to search.
+ *
+ * Returns: MSSndCard list of cards if successfull, NULL otherwise.
+ */
+MS2_PUBLIC bctbx_list_t * ms_snd_card_manager_get_all_cards_with_name(MSSndCardManager *m, const char *name);
 
 /**
  * Retreive a capture capable sound card object based on its name.
@@ -669,6 +679,14 @@ MS2_PUBLIC MSSndCard* ms_snd_card_ref(MSSndCard *sndCard);
  */
 MS2_PUBLIC void ms_snd_card_unref(MSSndCard *sndCard);
 
+/**
+ * Check if there is another card in the manager having same driver_type, name and device_type
+ * @param m    Card Manager
+ * @param card Card to compare properties against
+ *
+ * Returns: true if a duplicate has been found, false otherwise
+**/
+MS2_PUBLIC bool_t ms_snd_card_is_card_duplicate(MSSndCardManager *m, MSSndCard * card);
 
 /** @} */
 

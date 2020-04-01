@@ -74,6 +74,18 @@ static MSSndCard *get_card_with_cap(MSSndCardManager *m, const char *id, unsigne
 	return NULL;
 }
 
+bctbx_list_t * ms_snd_card_manager_get_all_cards_with_name(MSSndCardManager *m, const char *name){
+	bctbx_list_t *cards = NULL;
+	bctbx_list_t *elem;
+	for (elem=m->cards;elem!=NULL;elem=elem->next){
+		MSSndCard *card=(MSSndCard*)elem->data;
+		if (strcmp(ms_snd_card_get_name(card),name)==0) {
+			cards=bctbx_list_append(cards, ms_snd_card_ref(card));
+		}
+	}
+	return cards;
+}
+
 MSSndCard * ms_snd_card_manager_get_playback_card(MSSndCardManager *m, const char *id){
 	MSSndCard *ret;
 	ret = get_card_with_cap(m, id, MS_SND_CARD_CAP_PLAYBACK);
@@ -388,4 +400,27 @@ void ms_snd_card_unref(MSSndCard *sndCard) {
 		if (sndCard->id != NULL) ms_free(sndCard->id);
 		ms_free(sndCard);
 	}
+}
+
+bool_t ms_snd_card_is_card_duplicate(MSSndCardManager *m, MSSndCard * card) {
+	bctbx_list_t * cards = ms_snd_card_manager_get_all_cards_with_name(m, card->name);
+
+	// In modern devices, some devices are duplicated to improve performance.
+	// Only one of them will be added to the card manager. In order to simplify the logic, the device added to the manager will depend on the order devices are in the list.
+	// For any given combination of <name>,<driver_type>,<device_type> only the first one inn the list will be added to the card manager
+	// If a card with same driver type and device_type has already been added to the sound card manager
+	bctbx_list_t * elem;
+	bool_t same_type_card_found = FALSE;
+	for (elem=cards;elem!=NULL;elem=elem->next){
+		MSSndCard *c=(MSSndCard*)elem->data;
+		if ((c->device_type == card->device_type) && (strcmp(c->desc->driver_type, card->desc->driver_type)==0)) {
+			same_type_card_found = TRUE;
+		}
+	}
+
+	// Free memory and unref sound cards
+	bctbx_list_for_each(cards, (void (*)(void*))ms_snd_card_unref);
+	bctbx_list_free(cards);
+
+	return same_type_card_found;
 }

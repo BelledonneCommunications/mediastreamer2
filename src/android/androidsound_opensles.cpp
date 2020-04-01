@@ -1140,10 +1140,6 @@ static void snd_card_device_create_extra_fields(MSSndCardManager *m, MSSndCard *
 	}
 }
 
-static void android_add_card_to_manager(MSSndCardManager *m, MSSndCard * card) {
-//	bctbx_list_t * cards = ms_snd_card_manager_get_all_cards_with_name(m, name);
-	ms_snd_card_manager_add_card(m, card);
-}
 
 static void snd_card_device_create(int device_id, const char * name, MSSndCardDeviceType type, unsigned int capabilities, MSSndCardManager *m) {
 
@@ -1158,9 +1154,15 @@ static void snd_card_device_create(int device_id, const char * name, MSSndCardDe
 
 	snd_card_device_create_extra_fields(m, card);
 
-	android_add_card_to_manager(m, card);
+	ms_message("[OpenSLES] DEBUG Trying to add card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
+	if (!ms_snd_card_is_card_duplicate(m, card)) {
+		card=ms_snd_card_ref(card);
+		ms_snd_card_manager_add_card(m, card);
 
-	ms_message("[OpenSLES] Added card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
+		ms_message("[OpenSLES] Added card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
+	} else {
+		free(card);
+	}
 }
 
 static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSndCardManager *m) {
@@ -1173,7 +1175,7 @@ static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSn
 		(type == MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_MICROPHONE)
 	) {
 
-		const char * name = get_device_product_name(env, deviceInfo);
+		const char * name = ms_strdup(get_device_product_name(env, deviceInfo));
 		int device_id = get_device_id(env, deviceInfo);
 		unsigned int capabilities = get_device_capabilities(env, deviceInfo);
 
