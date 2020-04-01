@@ -551,8 +551,8 @@ static void android_snd_read_preprocess(MSFilter *obj) {
 		//android_snd_read_activate_hardware_aec(obj);
 	}
 
-//	JNIEnv *env = ms_get_jni_env();
-//	change_device(env, ictx->soundCard->device_type);
+	JNIEnv *env = ms_get_jni_env();
+	change_device(env, ictx->soundCard->device_type);
 }
 
 static void android_snd_read_process(MSFilter *obj) {
@@ -1021,8 +1021,8 @@ static void android_snd_write_preprocess(MSFilter *obj) {
 
 	octx->nbufs = 0;
 
-//	JNIEnv *env = ms_get_jni_env();
-//	change_device(env, octx->soundCard->device_type);
+	JNIEnv *env = ms_get_jni_env();
+	change_device(env, octx->soundCard->device_type);
 }
 
 static void android_snd_write_process(MSFilter *obj) {
