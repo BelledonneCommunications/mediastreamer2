@@ -60,7 +60,7 @@ RingStream * ring_start_with_cb(MSFactory* factory, const char *file, int interv
 	MSPinFormat pinfmt={0};
 
 	stream=(RingStream *)ms_new0(RingStream,1);
-	stream->card = sndcard;
+	stream->card = ms_snd_card_ref(sndcard);
 	if (file) {
 		stream->source=_ms_create_av_player(file,factory);
 		if (stream->source == NULL){
@@ -180,5 +180,6 @@ void ring_stop(RingStream *stream){
 	if (stream->decoder) ms_filter_destroy(stream->decoder);
 	if (stream->write_resampler)
 		ms_filter_destroy(stream->write_resampler);
+	if (stream->card) ms_snd_card_unref(stream->card);
 	ms_free(stream);
 }
