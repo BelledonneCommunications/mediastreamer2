@@ -98,7 +98,7 @@ static int DeviceFavoriteBufferSize = 256;
 using namespace fake_opensles;
 
 static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSndCardManager *m);
-static void snd_card_device_create(const char * name, MSSndCardDeviceType type, unsigned int capabilities, MSSndCardManager *m);
+static void snd_card_device_create(int device_id, const char * name, MSSndCardDeviceType type, unsigned int capabilities, MSSndCardManager *m);
 static MSFilter *ms_android_snd_read_new(MSFactory *factory);
 static MSFilter *ms_android_snd_write_new(MSFactory* factory);
 
@@ -279,9 +279,9 @@ static void android_snd_card_add_devices(MSSndCardManager *m) {
 	} else {
 
 		//For devices running API older than API23, only 3 devices are created: microphone, speaker and earpiece
-		snd_card_device_create("Microphone", MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_MICROPHONE, MS_SND_CARD_CAP_CAPTURE, m);
-		snd_card_device_create("Speaker", MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_SPEAKER, MS_SND_CARD_CAP_PLAYBACK, m);
-		snd_card_device_create("Earpiece", MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_EARPIECE, MS_SND_CARD_CAP_PLAYBACK, m);
+		snd_card_device_create(-1, "Microphone", MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_MICROPHONE, MS_SND_CARD_CAP_CAPTURE, m);
+		snd_card_device_create(-1, "Speaker", MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_SPEAKER, MS_SND_CARD_CAP_PLAYBACK, m);
+		snd_card_device_create(-1, "Earpiece", MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_EARPIECE, MS_SND_CARD_CAP_PLAYBACK, m);
 	}
 
 }
@@ -1140,12 +1140,17 @@ static void snd_card_device_create_extra_fields(MSSndCardManager *m, MSSndCard *
 	}
 }
 
-static void snd_card_device_create(const char * name, MSSndCardDeviceType type, unsigned int capabilities, MSSndCardManager *m) {
+static void android_add_card_to_manager(MSSndCardManager *m, MSSndCard * card) {
+//	bctbx_list_t * cards = ms_snd_card_manager_get_all_cards_with_name(m, name);
+	ms_snd_card_manager_add_card(m, card);
+}
+
+static void snd_card_device_create(int device_id, const char * name, MSSndCardDeviceType type, unsigned int capabilities, MSSndCardManager *m) {
 
 	MSSndCard *card = ms_snd_card_new(&android_native_snd_opensles_card_desc);
 
 	card->name = ms_strdup(name);
-	card->internal_id = -1;
+	card->internal_id = device_id;
 	card->device_type = type;
 
 	// Card capabilities
@@ -1153,7 +1158,7 @@ static void snd_card_device_create(const char * name, MSSndCardDeviceType type, 
 
 	snd_card_device_create_extra_fields(m, card);
 
-	ms_snd_card_manager_add_card(m, card);
+	android_add_card_to_manager(m, card);
 
 	ms_message("[OpenSLES] Added card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
 }
@@ -1167,19 +1172,12 @@ static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSn
 		(type == MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_SPEAKER) ||
 		(type == MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_MICROPHONE)
 	) {
-		MSSndCard *card = ms_snd_card_new(&android_native_snd_opensles_card_desc);
 
-		card->name = ms_strdup(get_device_product_name(env, deviceInfo));
-		card->internal_id = get_device_id(env, deviceInfo);
-		card->device_type = type;
+		const char * name = get_device_product_name(env, deviceInfo);
+		int device_id = get_device_id(env, deviceInfo);
+		unsigned int capabilities = get_device_capabilities(env, deviceInfo);
 
-		// Card capabilities
-		card->capabilities = get_device_capabilities(env, deviceInfo);
+		snd_card_device_create(device_id, name, type, capabilities, m);
 
-		snd_card_device_create_extra_fields(m, card);
-
-		ms_snd_card_manager_add_card(m, card);
-
-		ms_message("[OpenSLES] Added card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
 	}
 }
