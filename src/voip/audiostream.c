@@ -181,7 +181,7 @@ static void audio_stream_configure_input_snd_card(AudioStream *stream) {
 	if (stream->soundread) {
 		if(ms_filter_implements_interface(stream->soundread, MSFilterAudioCaptureInterface)) {
 			ms_filter_call_method(stream->soundread, MS_AUDIO_CAPTURE_SET_INTERNAL_ID, card);
-			ms_message("[AudioSteam] set input sound card for %s:%p to %s", ms_filter_get_name(stream->soundread), stream->soundread, card->id);
+			ms_message("[AudioStream] set input sound card for %s:%p to %s", ms_filter_get_name(stream->soundread), stream->soundread, card->id);
 		}
 	}
 }
