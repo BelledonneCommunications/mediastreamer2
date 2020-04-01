@@ -553,6 +553,9 @@ static void android_snd_read_preprocess(MSFilter *obj) {
 	if (ictx->opensles_context->builtin_aec) {
 		//android_snd_read_activate_hardware_aec(obj);
 	}
+
+//	JNIEnv *env = ms_get_jni_env();
+//	change_device(env, ictx->opensles_context->device_type);
 }
 
 static void android_snd_read_process(MSFilter *obj) {
@@ -1008,6 +1011,9 @@ static void android_snd_write_preprocess(MSFilter *obj) {
 	}
 
 	octx->nbufs = 0;
+
+//	JNIEnv *env = ms_get_jni_env();
+//	change_device(env, octx->opensles_context->device_type);
 }
 
 static void android_snd_write_process(MSFilter *obj) {
@@ -1168,5 +1174,6 @@ static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSn
 
 		ms_snd_card_manager_add_card(m, card);
 
-	ms_message("[OpenSLES] Added card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card_data->device_id, ms_snd_card_device_type_to_string(card->device_type));
+		ms_message("[OpenSLES] Added card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card_data->device_id, ms_snd_card_device_type_to_string(card->device_type));
+	}
 }
