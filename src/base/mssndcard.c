@@ -204,25 +204,25 @@ MSSndCardDeviceType ms_snd_card_get_device_type(const MSSndCard *obj){
 const char * ms_snd_card_device_type_to_string(const MSSndCardDeviceType type){
 	switch(type) {
 		case MS_SND_CARD_DEVICE_TYPE_TELEPHONY:
-			return "Telephony (Not supported)";
+			return "Telephony";
 		case MS_SND_CARD_DEVICE_TYPE_AUX_LINE:
-			return "Aux line (Not supported)";
+			return "Aux line";
 		case MS_SND_CARD_DEVICE_TYPE_GENERIC_USB:
-			return "USB device (Supported only by AAudio)";
+			return "USB device";
 		case MS_SND_CARD_DEVICE_TYPE_HEADSET:
-			return "Headset (Supported only by AAudio)";
+			return "Headset";
 		case MS_SND_CARD_DEVICE_TYPE_MICROPHONE:
 			return "Microphone";
 		case MS_SND_CARD_DEVICE_TYPE_EARPIECE:
 			return "Earpiece";
 		case MS_SND_CARD_DEVICE_TYPE_HEADPHONES:
-			return "Headphones (Supported only by AAudio)";
+			return "Headphones";
 		case MS_SND_CARD_DEVICE_TYPE_SPEAKER:
 			return "Speaker";
 		case MS_SND_CARD_DEVICE_TYPE_BLUETOOTH:
 			return "Bluetooth";
 		case MS_SND_CARD_DEVICE_TYPE_BLUETOOTH_A2DP:
-			return "Bluetooth (Not supported)";
+			return "Bluetooth A2DP";
 		case MS_SND_CARD_DEVICE_TYPE_UNKNOWN:
 			return "Unknown";
 		default:
