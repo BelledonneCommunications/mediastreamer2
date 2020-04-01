@@ -169,8 +169,7 @@ public class MediastreamerAndroidContext {
 	public synchronized static void enableSpeaker() { 
 		AudioManager audioManager = (AudioManager)getContext().getSystemService(Context.AUDIO_SERVICE);
 		if (audioManager.isBluetoothScoOn()) {
-			Log.i("[Audio Manager] Stopping bluetooth SCO");
-			audioManager.stopBluetoothSco();
+			disableBluetooth();
 		}
 
 		Log.i("[Audio Manager] Turning on speakerphone");
@@ -180,8 +179,7 @@ public class MediastreamerAndroidContext {
 	public synchronized static void enableEarpiece() {
 		AudioManager audioManager = (AudioManager)getContext().getSystemService(Context.AUDIO_SERVICE);
 		if (audioManager.isBluetoothScoOn()) {
-			Log.i("[Audio Manager] Stopping bluetooth SCO");
-			audioManager.stopBluetoothSco();
+			disableBluetooth();
 		}
 
 		Log.i("[Audio Manager] Turning off speakerphone");
@@ -191,6 +189,14 @@ public class MediastreamerAndroidContext {
 	public synchronized static void enableBluetooth() {
 		AudioManager audioManager = (AudioManager)getContext().getSystemService(Context.AUDIO_SERVICE);
 		Log.i("[Audio Manager] Starting bluetooth SCO");
+		audioManager.setBluetoothScoOn(true);
 		audioManager.startBluetoothSco();
+	}
+
+	public synchronized static void disableBluetooth() {
+		AudioManager audioManager = (AudioManager)getContext().getSystemService(Context.AUDIO_SERVICE);
+		Log.i("[Audio Manager] Stopping bluetooth SCO");
+		audioManager.stopBluetoothSco();
+		audioManager.setBluetoothScoOn(false);
 	}
 }

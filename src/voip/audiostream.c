@@ -91,6 +91,8 @@ static void audio_stream_free(AudioStream *stream) {
 	if (stream->outbound_mixer) ms_filter_destroy(stream->outbound_mixer);
 	if (stream->recorder_file) ms_free(stream->recorder_file);
 	if (stream->rtp_io_session) rtp_session_destroy(stream->rtp_io_session);
+	if (stream->captcard) ms_snd_card_unref(stream->captcard);
+	if (stream->playcard) ms_snd_card_unref(stream->playcard);
 
 	ms_free(stream);
 }
@@ -175,7 +177,7 @@ static bool_t audio_stream_payload_type_changed(RtpSession *session, void *data)
  * note: Only AAudio and OpenSLES leverage internal ID for input streams.
  */
 static void audio_stream_configure_input_snd_card(AudioStream *stream) {
-	MSSndCard * card = stream->captcard;
+	MSSndCard *card = stream->captcard;
 	if (stream->soundread) {
 		if(ms_filter_implements_interface(stream->soundread, MSFilterAudioCaptureInterface)) {
 			ms_filter_call_method(stream->soundread, MS_AUDIO_CAPTURE_SET_INTERNAL_ID, card);
@@ -188,7 +190,7 @@ static void audio_stream_configure_input_snd_card(AudioStream *stream) {
  * note: Only AAudio and OpenSLES leverage internal ID for output streams.
  */
 static void audio_stream_configure_output_snd_card(AudioStream *stream) {
-	MSSndCard * card = stream->playcard;
+	MSSndCard *card = stream->playcard;
 	if (stream->soundwrite) {
 		if(ms_filter_implements_interface(stream->soundwrite, MSFilterAudioPlaybackInterface)) {
 			ms_filter_call_method(stream->soundwrite, MS_AUDIO_PLAYBACK_SET_INTERNAL_ID, card);
@@ -1329,16 +1331,18 @@ int audio_stream_start_full(AudioStream *stream, RtpProfile *profile, const char
 	MSSndCard *playcard, MSSndCard *captcard, bool_t use_ec){
 	MSMediaStreamIO io = MS_MEDIA_STREAM_IO_INITIALIZER;
 
-	if (playcard){
+	if (playcard) {
 		io.output.type = MSResourceSoundcard;
-		io.output.soundcard = playcard;
+		stream->playcard = ms_snd_card_ref(playcard);
+		io.output.soundcard = stream->playcard;
 	}else{
 		io.output.type = MSResourceFile;
 		io.output.file = outfile;
 	}
-	if (captcard){
+	if (captcard) {
 		io.input.type = MSResourceSoundcard;
-		io.input.soundcard = captcard;
+		stream->captcard = ms_snd_card_ref(captcard);
+		io.input.soundcard = stream->captcard;
 	}else{
 		io.input.type = MSResourceFile;
 		io.input.file = infile;
@@ -1829,6 +1833,15 @@ void audio_stream_stop(AudioStream * stream){
 			}
 			/*dismantle the remote play part*/
 			close_av_player(stream);
+
+			if (stream->captcard) {
+				ms_snd_card_unref(stream->captcard);
+				stream->captcard = NULL;
+			}
+			if (stream->playcard) {
+				ms_snd_card_unref(stream->playcard);
+				stream->playcard = NULL;
+			}
 		}
 	}
 	rtp_session_set_rtcp_xr_media_callbacks(stream->ms.sessions.rtp_session, NULL);
@@ -2001,12 +2014,18 @@ void audio_stream_set_audio_route(AudioStream *stream, MSAudioRoute route) {
 }
 
 void audio_stream_set_input_ms_snd_card(AudioStream *stream, MSSndCard * sndcard_capture) {
-	stream->captcard = sndcard_capture;
+	if (stream->captcard) {
+		ms_snd_card_unref(stream->captcard);
+	}
+	stream->captcard = ms_snd_card_ref(sndcard_capture);
 	audio_stream_configure_input_snd_card(stream);
 }
 
 void audio_stream_set_output_ms_snd_card(AudioStream *stream, MSSndCard * sndcard_playback) {
-	stream->playcard = sndcard_playback;
+	if (stream->playcard) {
+		ms_snd_card_unref(stream->playcard);
+	}
+	stream->playcard = ms_snd_card_ref(sndcard_playback);
 	audio_stream_configure_output_snd_card(stream);
 }
 

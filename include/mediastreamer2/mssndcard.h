@@ -183,6 +183,7 @@ struct _MSSndCard{
 	int preferred_sample_rate;
 	int latency;
 	MSSndCardStreamType streamType;
+	int ref_count;
 };
 
 #ifdef __cplusplus
@@ -390,6 +391,7 @@ MS2_PUBLIC MSSndCard * ms_snd_card_new_with_name(MSSndCardDesc *desc,const char*
  * Destroy sound card object.
  *
  * @param obj   A MSSndCard object.
+ * @deprecated, use ms_snd_card_unref instead
  */
 MS2_PUBLIC void ms_snd_card_destroy(MSSndCard *obj);
 
@@ -651,6 +653,22 @@ MS2_PUBLIC MSSndCard * ms_alsa_card_new_custom(const char *pcmdev, const char *m
  * Use -1 to revert to normal behavior.
 **/
 MS2_PUBLIC void ms_alsa_card_set_forced_sample_rate(int samplerate);
+
+/**
+ * Returns a string value of the given MSSndCardDeviceType enum
+ */
+MS2_PUBLIC const char* ms_snd_card_device_type_to_string(MSSndCardDeviceType type);
+
+/**
+ * Takes a ref on a MSSndCard
+ */
+MS2_PUBLIC MSSndCard* ms_snd_card_ref(MSSndCard *sndCard);
+
+/**
+ * Removes a ref from a MSSndCard
+ */
+MS2_PUBLIC void ms_snd_card_unref(MSSndCard *sndCard);
+
 
 /** @} */
 
