@@ -868,7 +868,7 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 		if (stream->soundread==NULL)
 			stream->soundread = ms_snd_card_create_reader(card);
 		has_builtin_ec=!!(ms_snd_card_get_capabilities(io->input.soundcard) & MS_SND_CARD_CAP_BUILTIN_ECHO_CANCELLER);
-		stream->captcard = card;
+		stream->captcard = ms_snd_card_ref(card);
 		ms_message("DEBUG capture card id %s name %s device ID %0d device_type %s ", card->id, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
 	} else if (io->input.type == MSResourceRtp) {
 		stream->rtp_io_session = io->input.session;
@@ -887,7 +887,7 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 		if (stream->soundwrite==NULL)
 			stream->soundwrite=ms_snd_card_create_writer(card);
 
-		stream->playcard = card;
+		stream->playcard = ms_snd_card_ref(card);
 		ms_message("DEBUG playcard id %s name %s device ID %0d device_type %s ", card->id, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
 	} else if (io->output.type == MSResourceRtp) {
 		stream->rtp_io_session = io->output.session;
@@ -1333,7 +1333,6 @@ int audio_stream_start_full(AudioStream *stream, RtpProfile *profile, const char
 
 	if (playcard) {
 		io.output.type = MSResourceSoundcard;
-		stream->playcard = ms_snd_card_ref(playcard);
 		io.output.soundcard = stream->playcard;
 	}else{
 		io.output.type = MSResourceFile;
@@ -1341,7 +1340,6 @@ int audio_stream_start_full(AudioStream *stream, RtpProfile *profile, const char
 	}
 	if (captcard) {
 		io.input.type = MSResourceSoundcard;
-		stream->captcard = ms_snd_card_ref(captcard);
 		io.input.soundcard = stream->captcard;
 	}else{
 		io.input.type = MSResourceFile;
