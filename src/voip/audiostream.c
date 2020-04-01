@@ -1333,14 +1333,14 @@ int audio_stream_start_full(AudioStream *stream, RtpProfile *profile, const char
 
 	if (playcard) {
 		io.output.type = MSResourceSoundcard;
-		io.output.soundcard = stream->playcard;
+		io.output.soundcard = playcard;
 	}else{
 		io.output.type = MSResourceFile;
 		io.output.file = outfile;
 	}
 	if (captcard) {
 		io.input.type = MSResourceSoundcard;
-		io.input.soundcard = stream->captcard;
+		io.input.soundcard = captcard;
 	}else{
 		io.input.type = MSResourceFile;
 		io.input.file = infile;
