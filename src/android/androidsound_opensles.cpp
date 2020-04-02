@@ -1068,6 +1068,10 @@ static void android_snd_write_postprocess(MSFilter *obj) {
 		octx->soundCard = NULL;
 	}
 
+	// At the end of a call, postprocess is called therefore here the output device can be changed to earpiece in the audio manager
+	ms_message("[OpenSLES] [Write postprocess] DEBUG Changing to earpiece");
+	JNIEnv *env = ms_get_jni_env();
+	change_device(env, MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_EARPIECE);
 	free(octx->playBuffer[0]);
 	octx->playBuffer[0]=NULL;
 	free(octx->playBuffer[1]);
