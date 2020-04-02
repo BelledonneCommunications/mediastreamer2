@@ -1279,7 +1279,7 @@ MS2_PUBLIC MSSndCard * audio_stream_get_input_ms_snd_card(AudioStream *stream);
  * Retrieve the current sound card from the audio playback filter (currently only used for AAudio and OpenSLES)
  * @param[in] stream The AudioStream object
  */
-MSSndCard * audio_stream_get_output_ms_snd_card(AudioStream *stream);
+MS2_PUBLIC MSSndCard * audio_stream_get_output_ms_snd_card(AudioStream *stream);
 
 /**
  * @}
