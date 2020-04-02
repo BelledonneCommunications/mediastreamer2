@@ -666,7 +666,6 @@ static int android_snd_read_get_nchannels(MSFilter *obj, void *data) {
 static int android_snd_read_configure_soundcard(MSFilter *obj, void *data) {
 	MSSndCard *card = (MSSndCard*)data;
 	OpenSLESInputContext *ictx = (OpenSLESInputContext*)obj->data;
-	ms_message("[OpenSLES] [Read configure soundcard] DEBUG deviceID: current %0d requested %0d Type: current %0d requested %0d", ictx->soundCard->internal_id, card->internal_id, ictx->soundCard->device_type, card->device_type);
 
 	// Check if device_id is different and/or device_type is different
 	// For API < 23, all device ID are identical but the device type is different
@@ -970,7 +969,6 @@ static int android_snd_write_configure_soundcard(MSFilter *obj, void *data) {
 	MSSndCard *card = (MSSndCard*)data;
 	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
 
-	ms_message("[OpenSLES] [Write configure soundcard] DEBUG deviceID: current %0d requested %0d Type: current %0d requested %0d", octx->soundCard->internal_id, card->internal_id, octx->soundCard->device_type, card->device_type);
 	// Check if device_id is different and/or device_type is different
 	// For API < 23, all device ID are identical but the device type is different
 	if ((octx->soundCard->internal_id != card->internal_id) || (octx->soundCard->device_type != card->device_type)) {
@@ -1069,7 +1067,6 @@ static void android_snd_write_postprocess(MSFilter *obj) {
 	}
 
 	// At the end of a call, postprocess is called therefore here the output device can be changed to earpiece in the audio manager
-	ms_message("[OpenSLES] [Write postprocess] DEBUG Changing to earpiece");
 	JNIEnv *env = ms_get_jni_env();
 	change_device(env, MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_EARPIECE);
 	free(octx->playBuffer[0]);
@@ -1158,7 +1155,6 @@ static void snd_card_device_create(int device_id, const char * name, MSSndCardDe
 
 	snd_card_device_create_extra_fields(m, card);
 
-	ms_message("[OpenSLES] DEBUG Trying to add card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
 	if (!ms_snd_card_is_card_duplicate(m, card)) {
 		card=ms_snd_card_ref(card);
 		ms_snd_card_manager_add_card(m, card);
