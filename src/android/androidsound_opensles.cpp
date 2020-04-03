@@ -551,8 +551,6 @@ static void android_snd_read_preprocess(MSFilter *obj) {
 		//android_snd_read_activate_hardware_aec(obj);
 	}
 
-	JNIEnv *env = ms_get_jni_env();
-	change_device(env, ictx->soundCard->device_type);
 }
 
 static void android_snd_read_process(MSFilter *obj) {
@@ -677,8 +675,6 @@ static int android_snd_read_configure_soundcard(MSFilter *obj, void *data) {
 		}
 		ictx->soundCard = ms_snd_card_ref(card);
 		ictx->setContext((OpenSLESContext*)card->data);
-		JNIEnv *env = ms_get_jni_env();
-		change_device(env, card->device_type);
 		ms_mutex_unlock(&ictx->mutex);
 	}
 	return 0;
@@ -1151,11 +1147,13 @@ static void snd_card_device_create(int device_id, const char * name, MSSndCardDe
 	card->device_type = type;
 
 	// Card capabilities
-	card->capabilities |= capabilities;
+	card->capabilities = capabilities;
 
 	snd_card_device_create_extra_fields(m, card);
 
-	if (!ms_snd_card_is_card_duplicate(m, card)) {
+	// Last argument is set to false because cards are added based on the type ignoring their caapbilities as we do upcalls to Java in order to set devices
+	// For example in the case of a Bluetooth device
+	if (!ms_snd_card_is_card_duplicate(m, card, FALSE)) {
 		card=ms_snd_card_ref(card);
 		ms_snd_card_manager_add_card(m, card);
 
