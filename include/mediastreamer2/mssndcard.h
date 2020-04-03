@@ -683,10 +683,11 @@ MS2_PUBLIC void ms_snd_card_unref(MSSndCard *sndCard);
  * Check if there is another card in the manager having same driver_type, name and device_type
  * @param m    Card Manager
  * @param card Card to compare properties against
+ * @param checkCapabilities flag to check capabilities
  *
  * Returns: true if a duplicate has been found, false otherwise
 **/
-MS2_PUBLIC bool_t ms_snd_card_is_card_duplicate(MSSndCardManager *m, MSSndCard * card);
+MS2_PUBLIC bool_t ms_snd_card_is_card_duplicate(MSSndCardManager *m, MSSndCard * card, bool_t checkCapabilities);
 
 /** @} */
 

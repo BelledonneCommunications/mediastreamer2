@@ -402,8 +402,13 @@ void ms_snd_card_unref(MSSndCard *sndCard) {
 	}
 }
 
-bool_t ms_snd_card_is_card_duplicate(MSSndCardManager *m, MSSndCard * card) {
+bool_t ms_snd_card_is_card_duplicate(MSSndCardManager *m, MSSndCard * card, bool_t checkCapabilities) {
 	bctbx_list_t * cards = ms_snd_card_manager_get_all_cards_with_name(m, card->name);
+
+	// Distinguish card by playback and capture.
+	// Ignore other capatibilirties such as built-in echo cancelling
+	unsigned int caps_mask = (MS_SND_CARD_CAP_PLAYBACK | MS_SND_CARD_CAP_CAPTURE);
+	unsigned int card_caps = ms_snd_card_get_capabilities(card) & caps_mask;
 
 	// In modern devices, some devices are duplicated to improve performance.
 	// Only one of them will be added to the card manager. In order to simplify the logic, the device added to the manager will depend on the order devices are in the list.
@@ -413,7 +418,8 @@ bool_t ms_snd_card_is_card_duplicate(MSSndCardManager *m, MSSndCard * card) {
 	bool_t same_type_card_found = FALSE;
 	for (elem=cards;elem!=NULL;elem=elem->next){
 		MSSndCard *c=(MSSndCard*)elem->data;
-		if ((c->device_type == card->device_type) && (strcmp(c->desc->driver_type, card->desc->driver_type)==0)) {
+		unsigned int elem_caps = ms_snd_card_get_capabilities(c) & caps_mask;
+		if ((c->device_type == card->device_type) && (strcmp(c->desc->driver_type, card->desc->driver_type)==0) && ((checkCapabilities == FALSE) || (card_caps == elem_caps))) {
 			same_type_card_found = TRUE;
 		}
 	}
