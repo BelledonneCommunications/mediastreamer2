@@ -261,7 +261,14 @@ MS2_PUBLIC int ms_snd_card_get_minimal_latency(MSSndCard *obj){
 }
 
 const char *ms_snd_card_get_string_id(MSSndCard *obj){
-	if (obj->id==NULL)	obj->id=ms_strdup_printf("%s %s: %s",obj->desc->driver_type,ms_snd_card_device_type_to_string(obj->device_type),obj->name);
+	if (obj->id==NULL) {
+		bool_t addExtraData = ((obj->device_type==MS_SND_CARD_DEVICE_TYPE_BLUETOOTH) && (strcmp(obj->desc->driver_type, "openSLES") != 0));
+		if (addExtraData == TRUE) {
+			obj->id=ms_strdup_printf("%s %s %s: %s",obj->desc->driver_type,ms_snd_card_device_type_to_string(obj->device_type),cap_to_string(obj->capabilities),obj->name);
+		} else {
+			obj->id=ms_strdup_printf("%s %s: %s",obj->desc->driver_type,ms_snd_card_device_type_to_string(obj->device_type),obj->name);
+		}
+	}
 	return obj->id;
 }
 
