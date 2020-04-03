@@ -128,14 +128,14 @@ void change_device(JNIEnv *env, MSSndCardDeviceType type) {
 	}
 
 	if (methodName.empty()) {
-		ms_error("[Android Audio Utils] Unable to find method to enable device type %0d", static_cast<int>(type));
+		ms_error("[Android Audio Utils] Unable to find method to enable device type %s", ms_snd_card_device_type_to_string(type));
 	} else {
 		jclass mediastreamerAndroidContextClass = env->FindClass("org/linphone/mediastream/MediastreamerAndroidContext");
 		if (mediastreamerAndroidContextClass != NULL) {
 			jmethodID changeDevice = env->GetStaticMethodID(mediastreamerAndroidContextClass, methodName.c_str(), "()V");
 			if (changeDevice != NULL) {
 					env->CallStaticVoidMethod(mediastreamerAndroidContextClass, changeDevice);
-					ms_message("[Android Audio Utils] method %s has been called succesfully", methodName.c_str());
+					ms_message("[Android Audio Utils] changing device to %s ", ms_snd_card_device_type_to_string(type));
 			}
 			env->DeleteLocalRef(mediastreamerAndroidContextClass);
 		}
@@ -210,7 +210,6 @@ unsigned int get_device_capabilities(JNIEnv *env, jobject deviceInfo) {
 		}
 		env->DeleteLocalRef(audioDeviceInfoClass);
 	}
-
 	return cap;
 }
 
