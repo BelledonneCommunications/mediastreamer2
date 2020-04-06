@@ -183,3 +183,28 @@ void ring_stop(RingStream *stream){
 	if (stream->card) ms_snd_card_unref(stream->card);
 	ms_free(stream);
 }
+
+/*
+ * note: Only AAudio and OpenSLES leverage internal ID for output streams.
+ */
+static void ring_stream_configure_output_snd_card(RingStream *stream) {
+	MSSndCard *card = stream->card;
+	if (stream->sndwrite) {
+		if(ms_filter_implements_interface(stream->sndwrite, MSFilterAudioPlaybackInterface)) {
+			ms_filter_call_method(stream->sndwrite, MS_AUDIO_PLAYBACK_SET_INTERNAL_ID, card);
+			ms_message("[RingStream] set output sound card for %s:%p to %s", ms_filter_get_name(stream->sndwrite), stream->sndwrite, card->id);
+		}
+	}
+}
+
+void ring_stream_set_output_ms_snd_card(RingStream *stream, MSSndCard * sndcard_playback) {
+	if (stream->card) {
+		ms_snd_card_unref(stream->card);
+	}
+	stream->card = ms_snd_card_ref(sndcard_playback);
+	ring_stream_configure_output_snd_card(stream);
+}
+
+MSSndCard * ring_stream_get_output_ms_snd_card(RingStream *stream) {
+	return stream->card;
+}
