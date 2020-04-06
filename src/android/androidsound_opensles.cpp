@@ -1015,6 +1015,7 @@ static void android_snd_write_preprocess(MSFilter *obj) {
 
 	octx->nbufs = 0;
 
+	// Ensure consistency between the soundcard the core is setting and the one actually used as an output
 	JNIEnv *env = ms_get_jni_env();
 	change_device(env, octx->soundCard->device_type);
 }
