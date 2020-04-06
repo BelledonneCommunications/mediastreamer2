@@ -25,6 +25,8 @@
 #include "private.h"
 
 
+static MSSndCard * default_card;
+
 static void ring_player_event_handler(void *ud, MSFilter *f, unsigned int evid, void *arg){
 	RingStream *stream=(RingStream*)ud;
 
@@ -144,6 +146,11 @@ RingStream * ring_start_with_cb(MSFactory* factory, const char *file, int interv
 	ms_connection_helper_link(&h, stream->sndwrite, 0, -1);
 	ms_ticker_attach(stream->ticker,stream->source);
 
+	if (default_card) {
+		ring_stream_set_output_ms_snd_card(stream, default_card);
+		default_card = NULL;
+	}
+
 	return stream;
 }
 
@@ -195,6 +202,10 @@ static void ring_stream_configure_output_snd_card(RingStream *stream) {
 			ms_message("[RingStream] set output sound card for %s:%p to %s", ms_filter_get_name(stream->sndwrite), stream->sndwrite, card->id);
 		}
 	}
+}
+
+void ring_stream_set_default_output_ms_snd_card(MSSndCard * card) {
+	default_card = ms_snd_card_ref(card);
 }
 
 void ring_stream_set_output_ms_snd_card(RingStream *stream, MSSndCard * sndcard_playback) {

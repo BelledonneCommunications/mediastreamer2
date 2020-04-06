@@ -68,6 +68,26 @@ MS2_PUBLIC RingStream *ring_start_with_cb(MSFactory *factory, const char * file,
 MS2_PUBLIC void ring_stop (RingStream * stream);
 
 /**
+ * Asks the ring filter to route to the selected sound card (currently only used for AAudio and OpenSLES)
+ * @param[in] stream The RingStream object
+ * @param[in] sndcard_playback The wanted audio output soundcard
+ */
+MS2_PUBLIC void ring_stream_set_output_ms_snd_card(RingStream *stream, MSSndCard * sndcard_playback);
+
+/**
+ * Retrieve the current sound card from the audio playback filter (currently only used for AAudio and OpenSLES)
+ * @param[in] stream The AudioStream object
+ */
+MS2_PUBLIC MSSndCard * ring_stream_get_output_ms_snd_card(RingStream *stream);
+
+/**
+ * Sets the default sound card for the ringstream
+ * This function is called when the user asks to change the output soundcard before the ringstream is created
+ * @param[in] card The wanted audio output soundcard
+ */
+MS2_PUBLIC void ring_stream_set_default_output_ms_snd_card(MSSndCard * card);
+
+/**
  * @}
 **/
 /**
