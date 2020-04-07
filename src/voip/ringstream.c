@@ -148,6 +148,7 @@ RingStream * ring_start_with_cb(MSFactory* factory, const char *file, int interv
 
 	if (default_card) {
 		ring_stream_set_output_ms_snd_card(stream, default_card);
+		ms_snd_card_unref(default_card);
 		default_card = NULL;
 	}
 
@@ -217,5 +218,11 @@ void ring_stream_set_output_ms_snd_card(RingStream *stream, MSSndCard * sndcard_
 }
 
 MSSndCard * ring_stream_get_output_ms_snd_card(RingStream *stream) {
-	return stream->card;
+	// If stream is null, then return default_card as it means that the user was quick enough to change the output device before the connection with the receiving device was established
+	if (stream)
+		return stream->card;
+	else
+		return default_card;
+
+	return NULL;
 }
