@@ -166,9 +166,15 @@ static void card_detect(MSSndCardManager *m, MSSndCardDesc *desc){
 }
 
 void ms_snd_card_manager_register_desc(MSSndCardManager *m, MSSndCardDesc *desc){
-	if (bctbx_list_find(m->descs, desc) == NULL){
-		m->descs=bctbx_list_append(m->descs,desc);
-		card_detect(m,desc);
+	if (bctbx_list_find(m->descs, desc) == NULL) {
+		m->descs = bctbx_list_append(m->descs, desc);
+		card_detect(m, desc);
+	}
+}
+
+void ms_snd_card_manager_unregister_desc(MSSndCardManager *m, MSSndCardDesc *desc){
+	if (bctbx_list_find(m->descs, desc) != NULL) {
+		m->descs = bctbx_list_remove(m->descs, desc);
 	}
 }
 

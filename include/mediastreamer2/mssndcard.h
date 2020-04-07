@@ -344,6 +344,15 @@ MS2_PUBLIC void ms_snd_card_manager_prepend_cards(MSSndCardManager *m, MSList *l
 MS2_PUBLIC void ms_snd_card_manager_register_desc(MSSndCardManager *m, MSSndCardDesc *desc);
 
 /**
+ * Unregister a sound card description in a sound card manager.
+ *
+ * @param m      A sound card manager containing sound cards.
+ * @param desc   A sound card description object.
+ *
+ */
+MS2_PUBLIC void ms_snd_card_manager_unregister_desc(MSSndCardManager *m, MSSndCardDesc *desc);
+
+/**
  * Ask all registered MSSndCardDesc to re-detect their soundcards.
  * @param m The sound card manager.
 **/
