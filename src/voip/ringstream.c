@@ -24,9 +24,6 @@
 #include "mediastreamer2/msfileplayer.h"
 #include "private.h"
 
-
-static MSSndCard * default_card;
-
 static void ring_player_event_handler(void *ud, MSFilter *f, unsigned int evid, void *arg){
 	RingStream *stream=(RingStream*)ud;
 
@@ -146,12 +143,6 @@ RingStream * ring_start_with_cb(MSFactory* factory, const char *file, int interv
 	ms_connection_helper_link(&h, stream->sndwrite, 0, -1);
 	ms_ticker_attach(stream->ticker,stream->source);
 
-	if (default_card) {
-		ring_stream_set_output_ms_snd_card(stream, default_card);
-		ms_snd_card_unref(default_card);
-		default_card = NULL;
-	}
-
 	return stream;
 }
 
@@ -162,12 +153,12 @@ void ring_play_dtmf(RingStream *stream, char dtmf, int duration_ms){
 }
 
 void ring_stop_dtmf(RingStream *stream){
-	ms_message("DADA [RingStream] stop dtmf ringing default card is %s", ((stream->card) ? stream->card->id : "No default"));
+//	ms_message("DADA [RingStream] stop dtmf ringing card is %s", ((stream->card) ? stream->card->id : "No default"));
 	ms_filter_call_method_noarg(stream->gendtmf, MS_DTMF_GEN_STOP);
 }
 
 void ring_stop(RingStream *stream){
-	ms_message("DADA [RingStream] stop ringing default card is %s", ((stream->card) ? stream->card->id : "No default"));
+//	ms_message("DADA [RingStream] stop ringing card in stream is %s", ((stream->card) ? stream->card->id : "No card"));
 	MSConnectionHelper h;
 
 	if (stream->ticker){
@@ -193,12 +184,6 @@ void ring_stop(RingStream *stream){
 	if (stream->card) ms_snd_card_unref(stream->card);
 	ms_free(stream);
 
-	ring_stream_reset_default_card();
-}
-
-void ring_stream_reset_default_card(){
-	if (default_card) ms_snd_card_unref(default_card);
-	default_card = NULL;
 }
 
 /*
@@ -214,10 +199,6 @@ static void ring_stream_configure_output_snd_card(RingStream *stream) {
 	}
 }
 
-void ring_stream_set_default_output_ms_snd_card(MSSndCard * card) {
-	default_card = ms_snd_card_ref(card);
-}
-
 void ring_stream_set_output_ms_snd_card(RingStream *stream, MSSndCard * sndcard_playback) {
 	if (stream->card) {
 		ms_snd_card_unref(stream->card);
@@ -227,11 +208,9 @@ void ring_stream_set_output_ms_snd_card(RingStream *stream, MSSndCard * sndcard_
 }
 
 MSSndCard * ring_stream_get_output_ms_snd_card(RingStream *stream) {
-	// If stream is null, then return default_card as it means that the user was quick enough to change the output device before the connection with the receiving device was established
+	// If stream is null, then do not try to access the card
 	if (stream)
 		return stream->card;
-	else
-		return default_card;
 
 	return NULL;
 }

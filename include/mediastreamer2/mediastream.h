@@ -65,7 +65,6 @@ typedef struct _RingStream RingStream;
 
 MS2_PUBLIC RingStream *ring_start(MSFactory *factory, const char * file, int interval, MSSndCard *sndcard);
 MS2_PUBLIC RingStream *ring_start_with_cb(MSFactory *factory, const char * file, int interval, MSSndCard *sndcard, MSFilterNotifyFunc func, void * user_data);
-MS2_PUBLIC void ring_stream_reset_default_card();
 MS2_PUBLIC void ring_stop (RingStream * stream);
 
 /**
@@ -80,13 +79,6 @@ MS2_PUBLIC void ring_stream_set_output_ms_snd_card(RingStream *stream, MSSndCard
  * @param[in] stream The AudioStream object
  */
 MS2_PUBLIC MSSndCard * ring_stream_get_output_ms_snd_card(RingStream *stream);
-
-/**
- * Sets the default sound card for the ringstream
- * This function is called when the user asks to change the output soundcard before the ringstream is created
- * @param[in] card The wanted audio output soundcard
- */
-MS2_PUBLIC void ring_stream_set_default_output_ms_snd_card(MSSndCard * card);
 
 /**
  * @}
