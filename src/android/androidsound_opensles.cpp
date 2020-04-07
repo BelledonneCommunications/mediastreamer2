@@ -670,7 +670,7 @@ static int android_snd_read_configure_soundcard(MSFilter *obj, void *data) {
 	if ((ictx->soundCard->internal_id != card->internal_id) || (ictx->soundCard->device_type != card->device_type)) {
 		ms_mutex_lock(&ictx->mutex);
 		if (ictx->soundCard) {
-			ms_snd_card_ref(ictx->soundCard);
+			ms_snd_card_unref(ictx->soundCard);
 			ictx->soundCard = NULL;
 		}
 		ictx->soundCard = ms_snd_card_ref(card);
@@ -970,7 +970,7 @@ static int android_snd_write_configure_soundcard(MSFilter *obj, void *data) {
 	if ((octx->soundCard->internal_id != card->internal_id) || (octx->soundCard->device_type != card->device_type)) {
 		ms_mutex_lock(&octx->mutex);
 		if (octx->soundCard) {
-			ms_snd_card_ref(octx->soundCard);
+			ms_snd_card_unref(octx->soundCard);
 			octx->soundCard = NULL;
 		}
 		octx->soundCard = ms_snd_card_ref(card);
@@ -1159,6 +1159,7 @@ static void snd_card_device_create(int device_id, const char * name, MSSndCardDe
 		ms_snd_card_manager_add_card(m, card);
 
 		ms_message("[OpenSLES] Added card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
+		ms_message("DADA [OpenSLES] Added card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
 	} else {
 		free(card);
 	}
