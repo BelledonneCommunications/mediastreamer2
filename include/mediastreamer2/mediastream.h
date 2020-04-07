@@ -65,6 +65,7 @@ typedef struct _RingStream RingStream;
 
 MS2_PUBLIC RingStream *ring_start(MSFactory *factory, const char * file, int interval, MSSndCard *sndcard);
 MS2_PUBLIC RingStream *ring_start_with_cb(MSFactory *factory, const char * file, int interval, MSSndCard *sndcard, MSFilterNotifyFunc func, void * user_data);
+MS2_PUBLIC void ring_stream_reset_default_card();
 MS2_PUBLIC void ring_stop (RingStream * stream);
 
 /**

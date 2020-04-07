@@ -162,10 +162,12 @@ void ring_play_dtmf(RingStream *stream, char dtmf, int duration_ms){
 }
 
 void ring_stop_dtmf(RingStream *stream){
+	ms_message("DADA [RingStream] stop dtmf ringing default card is %s", ((stream->card) ? stream->card->id : "No default"));
 	ms_filter_call_method_noarg(stream->gendtmf, MS_DTMF_GEN_STOP);
 }
 
 void ring_stop(RingStream *stream){
+	ms_message("DADA [RingStream] stop ringing default card is %s", ((stream->card) ? stream->card->id : "No default"));
 	MSConnectionHelper h;
 
 	if (stream->ticker){
@@ -190,6 +192,13 @@ void ring_stop(RingStream *stream){
 		ms_filter_destroy(stream->write_resampler);
 	if (stream->card) ms_snd_card_unref(stream->card);
 	ms_free(stream);
+
+	ring_stream_reset_default_card();
+}
+
+void ring_stream_reset_default_card(){
+	if (default_card) ms_snd_card_unref(default_card);
+	default_card = NULL;
 }
 
 /*
