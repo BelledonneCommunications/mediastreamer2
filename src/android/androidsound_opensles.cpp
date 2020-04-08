@@ -297,6 +297,7 @@ static void android_snd_card_detect(MSSndCardManager *m) {
 		DeviceFavoriteSampleRate = get_preferred_sample_rate();
 		DeviceFavoriteBufferSize = get_preferred_buffer_size();
 		android_snd_card_add_devices(m);
+		ms_snd_card_remove_type_from_list_head(m, MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_BLUETOOTH);
 	} else {
 		ms_warning("[OpenSLES] Failed to dlopen libOpenSLES, OpenSLES MS soundcard unavailable");
 	}
@@ -1159,7 +1160,6 @@ static void snd_card_device_create(int device_id, const char * name, MSSndCardDe
 		ms_snd_card_manager_add_card(m, card);
 
 		ms_message("[OpenSLES] Added card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
-		ms_message("DADA [OpenSLES] Added card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
 	} else {
 		free(card);
 	}

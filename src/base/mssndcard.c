@@ -142,6 +142,39 @@ void ms_snd_card_manager_prepend_card(MSSndCardManager *m, MSSndCard *c){
 	m->cards=bctbx_list_prepend(m->cards, ms_snd_card_ref(c));
 }
 
+bool_t ms_snd_card_manager_swap_cards(MSSndCardManager *m, MSSndCard *c0, MSSndCard *c1){
+
+	if (!c0) return FALSE;
+	if (!c1) return FALSE;
+
+	bctbx_list_t *elem = NULL;
+	bctbx_list_t *ltmp = NULL;
+	bool_t c0Found = FALSE;
+	bool_t c1Found = FALSE;
+	for (elem = m->cards; elem != NULL; elem = elem->next) {
+		MSSndCard *card = (MSSndCard *)elem->data;
+		MSSndCard *c = NULL;
+		if (strcmp(ms_snd_card_get_string_id(card),ms_snd_card_get_string_id(c0))==0){
+			c0Found = TRUE;
+			c = c1;
+		} else if (strcmp(ms_snd_card_get_string_id(card),ms_snd_card_get_string_id(c1))==0){
+			c1Found = TRUE;
+			c = c0;
+		} else {
+			c = card;
+		}
+		ltmp=bctbx_list_append(ltmp, c);
+	}
+	if (c0Found && c1Found) {
+		m->cards=ltmp;
+		return TRUE;
+	} else {
+		ms_message("[Card Swap] Unable to swap position of card '%s' and card '%s' because %s has not been found",ms_snd_card_get_string_id(c0), ms_snd_card_get_string_id(c1), (c0Found ? "latter" : "former"));
+		return FALSE;
+	}
+
+}
+
 void ms_snd_card_manager_prepend_cards(MSSndCardManager *m, bctbx_list_t *l) {
 	bctbx_list_t *elem;
 	bctbx_list_t *lcopy = bctbx_list_copy(l);
@@ -442,4 +475,23 @@ bool_t ms_snd_card_is_card_duplicate(MSSndCardManager *m, MSSndCard * card, bool
 	bctbx_list_free(cards);
 
 	return same_type_card_found;
+}
+
+void ms_snd_card_remove_type_from_list_head(MSSndCardManager *m, MSSndCardDeviceType type) {
+		MSSndCard * head = ms_snd_card_ref(ms_snd_card_manager_get_card(m, NULL));
+		// Loop until the type of the head of the list is not a bluetooh device
+		while(ms_snd_card_get_device_type(head) == type) {
+			bctbx_list_t * elem;
+			for (elem=m->cards;elem!=NULL;elem=elem->next){
+				MSSndCard *c=(MSSndCard*)elem->data;
+				if(ms_snd_card_get_device_type(c) != type) {
+					ms_snd_card_manager_swap_cards(m, head, c);
+					// Exit for loop once swap occurred
+					break;
+				}
+			}
+			ms_snd_card_unref(head);
+			head = ms_snd_card_ref(ms_snd_card_manager_get_card(m, NULL));
+		}
+		ms_snd_card_unref(head);
 }

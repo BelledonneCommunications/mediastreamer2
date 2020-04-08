@@ -698,6 +698,24 @@ MS2_PUBLIC void ms_snd_card_unref(MSSndCard *sndCard);
 **/
 MS2_PUBLIC bool_t ms_snd_card_is_card_duplicate(MSSndCardManager *m, MSSndCard * card, bool_t checkCapabilities);
 
+/**
+ * Prevent card type to be at the head fo the list
+ * @param m    Card Manager
+ * @param type Card type to remove from the head of list of cards
+ *
+**/
+MS2_PUBLIC void ms_snd_card_remove_type_from_list_head(MSSndCardManager *m, MSSndCardDeviceType type);
+
+/**
+ * Swap two position of 2 sound cards in the sound card manager.
+ * @param m    Card Manager
+ * @param c0   Card to be swapped
+ * @param c1   Card to be swapped
+ *
+ * Returns: true if c0 and c1 are not null and both are found among the list of sound cards in the card manager, false otherwise
+**/
+MS2_PUBLIC bool_t ms_snd_card_manager_swap_cards(MSSndCardManager *m, MSSndCard *c0, MSSndCard *c1);
+
 /** @} */
 
 #ifdef __cplusplus
