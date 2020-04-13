@@ -120,6 +120,14 @@ int ms_filter_link(MSFilter *f1, int pin1, MSFilter *f2, int pin2){
 	ms_return_val_if_fail(pin2<f2->desc->ninputs, -1);
 	ms_return_val_if_fail(f1->outputs[pin1]==NULL,-1);
 	ms_return_val_if_fail(f2->inputs[pin2]==NULL,-1);
+#ifdef MS2_NO_RELINK_WHILE_RUNNING
+	if (f1->ticker){
+		ms_fatal("Filter %s:%p is already scheduled.", f1->desc->name, f1);
+	}
+	if (f2->ticker){
+		ms_fatal("Filter %s:%p is already scheduled.", f2->desc->name, f2);
+	}
+#endif
 	q=ms_queue_new(f1,pin1,f2,pin2);
 	f1->outputs[pin1]=q;
 	f2->inputs[pin2]=q;
@@ -134,6 +142,14 @@ int ms_filter_unlink(MSFilter *f1, int pin1, MSFilter *f2, int pin2){
 	ms_return_val_if_fail(f1->outputs[pin1]!=NULL,-1);
 	ms_return_val_if_fail(f2->inputs[pin2]!=NULL,-1);
 	ms_return_val_if_fail(f1->outputs[pin1]==f2->inputs[pin2],-1);
+#ifdef MS2_NO_RELINK_WHILE_RUNNING
+	if (f1->ticker){
+		ms_fatal("Filter %s:%p is still scheduled.", f1->desc->name, f1);
+	}
+	if (f2->ticker){
+		ms_fatal("Filter %s:%p is still scheduled.", f2->desc->name, f2);
+	}
+#endif
 	q=f1->outputs[pin1];
 	f1->outputs[pin1]=f2->inputs[pin2]=0;
 	ms_queue_destroy(q);
