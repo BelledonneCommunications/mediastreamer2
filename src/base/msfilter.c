@@ -93,7 +93,10 @@ bool_t ms_filter_desc_implements_interface(MSFilterDesc *desc, MSFilterInterface
 }
 
 bool_t ms_filter_implements_interface(MSFilter *f, MSFilterInterfaceId id){
-	return ms_filter_desc_implements_interface(f->desc,id);
+	if (f)
+		return ms_filter_desc_implements_interface(f->desc,id);
+	else
+		return FALSE;
 }
 
 bctbx_list_t *ms_filter_lookup_by_interface(MSFilterInterfaceId id){

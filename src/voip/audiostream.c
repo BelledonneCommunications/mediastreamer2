@@ -209,20 +209,25 @@ static void audio_stream_configure_resampler(AudioStream *st, MSFilter *resample
 	ms_filter_call_method(to,MS_FILTER_GET_SAMPLE_RATE,&to_rate);
 	ms_filter_call_method(from, MS_FILTER_GET_NCHANNELS, &from_channels);
 	ms_filter_call_method(to, MS_FILTER_GET_NCHANNELS, &to_channels);
+
+	// Access name member only if filter desc member is not null to aviod segfaults
+	const char * from_name = (from) ? ((from->desc) ? from->desc->name : "Unknown") : "Unknown";
+	const char * to_name = (to) ? ((to->desc) ? to->desc->name : "Unknown" ) : "Unknown";
+
 	if (from_channels == 0) {
 		from_channels = st->nchannels;
-		ms_error("Filter %s does not implement the MS_FILTER_GET_NCHANNELS method", from->desc->name);
+		ms_error("Filter %s does not implement the MS_FILTER_GET_NCHANNELS method", from_name);
 	}
 	if (to_channels == 0) {
 		to_channels = st->nchannels;
-		ms_error("Filter %s does not implement the MS_FILTER_GET_NCHANNELS method", to->desc->name);
+		ms_error("Filter %s does not implement the MS_FILTER_GET_NCHANNELS method", to_name);
 	}
 	if (from_rate == 0){
-		ms_error("Filter %s does not implement the MS_FILTER_GET_SAMPLE_RATE method", from->desc->name);
+		ms_error("Filter %s does not implement the MS_FILTER_GET_SAMPLE_RATE method", from_name);
 		from_rate = st->sample_rate;
 	}
 	if (to_rate == 0){
-		ms_error("Filter %s does not implement the MS_FILTER_GET_SAMPLE_RATE method", to->desc->name);
+		ms_error("Filter %s does not implement the MS_FILTER_GET_SAMPLE_RATE method", to_name);
 		to_rate = st->sample_rate;
 	}
 	ms_filter_call_method(resampler,MS_FILTER_SET_SAMPLE_RATE,&from_rate);
@@ -231,7 +236,7 @@ static void audio_stream_configure_resampler(AudioStream *st, MSFilter *resample
 	ms_filter_call_method(resampler, MS_FILTER_SET_OUTPUT_NCHANNELS, &to_channels);
 	ms_message(
 		"configuring %s:%p-->%s:%p from rate [%i] to rate [%i] and from channel [%i] to channel [%i]",
-		from->desc->name, from, to->desc->name, to, from_rate, to_rate, from_channels, to_channels
+		from_name, from, to_name, to, from_rate, to_rate, from_channels, to_channels
 	);
 }
 
@@ -811,6 +816,7 @@ static int get_usable_telephone_event(RtpProfile *profile, int clock_rate){
 
 int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const char *rem_rtp_ip, int rem_rtp_port,
 	const char *rem_rtcp_ip, int rem_rtcp_port, int payload, const MSMediaStreamIO *io) {
+
 	RtpSession *rtps=stream->ms.sessions.rtp_session;
 	PayloadType *pt;
 	int tmp, tev_pt;
