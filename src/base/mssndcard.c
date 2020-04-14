@@ -142,34 +142,34 @@ void ms_snd_card_manager_prepend_card(MSSndCardManager *m, MSSndCard *c){
 	m->cards=bctbx_list_prepend(m->cards, ms_snd_card_ref(c));
 }
 
-bool_t ms_snd_card_manager_swap_cards(MSSndCardManager *m, MSSndCard *c0, MSSndCard *c1){
+bool_t ms_snd_card_manager_swap_cards(MSSndCardManager *m, MSSndCard *card0, MSSndCard *card1){
 
-	if (!c0) return FALSE;
-	if (!c1) return FALSE;
+	if (!card0) return FALSE;
+	if (!card1) return FALSE;
 
 	bctbx_list_t *elem = NULL;
 	bctbx_list_t *ltmp = NULL;
-	bool_t c0Found = FALSE;
-	bool_t c1Found = FALSE;
+	bool_t card0_found = FALSE;
+	bool_t card1_found = FALSE;
 	for (elem = m->cards; elem != NULL; elem = elem->next) {
 		MSSndCard *card = (MSSndCard *)elem->data;
 		MSSndCard *c = NULL;
-		if (strcmp(ms_snd_card_get_string_id(card),ms_snd_card_get_string_id(c0))==0){
-			c0Found = TRUE;
-			c = c1;
-		} else if (strcmp(ms_snd_card_get_string_id(card),ms_snd_card_get_string_id(c1))==0){
-			c1Found = TRUE;
-			c = c0;
+		if (strcmp(ms_snd_card_get_string_id(card),ms_snd_card_get_string_id(card0))==0){
+			card0_found = TRUE;
+			c = card1;
+		} else if (strcmp(ms_snd_card_get_string_id(card),ms_snd_card_get_string_id(card1))==0){
+			card1_found = TRUE;
+			c = card0;
 		} else {
 			c = card;
 		}
 		ltmp=bctbx_list_append(ltmp, c);
 	}
-	if (c0Found && c1Found) {
+	if (card0_found && card1_found) {
 		m->cards=ltmp;
 		return TRUE;
 	} else {
-		ms_message("[Card Swap] Unable to swap position of card '%s' and card '%s' because %s has not been found",ms_snd_card_get_string_id(c0), ms_snd_card_get_string_id(c1), (c0Found ? "latter" : "former"));
+		ms_message("[Card Swap] Unable to swap position of card '%s' and card '%s' because %s has not been found",ms_snd_card_get_string_id(card0), ms_snd_card_get_string_id(card1), (card0_found ? "latter" : "former"));
 		return FALSE;
 	}
 

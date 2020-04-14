@@ -708,13 +708,13 @@ MS2_PUBLIC void ms_snd_card_remove_type_from_list_head(MSSndCardManager *m, MSSn
 
 /**
  * Swap two position of 2 sound cards in the sound card manager.
- * @param m    Card Manager
- * @param c0   Card to be swapped
- * @param c1   Card to be swapped
+ * @param m       Card Manager
+ * @param card0   Card to be swapped
+ * @param card1   Card to be swapped
  *
- * Returns: true if c0 and c1 are not null and both are found among the list of sound cards in the card manager, false otherwise
+ * Returns: true if card0 and card1 are not null and both are found among the list of sound cards in the card manager, false otherwise
 **/
-MS2_PUBLIC bool_t ms_snd_card_manager_swap_cards(MSSndCardManager *m, MSSndCard *c0, MSSndCard *c1);
+MS2_PUBLIC bool_t ms_snd_card_manager_swap_cards(MSSndCardManager *m, MSSndCard *card0, MSSndCard *card1);
 
 /** @} */
 
