@@ -257,8 +257,8 @@ if BUILD_V4L2
 libmediastreamer_voip_la_SOURCES+=	videofilters/msv4l2.c
 endif
 
-if BUILD_WIN32
-libmediastreamer_voip_la_SOURCES+=	videofilters/drawdib-display.c
+if BUILD_WIN32 AND NOT(ENABLE_MICROSOFT_STORE_APP)
+#libmediastreamer_voip_la_SOURCES+=	videofilters/drawdib-display.c  #uncomment when ENABLE_MICROSOFT_STORE_APP is propagate
 endif
 
 if BUILD_THEORA

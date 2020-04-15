@@ -639,14 +639,20 @@ void ortp_shm_close(void *mem){
 
 void ortp_get_cur_time(ortpTimeSpec *ret){
 #if defined(_WIN32_WCE) || defined(_WIN32)
-	DWORD timemillis;
+#ifdef MS2_WINDOWS_DESKTOP
+        DWORD timemillis;
 #	if defined(_WIN32_WCE)
-	timemillis=GetTickCount();
+        timemillis=GetTickCount();
 #	else
-	timemillis=timeGetTime();
+        timemillis=timeGetTime();
 #	endif
-	ret->tv_sec=timemillis/1000;
-	ret->tv_nsec=(timemillis%1000)*1000000LL;
+        ret->tv_sec=timemillis/1000;
+        ret->tv_nsec=(timemillis%1000)*1000000LL;
+#else
+        ULONGLONG timemillis = GetTickCount64();
+        ret->tv_sec = timemillis / 1000;
+        ret->tv_nsec = (timemillis % 1000) * 1000000LL;
+#endif
 #elif defined(__MACH__) && defined(__GNUC__) && (__GNUC__ >= 3)
 	struct timeval tv;
 	gettimeofday(&tv, NULL);

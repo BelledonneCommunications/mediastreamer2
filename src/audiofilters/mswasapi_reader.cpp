@@ -118,8 +118,13 @@ void MSWASAPIReader::init(LPCWSTR id)
 #else
 	IMMDeviceEnumerator *pEnumerator = NULL;
 	IMMDevice *pDevice = NULL;
-	CoInitialize(NULL);
-	result = CoCreateInstance(CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, IID_IMMDeviceEnumerator, (void**)&pEnumerator);
+        //#ifdef ENABLE_MICROSOFT_STORE_APP    //Use it when ENABLE_MICROSOFT_STORE_APP is propagate
+#ifndef ENABLE_MICROSOFT_STORE_APP
+        CoInitializeEx(NULL, COINIT_MULTITHREADED);
+#else
+        CoInitialize(NULL);
+#endif
+        result = CoCreateInstanceBT(CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, IID_IMMDeviceEnumerator, (void**)&pEnumerator);
 	REPORT_ERROR("mswasapi: Could not create an instance of the device enumerator", result);
 	mCaptureId = id;
 	result = pEnumerator->GetDevice(mCaptureId, &pDevice);

@@ -415,10 +415,15 @@ int try_format_size(V4wState *s, int format, int width, int height, GUID *pPinCa
 static int v4w_configure_videodevice(V4wState *s)
 {
 	// Initialize COM
-	CoInitialize(NULL);
+//#ifdef ENABLE_MICROSOFT_STORE_APP    //Use it when ENABLE_MICROSOFT_STORE_APP is propagate
+#ifndef ENABLE_MICROSOFT_STORE_APP
+        CoInitializeEx(NULL, COINIT_MULTITHREADED);
+#else
+        CoInitialize(NULL);
+#endif
 
 	// get a Graph
-	HRESULT hr= CoCreateInstance (CLSID_FilterGraph,
+        HRESULT hr= CoCreateInstanceBT (CLSID_FilterGraph,
 		NULL,
 		CLSCTX_INPROC_SERVER,
 		IID_IGraphBuilder, //IID_IBaseFilter,
@@ -429,7 +434,7 @@ static int v4w_configure_videodevice(V4wState *s)
 	}
 
 	// get a CaptureGraphBuilder2
-	hr= CoCreateInstance (CLSID_CaptureGraphBuilder2,
+        hr= CoCreateInstanceBT (CLSID_CaptureGraphBuilder2,
 		NULL,
 		CLSCTX_INPROC_SERVER,
 		IID_ICaptureGraphBuilder2, //IID_IBaseFilter,
@@ -456,7 +461,7 @@ static int v4w_configure_videodevice(V4wState *s)
 
 	ULONG nFetched = 0;
 
-	hr = CoCreateInstance(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER, 
+        hr = CoCreateInstanceBT(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
 		IID_ICreateDevEnum, (PVOID *)&pCreateDevEnum);
 	if(FAILED(hr))
 	{
@@ -623,10 +628,15 @@ static int v4w_configure_videodevice(V4wState *s)
 static int v4w_open_videodevice(V4wState *s)
 {
 	// Initialize COM
-	CoInitialize(NULL);
+//#ifdef ENABLE_MICROSOFT_STORE_APP    //Use it when ENABLE_MICROSOFT_STORE_APP is propagate
+#ifndef ENABLE_MICROSOFT_STORE_APP
+        CoInitializeEx(NULL, COINIT_MULTITHREADED);
+#else
+        CoInitialize(NULL);
+#endif
 
 	// get a Graph
-	HRESULT hr= CoCreateInstance (CLSID_FilterGraph,
+        HRESULT hr= CoCreateInstanceBT (CLSID_FilterGraph,
 		NULL,
 		CLSCTX_INPROC_SERVER,
 		IID_IGraphBuilder, //IID_IBaseFilter,
@@ -637,7 +647,7 @@ static int v4w_open_videodevice(V4wState *s)
 	}
 
 	// get a CaptureGraphBuilder2
-	hr= CoCreateInstance (CLSID_CaptureGraphBuilder2,
+        hr= CoCreateInstanceBT (CLSID_CaptureGraphBuilder2,
 		NULL,
 		CLSCTX_INPROC_SERVER,
 		IID_ICaptureGraphBuilder2, //IID_IBaseFilter,
@@ -664,7 +674,7 @@ static int v4w_open_videodevice(V4wState *s)
 
 	ULONG nFetched = 0;
 
-	hr = CoCreateInstance(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER, 
+        hr = CoCreateInstanceBT(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
 		IID_ICreateDevEnum, (PVOID *)&pCreateDevEnum);
 	if(FAILED(hr))
 	{
@@ -904,7 +914,7 @@ static int v4w_open_videodevice(V4wState *s)
 
 
 	// get null renderer
-	hr=CoCreateInstance (CLSID_NullRenderer,
+        hr=CoCreateInstanceBT (CLSID_NullRenderer,
 		NULL,
 		CLSCTX_INPROC_SERVER,
 		IID_IBaseFilter,
@@ -1443,9 +1453,14 @@ static void vfw_detect(MSWebCamManager *obj){
 	ULONG nFetched = 0;
 
 	// Initialize COM
-	CoInitialize(NULL);
+//#ifdef ENABLE_MICROSOFT_STORE_APP    //Use it when ENABLE_MICROSOFT_STORE_APP is propagate
+#ifndef ENABLE_MICROSOFT_STORE_APP
+        CoInitializeEx(NULL, COINIT_MULTITHREADED);
+#else
+        CoInitialize(NULL);
+#endif
 
-	hr = CoCreateInstance(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER, 
+        hr = CoCreateInstanceBT(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
 		IID_ICreateDevEnum, (PVOID *)&pCreateDevEnum);
 	if(FAILED(hr))
 	{
