@@ -368,8 +368,7 @@ int DSCapture::selectBestFormat(SharedComPtr<IAMStreamConfig> streamConfig, int 
 int DSCapture::createDshowGraph(){
 	SharedComPtr< ICreateDevEnum > createDevEnum;
 	
-//#ifdef ENABLE_MICROSOFT_STORE_APP    //Use it when ENABLE_MICROSOFT_STORE_APP is propagate
-#ifndef ENABLE_MICROSOFT_STORE_APP
+#ifdef ENABLE_MICROSOFT_STORE_APP
         CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #else
         CoInitialize(NULL);
@@ -683,8 +682,7 @@ MSWebCamDesc ms_dshow_cam_desc={
 static void ms_dshow_detect(MSWebCamManager *obj){
 	SharedComPtr<IPropertyBag> pBag;
 	
-//#ifdef ENABLE_MICROSOFT_STORE_APP    //Use it when ENABLE_MICROSOFT_STORE_APP is propagate
-#ifndef ENABLE_MICROSOFT_STORE_APP
+#ifdef ENABLE_MICROSOFT_STORE_APP
         CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #else
         CoInitialize(NULL);

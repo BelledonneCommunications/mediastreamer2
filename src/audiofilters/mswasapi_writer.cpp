@@ -127,8 +127,7 @@ void MSWASAPIWriter::init(LPCWSTR id, MSFilter *f) {
 #else
 	IMMDeviceEnumerator *pEnumerator = NULL;
 	IMMDevice *pDevice = NULL;
-//#ifdef ENABLE_MICROSOFT_STORE_APP    //Use it when ENABLE_MICROSOFT_STORE_APP is propagate
-#ifndef ENABLE_MICROSOFT_STORE_APP
+#ifdef ENABLE_MICROSOFT_STORE_APP
         CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #else
         CoInitialize(NULL);

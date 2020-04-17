@@ -300,8 +300,7 @@ CPropertyBag::QueryInterface(REFIID riid, void** ppv)
 static int v4w_open_videodevice(V4wState *s, int format, MSVideoSize *vsize)
 {
 	// Initialize COM
-//#ifdef ENABLE_MICROSOFT_STORE_APP    //Use it when ENABLE_MICROSOFT_STORE_APP is propagate
-#ifndef ENABLE_MICROSOFT_STORE_APP
+#ifdef ENABLE_MICROSOFT_STORE_APP
         CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #else
         CoInitialize(NULL);

@@ -246,8 +246,8 @@ if(ENABLE_VIDEO)
 	if(WIN32 AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsPhone" AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
 		add_definitions(-DHAVE_DIRECTSHOW)
                 if(NOT(ENABLE_MICROSOFT_STORE_APP))
-#                    list(APPEND VOIP_SOURCE_FILES_C videofilters/drawdib-display.c)    #uncomment when ENABLE_MICROSOFT_STORE_APP is propagate
-            endif()
+		    list(APPEND VOIP_SOURCE_FILES_C videofilters/drawdib-display.c)
+		endif()
 		list(APPEND VOIP_SOURCE_FILES_CXX
 			videofilters/msdscap.cc
 		)
@@ -543,9 +543,13 @@ if(ENABLE_SHARED)
 				PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 			)
 		endif()
-		message(STATUS "Force use WindowsApp for mediastreamer : ${ENABLE_MICROSOFT_STORE_APP}")
-		set_target_properties(mediastreamer PROPERTIES LINK_DIRECTORIES "\$(WindowsSDK_LibraryPath_x86);\$(NETFXKitsDir)Lib\\um\\x86;\$(VC_LibraryPath_VC_x86_store);\$(VC_ReferencesPath_ATL_x86);\$(VC_LibraryPath_VC_x86);\$(VC_LibraryPath_x86);C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\VS\\UnitTest\\lib;\$(LibraryPath)")
-		target_link_libraries(mediastreamer PRIVATE "WindowsApp.lib")
+		if( ${ENABLE_MICROSOFT_STORE_APP} )
+			message(STATUS "Build mediastreamer for Microsoft Store")
+			set_target_properties(mediastreamer PROPERTIES LINK_DIRECTORIES "\$(WindowsSDK_LibraryPath_x86);\$(NETFXKitsDir)Lib\\um\\x86;\$(VC_LibraryPath_VC_x86_store);\$(VC_ReferencesPath_ATL_x86);\$(VC_LibraryPath_VC_x86);\$(VC_LibraryPath_x86);C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\VS\\UnitTest\\lib;\$(LibraryPath)")
+			target_link_libraries(mediastreamer PRIVATE "WindowsApp.lib")
+		else()
+			message(STATUS "Build mediastreamer for Desktop")
+		endif()
 	endif()
 	install(TARGETS mediastreamer EXPORT ${EXPORT_TARGETS_NAME}Targets
 		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

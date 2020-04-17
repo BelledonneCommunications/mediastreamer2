@@ -567,8 +567,7 @@ static void ms_wasapi_snd_card_detect_with_data_flow(MSSndCardManager *m, EDataF
 	IMMDeviceEnumerator *pEnumerator = NULL;
 	IMMDeviceCollection *pCollection = NULL;
 	IMMDevice *pEndpoint = NULL;
-//#ifdef ENABLE_MICROSOFT_STORE_APP    //Use it when ENABLE_MICROSOFT_STORE_APP is propagate
-#ifndef ENABLE_MICROSOFT_STORE_APP
+#ifdef ENABLE_MICROSOFT_STORE_APP
         HRESULT result = CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #else
         HRESULT result = CoInitialize(NULL);

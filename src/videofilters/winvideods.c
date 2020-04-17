@@ -415,8 +415,7 @@ int try_format_size(V4wState *s, int format, int width, int height, GUID *pPinCa
 static int v4w_configure_videodevice(V4wState *s)
 {
 	// Initialize COM
-//#ifdef ENABLE_MICROSOFT_STORE_APP    //Use it when ENABLE_MICROSOFT_STORE_APP is propagate
-#ifndef ENABLE_MICROSOFT_STORE_APP
+#ifdef ENABLE_MICROSOFT_STORE_APP
         CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #else
         CoInitialize(NULL);
@@ -628,8 +627,7 @@ static int v4w_configure_videodevice(V4wState *s)
 static int v4w_open_videodevice(V4wState *s)
 {
 	// Initialize COM
-//#ifdef ENABLE_MICROSOFT_STORE_APP    //Use it when ENABLE_MICROSOFT_STORE_APP is propagate
-#ifndef ENABLE_MICROSOFT_STORE_APP
+#ifdef ENABLE_MICROSOFT_STORE_APP
         CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #else
         CoInitialize(NULL);
@@ -1453,8 +1451,7 @@ static void vfw_detect(MSWebCamManager *obj){
 	ULONG nFetched = 0;
 
 	// Initialize COM
-//#ifdef ENABLE_MICROSOFT_STORE_APP    //Use it when ENABLE_MICROSOFT_STORE_APP is propagate
-#ifndef ENABLE_MICROSOFT_STORE_APP
+#ifdef ENABLE_MICROSOFT_STORE_APP
         CoInitializeEx(NULL, COINIT_MULTITHREADED);
 #else
         CoInitialize(NULL);
