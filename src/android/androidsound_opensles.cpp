@@ -236,7 +236,8 @@ static SLuint32 convertSamplerate(int samplerate)
     case 8000:
         return SL_SAMPLINGRATE_8;
         break;
-    case 16000: return SL_SAMPLINGRATE_16;
+    case 16000:
+	return SL_SAMPLINGRATE_16;
         break;
     case 22050:
         return SL_SAMPLINGRATE_22_05;
@@ -665,7 +666,6 @@ static int android_snd_read_get_nchannels(MSFilter *obj, void *data) {
 static int android_snd_read_configure_soundcard(MSFilter *obj, void *data) {
 	MSSndCard *card = (MSSndCard*)data;
 	OpenSLESInputContext *ictx = (OpenSLESInputContext*)obj->data;
-
 	// Check if device_id is different and/or device_type is different
 	// For API < 23, all device ID are identical but the device type is different
 	if ((ictx->soundCard->internal_id != card->internal_id) || (ictx->soundCard->device_type != card->device_type)) {
@@ -1137,6 +1137,34 @@ static void snd_card_device_create_extra_fields(MSSndCardManager *m, MSSndCard *
 	if (d->recommended_rate){
 		card_data->samplerate = d->recommended_rate;
 	}
+}
+
+
+static void snd_card_device_create(int device_id, const char * name, MSSndCardDeviceType type, unsigned int capabilities, MSSndCardManager *m) {
+
+	MSSndCard *card = ms_snd_card_new(&android_native_snd_opensles_card_desc);
+
+	card->name = ms_strdup(name);
+	card->internal_id = device_id;
+	card->device_type = type;
+
+	// Card capabilities
+	card->capabilities = capabilities;
+
+	snd_card_device_create_extra_fields(m, card);
+
+	// Last argument is set to false because cards are added based on the type ignoring their caapbilities as we do upcalls to Java in order to set devices
+	// For example in the case of a Bluetooth device
+	if (!ms_snd_card_is_card_duplicate(m, card, FALSE)) {
+		card=ms_snd_card_ref(card);
+		ms_snd_card_manager_add_card(m, card);
+
+		ms_message("[OpenSLES] Added card [%p]: name [%s] device ID [%0d] type [%s]", card, card->name, card->internal_id, ms_snd_card_device_type_to_string(card->device_type));
+	} else {
+		free(card);
+	}
+}
+
 }
 
 
