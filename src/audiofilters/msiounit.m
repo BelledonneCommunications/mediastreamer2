@@ -137,6 +137,7 @@ struct au_filter_read_data{
 	AudioTimeStamp readTimeStamp;
 	unsigned int n_lost_frame;
 	MSTickerSynchronizer *ticker_synchronizer;
+	uint64_t read_samples;
 };
 
 struct au_filter_write_data{
@@ -529,7 +530,9 @@ static OSStatus au_read_cb (
 		return 0;
 	}
 	au_filter_read_data_t *d = card->read_filter_data;
-
+	if (d->readTimeStamp.mSampleTime <0) {
+		d->readTimeStamp=*inTimeStamp;
+	}
 	OSStatus err=0;
 	mblk_t * rm=NULL;
 	AudioBufferList readAudioBufferList;
@@ -540,13 +543,13 @@ static OSStatus au_read_cb (
 	if (d->base.card->read_started) {
 		rm=allocb(readAudioBufferList.mBuffers[0].mDataByteSize,0);
 		readAudioBufferList.mBuffers[0].mData=rm->b_wptr;
-		err = AudioUnitRender(d->base.card->audio_unit, ioActionFlags, inTimeStamp, inBusNumber,inNumberFrames, &readAudioBufferList);
+		err = AudioUnitRender(d->base.card->audio_unit, ioActionFlags, &d->readTimeStamp, inBusNumber,inNumberFrames, &readAudioBufferList);
 		if (err == 0) {
 			rm->b_wptr += readAudioBufferList.mBuffers[0].mDataByteSize;
 			ms_mutex_lock(&d->mutex);
 			putq(&d->rq,rm);
-			d->readTimeStamp = *inTimeStamp;
 			ms_mutex_unlock(&d->mutex);
+			d->readTimeStamp.mSampleTime+=readAudioBufferList.mBuffers[0].mDataByteSize/(d->base.card->bits/2);
 		} else {
 			check_au_unit_result(err, "AudioUnitRender");
 			freeb(rm);
@@ -738,6 +741,8 @@ static void au_read_preprocess(MSFilter *f){
 static void au_read_process(MSFilter *f){
 	au_filter_read_data_t *d=(au_filter_read_data_t*)f->data;
 	mblk_t *m;
+
+	bool_t read_something = FALSE;
 	
 	/*
 	In some rare cases the audio unit fails to start in preprocess(), because of AudioSession being temporarily suspended.
@@ -748,12 +753,12 @@ static void au_read_process(MSFilter *f){
 	}
 	ms_mutex_lock(&d->mutex);
 	while((m = getq(&d->rq)) != NULL){
+		d->read_samples += (msgdsize(m) / 2) / d->base.card->nchannels;
 		ms_queue_put(f->outputs[0],m);
 	}
-	if (d->readTimeStamp.mFlags & kAudioTimeStampSampleTimeValid) {
-		ms_ticker_synchronizer_update(d->ticker_synchronizer, d->readTimeStamp.mSampleTime, d->base.card->rate);
-	}
 	ms_mutex_unlock(&d->mutex);
+
+	ms_ticker_synchronizer_update(d->ticker_synchronizer, d->read_samples, d->base.card->rate);
 }
 
 static void au_read_postprocess(MSFilter *f){
@@ -952,6 +957,7 @@ static MSFilter *ms_au_read_new(MSSndCard *mscard){
 	MSFilter *f=ms_factory_create_filter_from_desc(ms_snd_card_get_factory(mscard), &au_read_desc);
 	au_filter_read_data_t *d=ms_new0(au_filter_read_data_t,1);
 	qinit(&d->rq);
+	d->readTimeStamp.mSampleTime=-1;
 	ms_mutex_init(&d->mutex,NULL);
 	d->base.card=card;
 	card->read_filter_data=d;
