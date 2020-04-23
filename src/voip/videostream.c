@@ -1806,6 +1806,8 @@ void video_preview_start(VideoPreview *stream, MSWebCam *device) {
 
 	stream->source = ms_web_cam_create_reader(device);
 
+	stream->cam = device;
+
 	/* configure the filters */
 	configure_video_preview_source(stream);
 
@@ -1815,7 +1817,8 @@ void video_preview_start(VideoPreview *stream, MSWebCam *device) {
 #else
 	{
 		MSPixFmt format = MS_YUV420P; /* Display format */
-		int mirroring = 1;
+		// Disable mirroring if static image
+		int mirroring = (strcmp(ms_web_cam_get_string_id(device), "StaticImage: Static picture") != 0);
 		int corner = -1;
 		MSVideoSize disp_size = stream->sent_vsize;
 		const char *displaytype = stream->display_name;
