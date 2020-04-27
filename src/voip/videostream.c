@@ -1481,6 +1481,14 @@ static MSFilter* _video_stream_change_camera(VideoStream *stream, MSWebCam *cam,
 			}
 		}
 
+		// Change value of mirroring as potentially the webcam was changed
+		if (stream->output2 && ms_filter_get_id(stream->output2) == MS_OGL_ID) {
+			MSWebCam * webcam = stream->cam;
+			// Disable mirroring if static image
+			int mirroring = (webcam) ? (strcmp(ms_web_cam_get_string_id(webcam), "StaticImage: Static picture") != 0) : TRUE;
+			ms_filter_call_method(stream->output2, MS_VIDEO_DISPLAY_ENABLE_MIRRORING, &mirroring);
+		}
+
 		ms_ticker_attach(stream->ms.sessions.ticker,stream->source);
 	}
 	return old_source;
