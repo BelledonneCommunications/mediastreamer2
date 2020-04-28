@@ -47,7 +47,7 @@ struct _FilterData {
 	bool_t update_mirroring;
 	bool_t update_context;
 
-	mblk_t * previnm;
+	mblk_t * prev_inm;
 };
 
 typedef struct _FilterData FilterData;
@@ -62,7 +62,7 @@ static void ogl_init (MSFilter *f) {
 	data->show_video = TRUE;
 	data->mirroring = TRUE;
 	data->update_mirroring = FALSE;
-	data->previnm = NULL;
+	data->prev_inm = NULL;
 
 	f->data = data;
 }
@@ -102,11 +102,11 @@ static void ogl_process (MSFilter *f) {
 		ogl_display_set_yuv_to_display(data->display, inm);
 
 		// Apply mirroring flag if the frame changed compared to last time process was executed or at the 1st iteration
-		if (((data->previnm != inm) || (data->previnm == NULL)) && (data->update_mirroring)) {
+		if (((data->prev_inm != inm) || (data->prev_inm == NULL)) && (data->update_mirroring)) {
 			ogl_display_enable_mirroring_to_display(data->display, data->mirroring);
 			data->update_mirroring = FALSE;
 		}
-		data->previnm = inm;
+		data->prev_inm = inm;
 	}
 
 end:
