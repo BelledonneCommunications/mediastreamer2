@@ -53,18 +53,20 @@
 
 #endif
 
-
+/*
 static void inc_ref(mblk_t*m){
 	dblk_ref(m->b_datap);
 	if (m->b_cont)
 		inc_ref(m->b_cont);
 }
 
+
 static void dec_ref(mblk_t *m){
 	if (m->b_cont)
 		dec_ref(m->b_cont);
 	dblk_unref(m->b_datap);
 }
+*/
 
 typedef struct V4l2State{
 	int fd;
@@ -531,8 +533,8 @@ static int msv4l2_do_mmap(V4l2State *s){
 		if (-1==v4l2_ioctl (s->fd, VIDIOC_QBUF, &buf)){
 			ms_error("VIDIOC_QBUF failed: %s",strerror(errno));
 		}else {
-			inc_ref(s->frames[i]);
 			s->queued++;
+			mblk_set_marker_info(s->frames[i], TRUE);
 		}
 	}
 	/*start capture immediately*/
@@ -574,7 +576,7 @@ static mblk_t *v4l2_dequeue_ready_buffer(V4l2State *s, int poll_timeout_ms){
 			ms_debug("v4l2: de-queue buf %i",buf.index);
 			/*decrement ref count of dequeued buffer */
 			ret=s->frames[buf.index];
-			dec_ref(ret);
+			
 			if ((int)buf.index >= s->frame_max){
 				ms_error("buf.index>=s->max_frames !");
 				return NULL;
@@ -583,6 +585,8 @@ static mblk_t *v4l2_dequeue_ready_buffer(V4l2State *s, int poll_timeout_ms){
 				ms_warning("Ignoring empty buffer...");
 				return NULL;
 			}
+			mblk_set_marker_info(ret, FALSE);
+			
 			/*normally buf.bytesused should contain the right buffer size; however we have found a buggy
 			driver that puts a random value inside */
 			if (s->picture_size!=0)
@@ -604,19 +608,19 @@ static mblk_t * v4lv2_grab_image(V4l2State *s, int poll_timeout_ms){
 	buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	buf.memory = V4L2_MEMORY_MMAP;
 
-	/*queue buffers whose ref count is 1, because they are not
-	 used anywhere in the filter chain */
+	/* Queue buffers whose ref count is 1, which means they are no longer
+	 used anywhere in the filter chain. */
 	for(k=0;k<s->frame_max;++k){
-		if (dblk_ref_value(s->frames[k]->b_datap)==1){
+		if (dblk_ref_value(s->frames[k]->b_datap)==1 && mblk_get_marker_info(s->frames[k]) == FALSE ){
 			no_slot_available = FALSE;
 			buf.index=k;
 			if (-1==v4l2_ioctl (s->fd, VIDIOC_QBUF, &buf))
 				ms_warning("VIDIOC_QBUF %i failed: %s",k,  strerror(errno));
 			else {
-				/*increment ref count of queued buffer*/
-				inc_ref(s->frames[k]);
 				s->queued++;
+				mblk_set_marker_info(s->frames[k], TRUE);
 			}
+			
 		}
 	}
 
@@ -711,10 +715,10 @@ static void *msv4l2_thread(void *ptr){
 			mblk_t *m;
 			m=v4lv2_grab_image(s,50);
 			if (m){
-				mblk_t *om=dupmsg(m);
-				mblk_set_marker_info(om,(s->pix_fmt==MS_MJPEG));
+				mblk_t *om = dupmsg(m);
+				mblk_set_marker_info(om, (s->pix_fmt==MS_MJPEG));
 				ms_mutex_lock(&s->mutex);
-				putq(&s->rq,om);
+				putq(&s->rq, om);
 				ms_mutex_unlock(&s->mutex);
 			}
 		}
@@ -955,18 +959,12 @@ static void msv4l2_detect(MSWebCamManager *obj){
 #else
 				camera_caps = V4L2_CAP_VIDEO_CAPTURE;
 #endif
-				if (((camera_caps & V4L2_CAP_VIDEO_CAPTURE)
-#ifdef V4L2_CAP_VIDEO_CAPTURE_MPLANE
-					|| (camera_caps & V4L2_CAP_VIDEO_CAPTURE_MPLANE)
-#endif
-					) && !((camera_caps & V4L2_CAP_VIDEO_OUTPUT)
-#ifdef V4L2_CAP_VIDEO_OUTPUT_MPLANE
-					|| (camera_caps & V4L2_CAP_VIDEO_OUTPUT_MPLANE)
-#endif
-					)) {
+				if (camera_caps & V4L2_CAP_VIDEO_CAPTURE) {
 					MSWebCam *cam=ms_web_cam_new(&v4l2_card_desc);
 					cam->name=ms_strdup(devname);
 					ms_web_cam_manager_add_cam(obj,cam);
+				}else{
+					ms_message("Ignored %s, not a capture device.", devname);
 				}
 			}
 			close(fd);
