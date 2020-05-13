@@ -31,7 +31,7 @@
 #ifndef NO_FFMPEG
 #include "ffmpeg-priv.h"
 #else
-#define FF_INPUT_BUFFER_PADDING_SIZE 32
+#define AV_INPUT_BUFFER_PADDING_SIZE 32
 #endif
 
 #if LIBAVCODEC_VERSION_MAJOR >= 57
