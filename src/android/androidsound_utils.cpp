@@ -142,7 +142,7 @@ void change_device(JNIEnv *env, MSSndCardDeviceType type) {
 	}
 }
 
-void set_bt_enable(JNIEnv *env, const bool enable) {
+void set_bt_enable(JNIEnv *env, const bool_t enable) {
 
 	std::string methodName;
 	if (enable) {
