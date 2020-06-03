@@ -197,7 +197,7 @@ static void enc_preprocess(MSFilter *f) {
 		else cpuused = 1;
 
 	}
-	if (s->cfg.g_threads == 1 || ms_video_size_area_greater_than(MS_VIDEO_SIZE_720P, s->vconf.vsize)){
+	if (s->cfg.g_threads == 1){
 		/* on mono-core iOS devices, we reduce the quality a bit more due to VP8 being slower with new Clang compilers */
 		cpuused = 16;
 	}
