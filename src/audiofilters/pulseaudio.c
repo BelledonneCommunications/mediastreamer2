@@ -478,9 +478,10 @@ static void stream_disconnect(Stream *s) {
 		if(err!=0 || !stream_wait_for_state(s, PA_STREAM_TERMINATED, PA_STREAM_FAILED)) {
 			ms_error("pa_stream_disconnect() failed. err=%d", err);
 		}
+		pa_threaded_mainloop_lock(the_pa_loop);
 		pa_stream_unref(s->stream);
-		
 		s->stream = NULL;
+		pa_threaded_mainloop_unlock(the_pa_loop);
 		s->state = PA_STREAM_UNCONNECTED;
 		s->init_volume = -1.0;
 	}
