@@ -457,8 +457,10 @@ static bool_t stream_connect(Stream *s) {
 	pa_threaded_mainloop_unlock(the_pa_loop);
 	if(err < 0 || !stream_wait_for_state(s, PA_STREAM_READY, PA_STREAM_FAILED)) {
 		ms_error("Fails to connect pulseaudio stream. err=%d", err);
+		pa_threaded_mainloop_lock(the_pa_loop);
 		pa_stream_unref(s->stream);
 		s->stream = NULL;
+		pa_threaded_mainloop_unlock(the_pa_loop);
 		return FALSE;
 	}
 	ms_message("pulseaudio %s stream connected (%dHz, %dch)",
@@ -508,7 +510,9 @@ static bool_t stream_set_volume(Stream *s, double volume) {
 			return TRUE;
 		}
 	}
+	pa_threaded_mainloop_lock(the_pa_loop);
 	idx = pa_stream_get_index(s->stream);
+	pa_threaded_mainloop_unlock(the_pa_loop);
 	pa_cvolume_init(&cvolume);
 	pa_cvolume_set(&cvolume, s->sampleSpec.channels, scale_to_volume(volume));
 	pa_threaded_mainloop_lock(the_pa_loop);
@@ -547,9 +551,9 @@ static bool_t stream_get_volume(Stream *s, double *volume) {
 		ms_error("stream_get_volume(): no stream");
 		return FALSE;
 	}
+	pa_threaded_mainloop_lock(the_pa_loop);
 	idx = pa_stream_get_index(s->stream);
 	*volume = -1.0;
-	pa_threaded_mainloop_lock(the_pa_loop);
 	if(s->type == STREAM_TYPE_PLAYBACK) {
 		op = pa_context_get_sink_input_info(the_pa_context, idx, stream_get_sink_volume_cb, volume);
 	} else {
