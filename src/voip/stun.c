@@ -1481,7 +1481,7 @@ static int ms_turn_rtp_endpoint_recvfrom(RtpTransport *rtptp, mblk_t *msg, int f
 
 	if ((context != NULL) && (context->rtp_session != NULL)) {
 		// Check first if we received a message from turn tcp
-		if (context->transport != MS_TURN_CONTEXT_TRANSPORT_UDP) {
+		if (context->transport != MS_TURN_CONTEXT_TRANSPORT_UDP && context->turn_tcp_client) {
 			msgsize = ms_turn_tcp_client_recvfrom(context->turn_tcp_client, msg, flags, from, fromlen);
 		}
 
@@ -1495,6 +1495,15 @@ static int ms_turn_rtp_endpoint_recvfrom(RtpTransport *rtptp, mblk_t *msg, int f
 			if ((ms_turn_context_get_state(context) >= MS_TURN_CONTEXT_STATE_BINDING_CHANNEL) && (*msg->b_rptr & 0x40)) {
 				uint16_t channel = ntohs(*((uint16_t *)msg->b_rptr));
 				uint16_t datasize = ntohs(*(((uint16_t *)msg->b_rptr) + 1));
+
+				if (context->transport != MS_TURN_CONTEXT_TRANSPORT_UDP && (datasize + 4) % 4 != 0) {
+					// The size of a channelData in TCP/TLS is rounded to a multiple of 4
+					// and not reflected in the length field, remove the padding to avoid any problems
+					uint16_t round = 4 + datasize;
+					uint16_t padded = round - (round % 4);
+					msg->b_wptr -= padded - datasize;
+				}
+
 				if ((channel == ms_turn_context_get_channel_number(context)) && (msgsize >= (datasize + 4))) {
 					msg->b_rptr += 4; /* Unpack the TURN ChannelData message */
 					context->stats.nb_received_channel_msg++;
@@ -1646,7 +1655,7 @@ static int ms_turn_rtp_endpoint_sendto(RtpTransport *rtptp, mblk_t *msg, int fla
 			}
 		}
 
-		if (send_via_turn_tcp) {
+		if (send_via_turn_tcp && context->turn_tcp_client) {
 			ret = ms_turn_tcp_client_sendto(context->turn_tcp_client, msg, flags, to, tolen);
 		} else {
 			ret = rtp_session_sendto(context->rtp_session, context->type == MS_TURN_CONTEXT_TYPE_RTP, msg, flags, to, tolen);
