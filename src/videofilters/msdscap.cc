@@ -368,11 +368,11 @@ int DSCapture::selectBestFormat(SharedComPtr<IAMStreamConfig> streamConfig, int 
 int DSCapture::createDshowGraph(){
 	SharedComPtr< ICreateDevEnum > createDevEnum;
 	
-#ifdef ENABLE_MICROSOFT_STORE_APP
-	CoInitializeEx(NULL, COINIT_MULTITHREADED);
-#else
+//#ifdef ENABLE_MICROSOFT_STORE_APP
+//	CoInitializeEx(NULL, COINIT_MULTITHREADED);
+//#else
 	CoInitialize(NULL);
-#endif
+//#endif
 	if ((createDevEnum=makeShared<ICreateDevEnum>( CLSID_SystemDeviceEnum,
                                     IID_ICreateDevEnum ))==NULL){
 		ms_error("Could not create device enumerator");
@@ -682,11 +682,11 @@ MSWebCamDesc ms_dshow_cam_desc={
 static void ms_dshow_detect(MSWebCamManager *obj){
 	SharedComPtr<IPropertyBag> pBag;
 	
-#ifdef ENABLE_MICROSOFT_STORE_APP
-	CoInitializeEx(NULL, COINIT_MULTITHREADED);
-#else
+//#ifdef ENABLE_MICROSOFT_STORE_APP
+//	CoInitializeEx(NULL, COINIT_MULTITHREADED);
+//#else
 	CoInitialize(NULL);
-#endif
+//#endif
 
 	SharedComPtr< ICreateDevEnum > createDevEnum;
 	if ((createDevEnum=makeShared<ICreateDevEnum>( CLSID_SystemDeviceEnum,

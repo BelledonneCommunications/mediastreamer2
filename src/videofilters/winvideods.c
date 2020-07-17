@@ -415,13 +415,14 @@ int try_format_size(V4wState *s, int format, int width, int height, GUID *pPinCa
 static int v4w_configure_videodevice(V4wState *s)
 {
 	// Initialize COM
-#ifdef ENABLE_MICROSOFT_STORE_APP
-	CoInitializeEx(NULL, COINIT_MULTITHREADED);
-#else
+//#ifdef ENABLE_MICROSOFT_STORE_APP
+//	CoInitializeEx(NULL, COINIT_MULTITHREADED);
+//#else
 	CoInitialize(NULL);
-#endif
+//#endif
 	// get a Graph
-	HRESULT hr= CoCreateInstanceBT (CLSID_FilterGraph,
+//	HRESULT hr= CoCreateInstanceBT (CLSID_FilterGraph,
+	HRESULT hr= CoCreateInstance (CLSID_FilterGraph,
 		NULL,
 		CLSCTX_INPROC_SERVER,
 		IID_IGraphBuilder, //IID_IBaseFilter,
@@ -626,14 +627,15 @@ static int v4w_configure_videodevice(V4wState *s)
 static int v4w_open_videodevice(V4wState *s)
 {
 	// Initialize COM
-#ifdef ENABLE_MICROSOFT_STORE_APP
-	CoInitializeEx(NULL, COINIT_MULTITHREADED);
-#else
+//#ifdef ENABLE_MICROSOFT_STORE_APP
+//	CoInitializeEx(NULL, COINIT_MULTITHREADED);
+//#else
 	CoInitialize(NULL);
-#endif
+//#endif
 
 	// get a Graph
-	HRESULT hr= CoCreateInstanceBT (CLSID_FilterGraph,
+//	HRESULT hr= CoCreateInstanceBT (CLSID_FilterGraph,
+	HRESULT hr= CoCreateInstance (CLSID_FilterGraph,
 		NULL,
 		CLSCTX_INPROC_SERVER,
 		IID_IGraphBuilder, //IID_IBaseFilter,
@@ -1450,12 +1452,13 @@ static void vfw_detect(MSWebCamManager *obj){
 	ULONG nFetched = 0;
 
 	// Initialize COM
-#ifdef ENABLE_MICROSOFT_STORE_APP
-	CoInitializeEx(NULL, COINIT_MULTITHREADED);
-#else
+//#ifdef ENABLE_MICROSOFT_STORE_APP
+//	CoInitializeEx(NULL, COINIT_MULTITHREADED);
+//#else
 	CoInitialize(NULL);
-#endif
-	hr = CoCreateInstanceBT(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
+//#endif
+//	hr = CoCreateInstanceBT(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
+	hr = CoCreateInstance(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
 		IID_ICreateDevEnum, (PVOID *)&pCreateDevEnum);
 	if(FAILED(hr))
 	{

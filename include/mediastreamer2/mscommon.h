@@ -90,6 +90,7 @@
 #endif
 #endif
 
+/*
 #ifdef ENABLE_MICROSOFT_STORE_APP
 _Check_return_ WINOLEAPI
 CoCreateInstanceFromApp(
@@ -150,6 +151,8 @@ __inline _Check_return_ HRESULT CoCreateInstanceExBT(
 	return CoCreateInstanceEx(Clsid, punkOuter, dwClsCtx, pServerInfo, dwCount, pResults);
 #endif //ENABLE_MICROSOFT_STORE_APP
 }
+*/
+
 #endif
 
 #if defined(_MSC_VER)

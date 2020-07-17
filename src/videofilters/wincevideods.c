@@ -300,14 +300,15 @@ CPropertyBag::QueryInterface(REFIID riid, void** ppv)
 static int v4w_open_videodevice(V4wState *s, int format, MSVideoSize *vsize)
 {
 	// Initialize COM
-#ifdef ENABLE_MICROSOFT_STORE_APP
-	CoInitializeEx(NULL, COINIT_MULTITHREADED);
-#else
+//#ifdef ENABLE_MICROSOFT_STORE_APP
+//	CoInitializeEx(NULL, COINIT_MULTITHREADED);
+//#else
 	CoInitialize(NULL);
-#endif
+//#endif
 
 	// get a Graph
-	HRESULT hr=s->m_pGraph.CoCreateInstanceBT(CLSID_FilterGraph);
+//	HRESULT hr=s->m_pGraph.CoCreateInstanceBT(CLSID_FilterGraph);
+	HRESULT hr=s->m_pGraph.CoCreateInstance(CLSID_FilterGraph);
 	if(FAILED(hr))
 	{
 		return -1;
