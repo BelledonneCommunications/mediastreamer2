@@ -127,7 +127,8 @@ private:
 template <typename _ComType>
 SharedComPtr<_ComType> makeShared(REFCLSID rclsid,LPUNKNOWN pUnkOuter,DWORD dwClsContext,REFIID riid){
 	_ComType *ptr=NULL;
-	if (CoCreateInstanceBT(rclsid,pUnkOuter,dwClsContext,riid,(void**)&ptr)!=S_OK) return SharedComPtr<_ComType>();
+//	if (CoCreateInstanceBT(rclsid,pUnkOuter,dwClsContext,riid,(void**)&ptr)!=S_OK) return SharedComPtr<_ComType>();
+	if (CoCreateInstance(rclsid,pUnkOuter,dwClsContext,riid,(void**)&ptr)!=S_OK) return SharedComPtr<_ComType>();
 	return SharedComPtr<_ComType>(ptr);
 }
 

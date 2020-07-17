@@ -433,7 +433,8 @@ static int v4w_configure_videodevice(V4wState *s)
 	}
 
 	// get a CaptureGraphBuilder2
-	hr= CoCreateInstanceBT (CLSID_CaptureGraphBuilder2,
+//	hr= CoCreateInstanceBT (CLSID_CaptureGraphBuilder2,
+	hr= CoCreateInstance (CLSID_CaptureGraphBuilder2,
 		NULL,
 		CLSCTX_INPROC_SERVER,
 		IID_ICaptureGraphBuilder2, //IID_IBaseFilter,
@@ -460,7 +461,8 @@ static int v4w_configure_videodevice(V4wState *s)
 
 	ULONG nFetched = 0;
 
-	hr = CoCreateInstanceBT(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
+//	hr = CoCreateInstanceBT(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
+	hr = CoCreateInstance(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
 		IID_ICreateDevEnum, (PVOID *)&pCreateDevEnum);
 	if(FAILED(hr))
 	{
@@ -646,7 +648,8 @@ static int v4w_open_videodevice(V4wState *s)
 	}
 
 	// get a CaptureGraphBuilder2
-	hr= CoCreateInstanceBT (CLSID_CaptureGraphBuilder2,
+//	hr= CoCreateInstanceBT (CLSID_CaptureGraphBuilder2,
+	hr= CoCreateInstance (CLSID_CaptureGraphBuilder2,
 		NULL,
 		CLSCTX_INPROC_SERVER,
 		IID_ICaptureGraphBuilder2, //IID_IBaseFilter,
@@ -673,7 +676,8 @@ static int v4w_open_videodevice(V4wState *s)
 
 	ULONG nFetched = 0;
 
-	hr = CoCreateInstanceBT(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
+//	hr = CoCreateInstanceBT(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
+	hr = CoCreateInstance(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
 		IID_ICreateDevEnum, (PVOID *)&pCreateDevEnum);
 	if(FAILED(hr))
 	{
@@ -913,7 +917,8 @@ static int v4w_open_videodevice(V4wState *s)
 
 
 	// get null renderer
-	hr=CoCreateInstanceBT (CLSID_NullRenderer,
+//	hr=CoCreateInstanceBT (CLSID_NullRenderer,
+	hr=CoCreateInstance (CLSID_NullRenderer,
 		NULL,
 		CLSCTX_INPROC_SERVER,
 		IID_IBaseFilter,

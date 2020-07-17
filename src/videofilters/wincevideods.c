@@ -316,9 +316,11 @@ static int v4w_open_videodevice(V4wState *s, int format, MSVideoSize *vsize)
 
 	// get a CaptureGraphBuilder2
 #if !defined(_WIN32_WCE)
-	hr=s->m_pBuilder.CoCreateInstanceBT(CLSID_CaptureGraphBuilder2);
+//	hr=s->m_pBuilder.CoCreateInstanceBT(CLSID_CaptureGraphBuilder2);
+	hr=s->m_pBuilder.CoCreateInstance(CLSID_CaptureGraphBuilder2);
 #else
-	hr=s->m_pBuilder.CoCreateInstanceBT(CLSID_CaptureGraphBuilder);
+//	hr=s->m_pBuilder.CoCreateInstanceBT(CLSID_CaptureGraphBuilder);
+	hr=s->m_pBuilder.CoCreateInstance(CLSID_CaptureGraphBuilder);
 #endif
 	if(FAILED(hr))
 	{
@@ -425,7 +427,8 @@ static int v4w_open_videodevice(V4wState *s, int format, MSVideoSize *vsize)
 
 	ULONG nFetched = 0;
 
-	hr = CoCreateInstanceBT(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
+//	hr = CoCreateInstanceBT(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
+	hr = CoCreateInstance(CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC_SERVER,
 		IID_ICreateDevEnum, (PVOID *)&pCreateDevEnum);
 	if(FAILED(hr))
 	{
@@ -465,7 +468,8 @@ static int v4w_open_videodevice(V4wState *s, int format, MSVideoSize *vsize)
     CComPtr<IPersistPropertyBag>    pPropertyBag;
 	GetFirstCameraDriver(wzDeviceName);
 
-	hr = s->m_pDeviceFilter.CoCreateInstanceBT( CLSID_VideoCapture );
+//	hr = s->m_pDeviceFilter.CoCreateInstanceBT( CLSID_VideoCapture );
+	hr = s->m_pDeviceFilter.CoCreateInstance( CLSID_VideoCapture );
 	if (FAILED(hr))
 	{
 		return -8;
@@ -491,7 +495,8 @@ static int v4w_open_videodevice(V4wState *s, int format, MSVideoSize *vsize)
 	// get null renderer
 	s->m_pNullRenderer = NULL;
 #if 0
-	hr=s->m_pNullRenderer.CoCreateInstanceBT(CLSID_NullRenderer);
+//	hr=s->m_pNullRenderer.CoCreateInstanceBT(CLSID_NullRenderer);
+	hr=s->m_pNullRenderer.CoCreateInstance(CLSID_NullRenderer);
 	if(FAILED(hr))
 	{
 		return -13;
@@ -522,7 +527,8 @@ IFilterMapper *pMapper = NULL;
 //IEnumMoniker *pEnum = NULL;
 IEnumRegFilters *pEnum = NULL;
 
-hr = CoCreateInstanceBT(CLSID_FilterMapper,
+//hr = CoCreateInstanceBT(CLSID_FilterMapper,
+hr = CoCreateInstance(CLSID_FilterMapper,
     NULL, CLSCTX_INPROC, IID_IFilterMapper, 
     (void **) &pMapper);
 
