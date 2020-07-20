@@ -474,7 +474,12 @@ ms_mutex_t mutex;
 	//UInt32 audioCategorySize=sizeof(audioCategory);
 	AVAudioSession *audioSession = [AVAudioSession sharedInstance];
 
-		if (_audio_unit_state == MSAudioUnitStarted){
+	if (_audio_unit_state == MSAudioUnitNotCreated){
+		ms_message("configure_audio_session(): AudioUnit is not created, skipping this process.");
+		return;
+	}
+
+	if (_audio_unit_state == MSAudioUnitStarted){
 		ms_message("configure_audio_session(): AudioUnit is already started, skipping this process.");
 		return;
 	}
@@ -677,6 +682,11 @@ static void au_callkit_enabled(MSSndCard *obj, bool_t enabled) {
 	}
 }
 
+static void au_configure(MSSndCard *obj) {
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
+	[au_holder configure_audio_session];
+}
+
 MSSndCardDesc au_card_desc={
 .driver_type="AU",
 .detect=au_detect,
@@ -693,7 +703,8 @@ MSSndCardDesc au_card_desc={
 .usage_hint=au_usage_hint,
 .audio_session_activated=au_audio_session_activated,
 .callkit_enabled=au_callkit_enabled,
-.audio_route_changed=au_audio_route_changed
+.audio_route_changed=au_audio_route_changed,
+.configure=au_configure
 };
 
 static MSSndCard *au_duplicate(MSSndCard *obj){
