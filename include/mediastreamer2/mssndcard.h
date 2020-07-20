@@ -102,6 +102,7 @@ typedef void (*MSSndCardUnloadFunc)(MSSndCardManager *obj);
 typedef void (*MSSndCardAudioSessionFunc)(struct _MSSndCard *obj, bool_t actived);
 typedef void (*MSSndCardCallKitFunc)(struct _MSSndCard *obj, bool_t enabled);
 typedef void (*MSSndCardAudioRouteFunc)(struct _MSSndCard *obj);
+typedef void (*MSSndCardConfigureFunc)(struct _MSSndCard *obj);
 
 
 struct _MSSndCardDesc{
@@ -122,6 +123,7 @@ struct _MSSndCardDesc{
 	MSSndCardAudioSessionFunc audio_session_activated;
 	MSSndCardCallKitFunc callkit_enabled;
 	MSSndCardAudioRouteFunc audio_route_changed;
+	MSSndCardConfigureFunc configure;
 };
 
 /**
@@ -721,6 +723,11 @@ MS2_PUBLIC void ms_snd_card_notify_audio_route_changed(MSSndCard *obj);
  */
 MS2_PUBLIC void ms_snd_card_app_notifies_activation(MSSndCard *obj, bool_t yesno);
 
+/**
+* Used to configure audio session.
+* @param obj      A sound card object.
+*/
+MS2_PUBLIC void ms_snd_card_configure(MSSndCard *obj);
 /**
  * Sets the stream type for this soundcard, default is VOICE
 **/
