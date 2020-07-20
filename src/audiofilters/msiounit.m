@@ -504,6 +504,11 @@ static void au_callkit_enabled(MSSndCard *obj, bool_t enabled) {
 	}
 }
 
+static void configure_audio_session(au_card_t* d);
+static void au_configure(MSSndCard *obj) {
+	configure_audio_session((au_card_t*)obj->data);
+}
+
 MSSndCardDesc au_card_desc={
 .driver_type="AU",
 .detect=au_detect,
@@ -519,7 +524,8 @@ MSSndCardDesc au_card_desc={
 .duplicate=au_duplicate,
 .usage_hint=au_usage_hint,
 .audio_session_activated=au_audio_session_activated,
-.callkit_enabled=au_callkit_enabled
+.callkit_enabled=au_callkit_enabled,
+.configure=au_configure
 };
 
 static MSSndCard *au_duplicate(MSSndCard *obj){
