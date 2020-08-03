@@ -358,6 +358,24 @@ static int ms_add_srtp_stream(srtp_t srtp, MSCryptoSuite suite, uint32_t ssrc, c
 /***********************************************/
 /**** Private to mediastreamer2 functions ****/
 /* header declared in voip/private.h */
+
+static void srtp_log_handler(srtp_log_level_t level, const char *msg, void *data) {
+	switch (level) {
+		case srtp_log_level_error:
+			ms_error("SRTP: %s", msg);
+			break;
+		case srtp_log_level_warning:
+			ms_warning("SRTP: %s", msg);
+			break;
+		case srtp_log_level_info:
+			ms_message("SRTP: %s", msg);
+			break;
+		case srtp_log_level_debug:
+			ms_debug("SRTP: %s", msg);
+			break;
+		}
+}
+
 static int srtp_init_done=0;
 
 int ms_srtp_init(void)
@@ -368,6 +386,7 @@ int ms_srtp_init(void)
 	if (!srtp_init_done) {
 		st=srtp_init();
 		if (st==0) {
+			srtp_install_log_handler(srtp_log_handler, NULL);
 			srtp_init_done++;
 		}else{
 			ms_fatal("Couldn't initialize SRTP library: %d.", st);
