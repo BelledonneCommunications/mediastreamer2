@@ -1553,6 +1553,7 @@ AudioStream *audio_stream_new_with_sessions(MSFactory *factory, const MSMediaStr
 	stream->use_agc=FALSE;
 	stream->use_ng=FALSE;
 	stream->features=AUDIO_STREAM_FEATURE_ALL;
+    stream->disable_record_on_mute=FALSE;
 
 	rtp_session_set_rtcp_xr_media_callbacks(stream->ms.sessions.rtp_session, &rtcp_xr_media_cbs);
 
@@ -1631,10 +1632,19 @@ void audio_stream_enable_noise_gate(AudioStream *stream, bool_t val){
 }
 
 void audio_stream_set_mic_gain_db(AudioStream *stream, float gain_db) {
+    if (stream->disable_record_on_mute && ms_filter_has_method(stream->soundread, MS_MIC_MUTE)) {
+        bool_t muted = FALSE;
+        ms_filter_call_method(stream->soundread, MS_MIC_MUTE, &muted);
+    }
 	audio_stream_set_rtp_output_gain_db(stream, gain_db);
 }
 
 void audio_stream_set_mic_gain(AudioStream *stream, float gain){
+    if (stream->disable_record_on_mute && ms_filter_has_method(stream->soundread, MS_MIC_MUTE)) {
+        bool_t muted = (gain == 0);
+        ms_filter_call_method(stream->soundread, MS_MIC_MUTE, &muted);
+    }
+    
 	if (stream->volsend){
 		ms_filter_call_method(stream->volsend,MS_VOLUME_SET_GAIN,&gain);
 	}else ms_warning("Could not apply gain: gain control wasn't activated. "
