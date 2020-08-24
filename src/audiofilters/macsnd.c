@@ -780,7 +780,7 @@ static int ms_macsnd_set_volume(MSFilter *f, void *arg, bool isCapture)
 {
     AUCommon *d = (AUCommon *) f->data;
     float * pvolume = (float *)arg;
-    bool isWritable;
+    Boolean isWritable = false;
     AudioObjectPropertyAddress  volumeAddr =
     {
         kAudioHardwareServiceDeviceProperty_VirtualMasterVolume,
