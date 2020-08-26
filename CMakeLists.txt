@@ -23,6 +23,10 @@
 cmake_minimum_required(VERSION 3.1)
 project(mediastreamer2 VERSION 4.5.0 LANGUAGES C CXX)
 
+if(WIN32)
+	add_compile_definitions(_WIN32_WINNT=0x0601 _ALLOW_KEYWORD_MACROS)	#_WIN32_WINNT_WIN7
+endif()
+
 # See: https://cmake.org/cmake/help/v3.12/policy/CMP0072.html
 if(POLICY CMP0072)
 	cmake_policy(SET CMP0072 NEW)

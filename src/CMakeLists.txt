@@ -258,7 +258,9 @@ if(ENABLE_VIDEO)
 			list(APPEND VOIP_SOURCE_FILES_C videofilters/drawdib-display.c)
 		endif()
 		list(APPEND VOIP_SOURCE_FILES_CXX
-			videofilters/msdscap.cc
+											videofilters/msmfoundationcap.cpp	#Media-Foundation
+											videofilters/msmfoundationcap.h
+											videofilters/msdscap.cc				#DirectShow
 		)
 	endif()
 	if(APPLE)
