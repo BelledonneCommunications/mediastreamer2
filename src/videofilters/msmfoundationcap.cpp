@@ -93,15 +93,18 @@ MSMFoundationCap::MSMFoundationCap() {
 	InitializeConditionVariable (&mIsFlushed);
 	mWidth = MS_VIDEO_SIZE_CIF_W;
 	mHeight = MS_VIDEO_SIZE_CIF_H;
+	mStride = mWidth;
 	mPixelFormat = MS_YUV420P;
+	mVideoFormat = MFVideoFormat_NV12;
 	mAllocator = ms_yuv_buf_allocator_new();
 	mReferenceCount = 1;
 	mSourceReader = NULL;
-	mRawData = NULL;
 	mRunning = FALSE;
 	mHaveFrame = FALSE;
 	mFPS = 0.0;
 	mOrientation = 0;
+	mRawData = NULL;
+	updateRawData();
 }
 
 MSMFoundationCap::~MSMFoundationCap() {
@@ -121,14 +124,14 @@ MSMFoundationCap::~MSMFoundationCap() {
 }
 
 void MSMFoundationCap::setVSize(MSVideoSize vsize) {
-	setMediaConfiguration(mVideoFormat, mStride,vsize.width,vsize.height );
+	setMediaConfiguration(mVideoFormat, vsize.width,vsize.height );
 }
 
 void MSMFoundationCap::setDeviceName(const std::string &pName) {
 	mDeviceName = pName;
 }
 
-void MSMFoundationCap::setFPS(float pFps){
+void MSMFoundationCap::setFPS(const float &pFps){
 	mFPS=pFps;
 	ms_video_init_framerate_controller(&mFramerateController, mFPS);
 	ms_average_fps_init(&mAvgFPS,"MSMediaFoundationCap: fps=%f");
@@ -144,6 +147,14 @@ int MSMFoundationCap::getDeviceOrientation() const{
 
 void MSMFoundationCap::setDeviceOrientation(int orientation){
 	mOrientation = orientation;
+}
+
+void MSMFoundationCap::updateRawData(){
+	unsigned int bytesPerPixel = abs(mStride) / mWidth;
+	mPlaneSize = mWidth * mHeight * bytesPerPixel;
+	if( mRawData)
+		delete [] mRawData;
+	mRawData = new BYTE[(unsigned int)(mWidth*mHeight * bytesPerPixel*1.5) + 1]();//+1 for potential alignment issues when pixels are odd.
 }
 //----------------------------------------
 
@@ -263,40 +274,36 @@ HRESULT MSMFoundationCap::setCaptureDevice(const std::string& pName) {
 	return hr;
 }
 
-void MSMFoundationCap::setMediaConfiguration(const GUID &videoFormat, const LONG &stride, const UINT32 &frameWidth, const UINT32 &frameHeight){
+HRESULT MSMFoundationCap::setMediaConfiguration(const GUID &videoFormat, const UINT32 &frameWidth, const UINT32 &frameHeight){
 	IMFMediaType *mediaType= NULL;
 	HRESULT hr = S_OK;
-	int newSize = 0;
+	LONG stride = frameWidth; // Set stride to width as default
+	bool_t frameConfigChanged = FALSE;
 
 	EnterCriticalSection(&mCriticalSection);
-	if(mVideoFormat != videoFormat){
-		if( mSourceReader){
-			if ( videoFormat != MFVideoFormat_NV12 ){ //subtype == MFVideoFormat_RGB32 || subtype == MFVideoFormat_RGB24 || subtype == MFVideoFormat_YUY2 ||
-				ms_error("MSMediaFoundationCap: The Video format is not supported : %s. Trying to force to MFVideoFormat_NV12", pixFmtToString(videoFormat));
-				mSourceReader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, &mediaType);
-				if(mediaType){
-					mediaType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_NV12);
-					hr = mSourceReader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM, NULL, mediaType);
-					mediaType->Release();
-				}
-			}
-		}else
-			ms_error("MSMediaFoundationCap: You must set Media configuration while having a source reader.");
-		if(SUCCEEDED(hr))
-				mVideoFormat = MFVideoFormat_NV12;
+	if( mSourceReader) hr = mSourceReader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, &mediaType);
+	if ( videoFormat != MFVideoFormat_NV12 ){ //subtype == MFVideoFormat_RGB32 || subtype == MFVideoFormat_RGB24 || subtype == MFVideoFormat_YUY2 ||
+		ms_error("MSMediaFoundationCap: The Video format is not supported : %s. Trying to force to MFVideoFormat_NV12", pixFmtToString(videoFormat));
+		if(SUCCEEDED(hr) && mediaType) hr = mediaType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_NV12);
 	}
-	if(mWidth!=frameWidth || mHeight!=frameHeight || mStride!=stride ){
-		mHaveFrame = FALSE;
-		mWidth = frameWidth;
-		mHeight = frameHeight;
-		mStride = stride;
-		mBytesPerPixel = abs(mStride) / mWidth;
-		mPlaneSize = mWidth * mHeight * mBytesPerPixel;
-		if( mRawData)
-			delete [] mRawData;
-		mRawData = new BYTE[(unsigned int)(mWidth*mHeight * mBytesPerPixel*1.5) + 1]();//+1 for potential alignment issues when pixels are odd.
+	if(SUCCEEDED(hr) && mediaType) hr = MFSetAttributeSize(mediaType, MF_MT_FRAME_SIZE, frameWidth, frameHeight);
+	if(SUCCEEDED(hr) && mediaType) hr = getStride(mediaType, &stride);
+	if(SUCCEEDED(hr) && mSourceReader) hr = mSourceReader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, NULL, mediaType);
+	if(SUCCEEDED(hr)) {
+		mVideoFormat = MFVideoFormat_NV12;
+		if(frameWidth != mWidth || frameHeight != mHeight || stride != mStride){
+			mHaveFrame = FALSE;
+			mWidth = frameWidth;
+			mHeight = frameHeight;
+			mStride = stride;
+			updateRawData();
+		}
 	}
+	if(FAILED(hr))
+		ms_error("MSMediaFoundationCap: Cannot change the video format : %dx%d : %s", frameWidth, frameHeight, pixFmtToString(videoFormat));
+	if(mediaType) mediaType->Release();
 	LeaveCriticalSection(&mCriticalSection);
+	return hr;
 }
 
 HRESULT MSMFoundationCap::setSourceReader(IMFActivate *device) {
@@ -315,58 +322,78 @@ HRESULT MSMFoundationCap::setSourceReader(IMFActivate *device) {
 		hr = attributes->SetUnknown(MF_SOURCE_READER_ASYNC_CALLBACK, this);	
 	if (SUCCEEDED(hr)) //Create the source reader
 		hr = MFCreateSourceReaderFromMediaSource(source, attributes, &mSourceReader);	
-	if (SUCCEEDED(hr)) { // Try to find a suitable output type.
-		bool_t found = FALSE;
-		for(DWORD i = 0 ; !found && mSourceReader->GetNativeMediaType((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, i, &mediaType) != MF_E_NO_MORE_TYPES ; ++i ) {
-			GUID videoFormat;
-			UINT32 frameWidth, frameHeight;
-			LONG stride;
-			hr = getMediaConfiguration(mediaType, &videoFormat, &stride, &frameWidth, &frameHeight);	// Use temporary variable in order to not change the previous state
-			if (mediaType) {
-				mediaType->Release();
-				mediaType = NULL;
+	if (SUCCEEDED(hr)){  // Try to find a suitable output type.
+		hr = setMediaConfiguration(mVideoFormat, mWidth, mHeight);
+		if(FAILED(hr)) {
+			bool_t found = FALSE;
+			ms_error("MSMediaFoundationCap: Cannot find any devices to fit parameters : %dx%d : %s. Trying to find one from defaults.",mWidth,mHeight, pixFmtToString(mVideoFormat));
+			for(DWORD i = 0 ; !found && mSourceReader->GetNativeMediaType((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, i, &mediaType) != MF_E_NO_MORE_TYPES ; ++i ) {
+		// Apply frame configuration to the selected device
+				LONG stride = 0;
+				GUID videoFormat;
+				UINT32 width, height;
+				if(mediaType){
+					hr = mediaType->GetGUID(MF_MT_SUBTYPE, &videoFormat);
+					if (SUCCEEDED(hr)) hr = MFGetAttributeSize(mediaType, MF_MT_FRAME_SIZE, &width, &height);
+					if (SUCCEEDED(hr)) hr = setMediaConfiguration(videoFormat, width, height);
+					if (SUCCEEDED(hr)) found = TRUE;
+					mediaType->Release();
+					mediaType = NULL;
+				}
 			}
-			if (SUCCEEDED(hr)){
-				found = TRUE;
-				setMediaConfiguration(videoFormat, stride, frameWidth, frameHeight);
-			}
-		}
+			if(found)
+				ms_message("MSMediaFoundationCap: Use default format : %dx%d : %s.",mWidth,mHeight, pixFmtToString(mVideoFormat));
+		}else
+			ms_message("MSMediaFoundationCap: Use format : %dx%d : %s.",mWidth,mHeight, pixFmtToString(mVideoFormat));
+	}
+	if( FAILED(hr) ) {
+		ms_error("MSMediaFoundationCap: Cannot use any format on devices");
+		mSourceReader->Release();
+		mSourceReader = NULL;
 	}
 // Cleanup
 	if (source) { source->Release(); source = NULL; }
 	if (attributes) { attributes->Release(); attributes = NULL; }
 	if (mediaType) { mediaType->Release(); mediaType = NULL; }
-
 	LeaveCriticalSection(&mCriticalSection);
 
 	return hr;
 }
 
-HRESULT MSMFoundationCap::getMediaConfiguration(IMFMediaType *pType, GUID *videoFormat, LONG *stride, UINT32 * frameWidth, UINT32 * frameHeight) {
+HRESULT MSMFoundationCap::getStride(IMFMediaType *pType, LONG * stride){
 	HRESULT hr = S_OK;
-	BOOL bFound = FALSE;
-	GUID subtype = { 0 };
 	LONG tempStride = 0;
-	
+
 	//Get the stride for this format so we can calculate the number of bytes per pixel
 	hr = pType->GetUINT32(MF_MT_DEFAULT_STRIDE, (UINT32*)&tempStride); // Try to get the default stride from the media type.
 	if (FAILED(hr)) {
+		UINT32 width, height;
 		//Setting this atribute to NULL we can obtain the default stride
 		GUID subtype = GUID_NULL;
 		// Obtain the subtype
 		hr = pType->GetGUID(MF_MT_SUBTYPE, &subtype);
 		//obtain the width and height
 		if (SUCCEEDED(hr))
-			hr = MFGetAttributeSize(pType, MF_MT_FRAME_SIZE, frameWidth, frameHeight);
+			hr = MFGetAttributeSize(pType, MF_MT_FRAME_SIZE, &width, &height);
 		//Calculate the stride based on the subtype and width
 		if (SUCCEEDED(hr))
-			hr = MFGetStrideForBitmapInfoHeader(subtype.Data1, *frameWidth, &tempStride); //[desktop apps only]
+			hr = MFGetStrideForBitmapInfoHeader(subtype.Data1, width, &tempStride); //[desktop apps only]
 		// set the attribute so it can be read
 		if (SUCCEEDED(hr))
 			(void)pType->SetUINT32(MF_MT_DEFAULT_STRIDE, UINT32(tempStride));
 	}
-	if (SUCCEEDED(hr))
+	if( SUCCEEDED(hr) && stride)
 		*stride = tempStride;
+	return hr;
+}
+
+HRESULT MSMFoundationCap::getMediaConfiguration(IMFMediaType *pType, GUID *videoFormat, UINT32 * frameWidth, UINT32 * frameHeight) {
+	HRESULT hr = S_OK;
+	BOOL bFound = FALSE;
+	GUID subtype = { 0 };
+
+	if(SUCCEEDED(hr))// Get frame size from media type
+		hr = MFGetAttributeSize(pType, MF_MT_FRAME_SIZE, frameWidth, frameHeight);
 	if (FAILED(hr)) { return hr; }
 	hr = pType->GetGUID(MF_MT_SUBTYPE, &subtype);
 	*videoFormat = subtype;
@@ -451,7 +478,7 @@ static void ms_mfoundation_postprocess(MSFilter *filter) {
 
 static void ms_mfoundation_uninit(MSFilter *filter) {
 	MSMFoundationCap *mf = static_cast<MSMFoundationCap *>(filter->data);
-	delete mf;
+	mf->Release();
 }
 
 static int ms_mfoundation_set_fps(MSFilter *filter, void *arg){

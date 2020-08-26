@@ -49,17 +49,20 @@ class MSMFoundationCap : public IMFSourceReaderCallback {
 	bool_t mHaveFrame;	// Used to know if the current frame is usable
 	float mFPS;
 	unsigned int mPlaneSize;	// Optimization to avoid to compute it on each frame
+	LONG mStride;				// Stride from media type
 public:
 	MSMFoundationCap();
 	~MSMFoundationCap();
 
 //-----------------------------------------  Getters/Setters
+
 	void setVSize(MSVideoSize vsize);
 	void setDeviceName(const std::string &name);
-	void setFPS(float fps);
+	void setFPS(const float &fps);
 	float getFPS() const;
 	int getDeviceOrientation() const;
 	void setDeviceOrientation(int orientation);
+	void updateRawData();
 
 //----------------------------------------  Mediastreamer Interface
 
@@ -73,8 +76,9 @@ public:
 
 	HRESULT setCaptureDevice(const std::string& name);	// Set the current Capture device name
 	HRESULT setSourceReader(IMFActivate *device);		// Set the reader source
-	HRESULT getMediaConfiguration(IMFMediaType *pType, GUID *videoFormat, LONG *stride, UINT32 * frameWidth, UINT32 * frameHeight);// Get data from MediaType
-	void setMediaConfiguration(const GUID &videoFormat, const LONG &stride, const UINT32 &frameWidth, const UINT32 &frameHeight);// Set internal data and do updates
+	HRESULT getMediaConfiguration(IMFMediaType *pType, GUID *videoFormat, UINT32 * frameWidth, UINT32 * frameHeight);// Get data from MediaType
+	HRESULT getStride(IMFMediaType *pType, LONG * stride);// Update media type if it hasn't any stride and put it in parameter
+	HRESULT setMediaConfiguration(const GUID &videoFormat, const UINT32 &frameWidth, const UINT32 &frameHeight);// Set internal data and do updates
 	bool_t isTimeToSend(uint64_t tickerTime);// Wheck if we have to put the frame in ms queue
 
 //----------------------------------------  Variables
@@ -82,10 +86,8 @@ public:
 	GUID mVideoFormat;  // MFVideoFormat_NV12 is only supported. Another filter will lead to trying to force the media to MFVideoFormat_NV12
 	int mPixelFormat;	// Store MSPixFmt
 	int mOrientation;
-	LONG mStride;
 	UINT32 mWidth;
 	UINT32 mHeight;
-	int mBytesPerPixel;	// Computed as : abs(mStride) / mWidth	
 	BYTE* mRawData;
 	DWORD mRawDataLength;// Contains a copy of the internal buffer of MediaFoundation
 	std::string mDeviceName;
@@ -106,4 +108,4 @@ public:
 	static const char *pixFmtToString(const GUID &fmt);	// Helper to return the name of the format
 };
 
-#endif //_MS_MEDIA_FOUNDATION_CAP_H	
+#endif //_MS_MEDIA_FOUNDATION_CAP_H
