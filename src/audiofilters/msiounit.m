@@ -113,8 +113,8 @@ typedef struct au_card {
 	unsigned int	bits;
 	unsigned int	nchannels;
 	uint64_t last_failed_iounit_start_time;
-	au_filter_read_data_t* read_filter_data;
-	au_filter_write_data_t* write_filter_data;
+	MSFilter* read_filter;
+	MSFilter* write_filter;
 	MSSndCard* ms_snd_card;
 	bool_t is_ringer;
 	bool_t is_fast;
@@ -459,7 +459,7 @@ static void au_uninit(MSSndCard *card){
 }
 
 static void check_unused(au_card_t *card){
-	if (card->read_filter_data || card->write_filter_data)
+	if (card->read_filter || card->write_filter)
 		return;
 
 	if (card->is_tester || !card->will_be_used){
@@ -479,6 +479,29 @@ static void au_usage_hint(MSSndCard *card, bool_t used){
 
 static void au_detect(MSSndCardManager *m);
 static MSSndCard *au_duplicate(MSSndCard *obj);
+
+static void au_audio_route_changed(MSSndCard *obj) {
+	au_card_t *d = (au_card_t*)obj->data;
+	int rate = (int)[[AVAudioSession sharedInstance] sampleRate];
+	if (!d || rate >= d->rate) {
+		return;
+	}
+
+	stop_audio_unit(d);
+	d->rate = rate;
+	ms_message("MSAURead/MSAUWrite: AVAudioSession is configured from at sample rate %i.", d->rate);
+	configure_audio_unit(d);
+	start_audio_unit(d, 0);
+
+	if (d->write_filter) {
+		au_filter_write_data_t *ft=(au_filter_write_data_t*)d->write_filter->data;
+		ms_flow_controlled_bufferizer_set_samplerate(ft->bufferizer, rate);
+		ms_filter_notify_no_arg(d->write_filter, MS_FILTER_OUTPUT_FMT_CHANGED);
+	}
+	if (d->read_filter) {
+		ms_filter_notify_no_arg(d->read_filter, MS_FILTER_OUTPUT_FMT_CHANGED);
+	}
+}
 
 static void au_audio_session_activated(MSSndCard *obj, bool_t actived) {
 	au_card_t *d = (au_card_t*)obj->data;
@@ -517,7 +540,8 @@ MSSndCardDesc au_card_desc={
 .duplicate=au_duplicate,
 .usage_hint=au_usage_hint,
 .audio_session_activated=au_audio_session_activated,
-.callkit_enabled=au_callkit_enabled
+.callkit_enabled=au_callkit_enabled,
+.audio_route_changed=au_audio_route_changed
 };
 
 static MSSndCard *au_duplicate(MSSndCard *obj){
@@ -554,12 +578,12 @@ static OSStatus au_read_cb (
 {
 	au_card_t* card = (au_card_t*)inRefCon;
 	ms_mutex_lock(&card->mutex);
-	if (!card->read_filter_data) {
+	if (!card->read_filter) {
 		//just return from now;
 		ms_mutex_unlock(&card->mutex);
 		return 0;
 	}
-	au_filter_read_data_t *d = card->read_filter_data;
+	au_filter_read_data_t *d = card->read_filter->data;
 	if (d->readTimeStamp.mSampleTime <0) {
 		d->readTimeStamp=*inTimeStamp;
 	}
@@ -604,14 +628,14 @@ static OSStatus au_write_cb (
 	ioData->mNumberBuffers=1;
 	
 	ms_mutex_lock(&card->mutex);
-	if( !card->write_filter_data ){
+	if( !card->write_filter ){
 		ms_mutex_unlock(&card->mutex);
 		memset(ioData->mBuffers[0].mData, 0,ioData->mBuffers[0].mDataByteSize);
 		return 0;
 	}
 	
 
-	au_filter_write_data_t *d=card->write_filter_data;
+	au_filter_write_data_t *d=card->write_filter->data;
 
 	if (d!=NULL){
 		unsigned int size;
@@ -919,7 +943,7 @@ static void au_read_uninit(MSFilter *f) {
 	au_card_t* card=d->base.card;
 
 	ms_mutex_lock(&card->mutex);
-	card->read_filter_data=NULL;
+	card->read_filter=NULL;
 	ms_mutex_unlock(&card->mutex);
 
 	check_unused(card);
@@ -935,7 +959,7 @@ static void au_write_uninit(MSFilter *f) {
 	au_card_t* card=d->base.card;
 
 	ms_mutex_lock(&card->mutex);
-	card->write_filter_data=NULL;
+	card->write_filter=NULL;
 	ms_mutex_unlock(&card->mutex);
 
 	check_unused(card);
@@ -983,7 +1007,7 @@ static MSFilter *ms_au_read_new(MSSndCard *mscard){
 	d->readTimeStamp.mSampleTime=-1;
 	ms_mutex_init(&d->mutex,NULL);
 	d->base.card=card;
-	card->read_filter_data=d;
+	card->read_filter = f;
 	f->data=d;
 	return f;
 }
@@ -998,7 +1022,7 @@ static MSFilter *ms_au_write_new(MSSndCard *mscard){
 	ms_flow_controlled_bufferizer_set_flow_control_interval_ms(d->bufferizer, flowControlInterval);
 	ms_mutex_init(&d->mutex,NULL);
 	d->base.card=card;
-	card->write_filter_data=d;
+	card->write_filter=f;
 	f->data=d;
 	return f;
 }
