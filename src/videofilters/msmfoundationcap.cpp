@@ -362,7 +362,7 @@ HRESULT MSMFoundationCap::setMediaConfiguration(GUID videoFormat, UINT32 frameWi
 			}
 			if( doSet ){
 				hr = mSourceReader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, NULL, mediaType);
-				if( hr == MF_E_INVALIDREQUEST){//One or more sample requests are still pending. Flush the device, retart it and try setting format 
+				if( hr == MF_E_INVALIDREQUEST){//One or more sample requests are still pending. Flush the device, restart it and try setting format 
 					hr = restartWithNewConfiguration(videoFormat,frameWidth,frameHeight, pFPS  );
 				}
 				if(SUCCEEDED(hr)) getStride(mediaType, &stride);
