@@ -46,10 +46,11 @@ class MSMFoundationCap : public IMFSourceReaderCallback {
 	IMFSourceReader* mSourceReader;	// The source
 	MSYuvBufAllocator * mAllocator;
 	bool_t mRunning;	// The reading process is running or not. Set it to FALSE to stop it.
-	bool_t mHaveFrame;	// Used to know if the current frame is usable
 	float mFPS;
 	unsigned int mPlaneSize;	// Optimization to avoid to compute it on each frame
 	LONG mStride;				// Stride from media type
+	mblk_t * mFrameData;		// Frame to send to MS Queue when it request one
+	unsigned int mSampleCount, mProcessCount;
 public:
 	MSMFoundationCap();
 	~MSMFoundationCap();
@@ -62,24 +63,25 @@ public:
 	float getFPS() const;
 	int getDeviceOrientation() const;
 	void setDeviceOrientation(int orientation);
-	void updateRawData();
+	void setVideoFormat(const GUID &videoFormat);				// Set videoformat and update MSPixFmt format
 
 //----------------------------------------  Mediastreamer Interface
 
 	void activate();
 	void start();
 	void feed(MSFilter * filter);
-	void stop();
+	void stop(const int& pWaitStop);
 	void deactivate();
 
 //----------------------------------------  Actions
 
 	HRESULT setCaptureDevice(const std::string& name);	// Set the current Capture device name
 	HRESULT setSourceReader(IMFActivate *device);		// Set the reader source
-	HRESULT getMediaConfiguration(IMFMediaType *pType, GUID *videoFormat, UINT32 * frameWidth, UINT32 * frameHeight);// Get data from MediaType
+	HRESULT restartWithNewConfiguration(GUID videoFormat, UINT32 frameWidth, UINT32 frameHeight, float pFPS);
 	HRESULT getStride(IMFMediaType *pType, LONG * stride);// Update media type if it hasn't any stride and put it in parameter
-	HRESULT setMediaConfiguration(const GUID &videoFormat, const UINT32 &frameWidth, const UINT32 &frameHeight);// Set internal data and do updates
+	HRESULT setMediaConfiguration(GUID videoFormat, UINT32 frameWidth, UINT32 frameHeight, float FPS);// Set internal data and do updates
 	bool_t isTimeToSend(uint64_t tickerTime);// Wheck if we have to put the frame in ms queue
+	bool_t isSupportedFormat(const GUID &videoFormat)const;
 
 //----------------------------------------  Variables
 
@@ -88,8 +90,6 @@ public:
 	int mOrientation;
 	UINT32 mWidth;
 	UINT32 mHeight;
-	BYTE* mRawData;
-	DWORD mRawDataLength;// Contains a copy of the internal buffer of MediaFoundation
 	std::string mDeviceName;
 	MSAverageFPS mAvgFPS;
 	MSFrameRateController mFramerateController;

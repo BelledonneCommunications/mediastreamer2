@@ -22,15 +22,13 @@
 
 #include "mediastreamer2/mswebcam.h"
 #include "mediastreamer2/msticker.h"
+#include <ortp/ortp.h>
 
-#include "filter-wrapper/filter-wrapper-base.h"
+#include <map>
+#include <vector>
+#include <limits>
 
-
-
-//#include <camera/camera_api.h>
 #include <Mferror.h>//MF_E_NO_MORE_TYPES
-
-
 #pragma comment(lib,"Mfplat.lib")
 #pragma comment(lib,"Mf.lib")
 #pragma comment(lib,"Mfreadwrite.lib")
@@ -87,6 +85,73 @@ public:
 	}
 };
 
+// GUID hack to allow storing it into map
+struct GUIDComparer{
+    bool operator()(const GUID & Left, const GUID & Right) const{
+        return memcmp(&Left , &Right,sizeof(Right)) < 0;
+    }
+};
+class ConfigurationManager{
+public:
+	std::map<UINT32, std::map<UINT32, std::map<float, std::map<GUID, IMFMediaType * , GUIDComparer> > > > mSortedList;
+	std::vector<IMFMediaType *> mMediaTypes;// Used to cleanup
+	ConfigurationManager(){}
+	~ConfigurationManager(){};
+
+	void clean(){
+		for(size_t i = 0 ; i < mMediaTypes.size() ; ++i)
+			mMediaTypes[i]->Release();
+	}
+	void setMediaTypes(IMFSourceReader* source){
+		IMFMediaType * mediaType = NULL;
+		HRESULT hr;
+		UINT32 width, height, fpsNumerator, fpsDenominator;
+		GUID videoType;
+		for(DWORD i = 0 ; source->GetNativeMediaType((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, i, &mediaType) != MF_E_NO_MORE_TYPES ; ++i ) {
+			if(mediaType) {
+				hr = mediaType->GetGUID(MF_MT_SUBTYPE, &videoType);
+				if(SUCCEEDED(hr))// Get frame size from media type
+					hr = MFGetAttributeSize(mediaType, MF_MT_FRAME_SIZE, &width, &height);
+				if (SUCCEEDED(hr))
+					hr = MFGetAttributeRatio(mediaType, MF_MT_FRAME_RATE , &fpsNumerator, &fpsDenominator);
+				if (SUCCEEDED(hr)) {
+					mSortedList[width][height][static_cast<float>(fpsNumerator)/fpsDenominator][videoType] = mediaType;
+					mMediaTypes.push_back(mediaType);
+				}else {
+					mediaType->Release();
+					mediaType = NULL;
+				}
+			}
+		}
+	}
+	IMFMediaType * getMediaConfiguration(GUID* videoFormat, UINT32* width, UINT32 *height, float * fps){
+		auto mediaWidth = mSortedList.lower_bound(*width);
+		if(mediaWidth == mSortedList.end() )
+			--mediaWidth;
+		auto mediaHeight = mediaWidth->second.lower_bound(*height);
+		if(mediaHeight == mediaWidth->second.end() )
+			--mediaHeight;
+		auto mediaFPS = mediaHeight->second.upper_bound(*fps);// Try to get more FPS than target
+		if(mediaFPS == mediaHeight->second.end() )
+			--mediaFPS;
+
+		auto mediaVideo = mediaFPS->second.find(*videoFormat);
+		if( mediaVideo == mediaFPS->second.end())
+			mediaVideo = mediaFPS->second.find(MFVideoFormat_NV12);// The format is not found. Try with NV12
+		if(mediaVideo == mediaFPS->second.end())
+			mediaVideo = mediaFPS->second.find(MFVideoFormat_MJPG);// Try with MFVideoFormat_MJPG format
+		if(mediaVideo == mediaFPS->second.end()){
+			return NULL;
+		}else{
+			*videoFormat = mediaVideo->first;
+			*width = mediaWidth->first;
+			*height = mediaHeight->first;
+			*fps = mediaFPS->first;
+			return mediaVideo->second;
+		}
+
+	}
+};
 
 MSMFoundationCap::MSMFoundationCap() {
 	InitializeCriticalSection(&mCriticalSection);
@@ -94,17 +159,16 @@ MSMFoundationCap::MSMFoundationCap() {
 	mWidth = MS_VIDEO_SIZE_CIF_W;
 	mHeight = MS_VIDEO_SIZE_CIF_H;
 	mStride = mWidth;
-	mPixelFormat = MS_YUV420P;
-	mVideoFormat = MFVideoFormat_NV12;
+	setVideoFormat(MFVideoFormat_Base);// Defaut format
 	mAllocator = ms_yuv_buf_allocator_new();
+	mFrameData = NULL;
 	mReferenceCount = 1;
 	mSourceReader = NULL;
 	mRunning = FALSE;
-	mHaveFrame = FALSE;
-	mFPS = 0.0;
+	mFPS = 60.0;
 	mOrientation = 0;
-	mRawData = NULL;
-	updateRawData();
+	mPlaneSize =  mHeight * abs(mStride);
+	mSampleCount= mProcessCount=0;
 }
 
 MSMFoundationCap::~MSMFoundationCap() {
@@ -113,10 +177,9 @@ MSMFoundationCap::~MSMFoundationCap() {
 		mSourceReader->Release();
 		mSourceReader = NULL;
 	}
-
-	if (mRawData) {
-		delete[] mRawData;
-		mRawData = NULL;
+	if(mFrameData){
+		freemsg(mFrameData);
+		mFrameData = NULL;
 	}
 	ms_free(mAllocator);
 	LeaveCriticalSection(&mCriticalSection);
@@ -124,16 +187,16 @@ MSMFoundationCap::~MSMFoundationCap() {
 }
 
 void MSMFoundationCap::setVSize(MSVideoSize vsize) {
-	setMediaConfiguration(mVideoFormat, vsize.width,vsize.height );
+	setMediaConfiguration(mVideoFormat, vsize.width, vsize.height, mFPS);
 }
 
 void MSMFoundationCap::setDeviceName(const std::string &pName) {
 	mDeviceName = pName;
 }
 
-void MSMFoundationCap::setFPS(const float &pFps){
-	mFPS=pFps;
-	ms_video_init_framerate_controller(&mFramerateController, mFPS);
+void MSMFoundationCap::setFPS(const float &pFPS){
+	ms_video_init_framerate_controller(&mFramerateController, pFPS);// Set the controller to the target FPS and then try to find a format to fit the configuration
+	setMediaConfiguration(mVideoFormat, mWidth, mHeight, pFPS);// mFPS can change here, but don't use it to the controller
 	ms_average_fps_init(&mAvgFPS,"MSMediaFoundationCap: fps=%f");
 }
 
@@ -149,13 +212,6 @@ void MSMFoundationCap::setDeviceOrientation(int orientation){
 	mOrientation = orientation;
 }
 
-void MSMFoundationCap::updateRawData(){
-	unsigned int bytesPerPixel = abs(mStride) / mWidth;
-	mPlaneSize = mWidth * mHeight * bytesPerPixel;
-	if( mRawData)
-		delete [] mRawData;
-	mRawData = new BYTE[(unsigned int)(mWidth*mHeight * bytesPerPixel*1.5) + 1]();//+1 for potential alignment issues when pixels are odd.
-}
 //----------------------------------------
 
 void MSMFoundationCap::activate() {
@@ -163,22 +219,17 @@ void MSMFoundationCap::activate() {
 }
 
 void MSMFoundationCap::feed(MSFilter * filter) {
+	mblk_t **data = &mFrameData;
 	EnterCriticalSection(&mCriticalSection);
-	if(mRunning && mHaveFrame) {
-		if (isTimeToSend(filter->ticker->time)){
+	if(mRunning && mFrameData ) {
+		if (isTimeToSend(filter->ticker->time) ) {
+			++mProcessCount;
 			uint32_t timestamp;	
-			mblk_t *om = NULL;
-			if(mVideoFormat == MFVideoFormat_NV12){// Process raw data from NV12
-				const uint8_t * y = mRawData;
-				const uint8_t *cbcr = mRawData + mPlaneSize;
-				om = copy_ycbcrbiplanar_to_true_yuv_with_rotation(mAllocator, mRawData, cbcr, mOrientation, mWidth, mHeight, mStride, mStride, TRUE);
-			}
-			if (om != NULL) {
-				timestamp = (uint32_t)(filter->ticker->time * 90);// rtp uses a 90000 Hz clockrate for video
-				mblk_set_timestamp_info(om, timestamp);
-				ms_queue_put(filter->outputs[0], om);
-				ms_average_fps_update(&mAvgFPS,filter->ticker->time);
-			}
+			timestamp = (uint32_t)(filter->ticker->time * 90);// rtp uses a 90000 Hz clockrate for video
+			mblk_set_timestamp_info(*data, timestamp);
+			ms_queue_put(filter->outputs[0], *data);
+			ms_average_fps_update(&mAvgFPS,filter->ticker->time);
+			*data = NULL;
 		}
 	}
 	LeaveCriticalSection(&mCriticalSection);
@@ -190,17 +241,23 @@ void MSMFoundationCap::start() {
 		HRESULT hr = mSourceReader->ReadSample(MF_SOURCE_READER_FIRST_VIDEO_STREAM, 0, NULL, NULL, NULL, NULL);  // Ask for the first sample.
 		if (SUCCEEDED(hr)){
 			mRunning = TRUE;// Inside critical section to ensure to not miss the first frame
+		}else {
+			ms_error("MSMediaFoundationCap: Cannot start reading from Camera : %d", hr);
 		}
 		LeaveCriticalSection(&mCriticalSection);
 	}
 }
 
-void MSMFoundationCap::stop() {
-	mRunning = FALSE;// No need to protect as it's a boolean and setting are only done in start/stop functions
+void MSMFoundationCap::stop(const int& pWaitStop) {
+	HRESULT hr;
 	if(mSourceReader){
 		EnterCriticalSection(&mCriticalSection);
-		mSourceReader->Flush(MF_SOURCE_READER_FIRST_VIDEO_STREAM);// Flush the video stream
-		SleepConditionVariableCS (&mIsFlushed, &mCriticalSection, INFINITE);// wait for emptying queue. This is done asynchrounsly as the Callback on flush has been implemented
+		mRunning = FALSE;
+		hr = mSourceReader->Flush(MF_SOURCE_READER_FIRST_VIDEO_STREAM);// Flush the video stream
+		if( SUCCEEDED(hr))
+			SleepConditionVariableCS (&mIsFlushed, &mCriticalSection, pWaitStop);// wait for emptying queue. This is done asynchrounsly as the Callback on flush has been implemented
+		else
+			ms_error("MSMediaFoundationCap: Cannot flush device, %d", hr);
 		LeaveCriticalSection(&mCriticalSection);
 	}
 }
@@ -211,8 +268,13 @@ void MSMFoundationCap::deactivate() {
 		mSourceReader->Release();
 		mSourceReader = NULL;
 	}
-	mHaveFrame = FALSE;
+	if(mFrameData){
+		freemsg(mFrameData);
+		mFrameData = NULL;
+	}
 	LeaveCriticalSection(&mCriticalSection);
+	ms_message("MSMediaFoundationCap: Frames count : %d samples, %d processed", mSampleCount, mProcessCount);
+	mSampleCount = mProcessCount = 0;
 }
 
 //-------------------------------------------------------------------------------------------------------------
@@ -233,7 +295,7 @@ ULONG MSMFoundationCap::Release() {
 //From IUnknown
 ULONG MSMFoundationCap::AddRef() { return InterlockedIncrement(&mReferenceCount); }
 //Method from IMFSourceReaderCallback
-STDMETHODIMP MSMFoundationCap::OnEvent(DWORD, IMFMediaEvent *) { return S_OK; }
+STDMETHODIMP MSMFoundationCap::OnEvent(DWORD, IMFMediaEvent * mediaEvent) { return S_OK; }
 //Method from IMFSourceReaderCallback
 STDMETHODIMP MSMFoundationCap::OnFlush(DWORD) {
 	WakeConditionVariable (&mIsFlushed);// Wakeup threads that are waiting for the flush
@@ -274,35 +336,61 @@ HRESULT MSMFoundationCap::setCaptureDevice(const std::string& pName) {
 	return hr;
 }
 
-HRESULT MSMFoundationCap::setMediaConfiguration(const GUID &videoFormat, const UINT32 &frameWidth, const UINT32 &frameHeight){
-	IMFMediaType *mediaType= NULL;
+HRESULT MSMFoundationCap::setMediaConfiguration(GUID videoFormat, UINT32 frameWidth, UINT32 frameHeight, float pFPS){
 	HRESULT hr = S_OK;
+	IMFMediaType *mediaType= NULL;
+	ConfigurationManager configs;
 	LONG stride = frameWidth; // Set stride to width as default
-	bool_t frameConfigChanged = FALSE;
+	bool_t doSet = TRUE;
 
 	EnterCriticalSection(&mCriticalSection);
-	if( mSourceReader) hr = mSourceReader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, &mediaType);
-	if ( videoFormat != MFVideoFormat_NV12 ){ //subtype == MFVideoFormat_RGB32 || subtype == MFVideoFormat_RGB24 || subtype == MFVideoFormat_YUY2 ||
-		ms_error("MSMediaFoundationCap: The Video format is not supported : %s. Trying to force to MFVideoFormat_NV12", pixFmtToString(videoFormat));
-		if(SUCCEEDED(hr) && mediaType) hr = mediaType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_NV12);
+	if( mSourceReader){
+		configs.setMediaTypes(mSourceReader);
+		if ( !isSupportedFormat(videoFormat)){
+			ms_error("MSMediaFoundationCap: The Video format is not supported by the filter : %s. Trying to force to MFVideoFormat_NV12", pixFmtToString(videoFormat));
+			videoFormat = MFVideoFormat_NV12;
+		}
+		mediaType = configs.getMediaConfiguration(&videoFormat, &frameWidth, &frameHeight,&pFPS );
+		if(mediaType){
+			IMFMediaType * currentMediaType = NULL;
+			DWORD equalFlags = 0;
+			HRESULT hrCurrentMedia = mSourceReader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, &currentMediaType);
+			if( SUCCEEDED(hrCurrentMedia) && currentMediaType){
+				currentMediaType->IsEqual(mediaType, &equalFlags);// This is the same media type. Don't need to change it.
+				doSet = (equalFlags != 0);
+				currentMediaType->Release();
+			}
+			if( doSet ){
+				hr = mSourceReader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, NULL, mediaType);
+				if( hr == MF_E_INVALIDREQUEST){//One or more sample requests are still pending. Flush the device, retart it and try setting format 
+					hr = restartWithNewConfiguration(videoFormat,frameWidth,frameHeight, pFPS  );
+				}
+				if(SUCCEEDED(hr)) getStride(mediaType, &stride);
+			}
+		}else
+			hr = -1;
 	}
-	if(SUCCEEDED(hr) && mediaType) hr = MFSetAttributeSize(mediaType, MF_MT_FRAME_SIZE, frameWidth, frameHeight);
-	if(SUCCEEDED(hr) && mediaType) hr = getStride(mediaType, &stride);
-	if(SUCCEEDED(hr) && mSourceReader) hr = mSourceReader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, NULL, mediaType);
-	if(SUCCEEDED(hr)) {
-		mVideoFormat = MFVideoFormat_NV12;
+	if(doSet && SUCCEEDED(hr)) {
+		setVideoFormat(videoFormat);
+		mFPS = pFPS;
 		if(frameWidth != mWidth || frameHeight != mHeight || stride != mStride){
-			mHaveFrame = FALSE;
+			if(mFrameData){
+				freemsg(mFrameData);
+				mFrameData = NULL;
+			}
 			mWidth = frameWidth;
 			mHeight = frameHeight;
 			mStride = stride;
-			updateRawData();
+			mPlaneSize = mHeight * abs(mStride);// Details : mWidth * mHeight * abs(mStride) / mWidth;
 		}
-	}
-	if(FAILED(hr))
-		ms_error("MSMediaFoundationCap: Cannot change the video format : %dx%d : %s", frameWidth, frameHeight, pixFmtToString(videoFormat));
-	if(mediaType) mediaType->Release();
+		if(mSourceReader)
+			ms_message("MSMediaFoundationCap: Change the video format : %dx%d : %s, %f fps", mWidth, mHeight, pixFmtToString(mVideoFormat), mFPS);
+		else
+			ms_message("MSMediaFoundationCap: Change the video format without Reader : %dx%d : %s, %f fps", mWidth, mHeight, pixFmtToString(mVideoFormat), mFPS);
+	}else
+		ms_error("MSMediaFoundationCap: Cannot change the video format : %dx%d : %s, %f fps", frameWidth, frameHeight, pixFmtToString(videoFormat), pFPS);
 	LeaveCriticalSection(&mCriticalSection);
+	configs.clean();
 	return hr;
 }
 
@@ -310,7 +398,6 @@ HRESULT MSMFoundationCap::setSourceReader(IMFActivate *device) {
 	HRESULT hr = S_OK;
 	IMFMediaSource *source = NULL;
 	IMFAttributes *attributes = NULL;
-	IMFMediaType *mediaType = NULL;
 
 	EnterCriticalSection(&mCriticalSection);
 	hr = device->ActivateObject(__uuidof(IMFMediaSource), (void**)&source);
@@ -323,41 +410,51 @@ HRESULT MSMFoundationCap::setSourceReader(IMFActivate *device) {
 	if (SUCCEEDED(hr)) //Create the source reader
 		hr = MFCreateSourceReaderFromMediaSource(source, attributes, &mSourceReader);	
 	if (SUCCEEDED(hr)){  // Try to find a suitable output type.
-		hr = setMediaConfiguration(mVideoFormat, mWidth, mHeight);
-		if(FAILED(hr)) {
-			bool_t found = FALSE;
-			ms_error("MSMediaFoundationCap: Cannot find any devices to fit parameters : %dx%d : %s. Trying to find one from defaults.",mWidth,mHeight, pixFmtToString(mVideoFormat));
-			for(DWORD i = 0 ; !found && mSourceReader->GetNativeMediaType((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, i, &mediaType) != MF_E_NO_MORE_TYPES ; ++i ) {
-		// Apply frame configuration to the selected device
-				LONG stride = 0;
-				GUID videoFormat;
-				UINT32 width, height;
-				if(mediaType){
-					hr = mediaType->GetGUID(MF_MT_SUBTYPE, &videoFormat);
-					if (SUCCEEDED(hr)) hr = MFGetAttributeSize(mediaType, MF_MT_FRAME_SIZE, &width, &height);
-					if (SUCCEEDED(hr)) hr = setMediaConfiguration(videoFormat, width, height);
-					if (SUCCEEDED(hr)) found = TRUE;
-					mediaType->Release();
-					mediaType = NULL;
-				}
-			}
-			if(found)
-				ms_message("MSMediaFoundationCap: Use default format : %dx%d : %s.",mWidth,mHeight, pixFmtToString(mVideoFormat));
-		}else
-			ms_message("MSMediaFoundationCap: Use format : %dx%d : %s.",mWidth,mHeight, pixFmtToString(mVideoFormat));
+		hr = setMediaConfiguration(mVideoFormat, mWidth, mHeight, mFPS);
 	}
 	if( FAILED(hr) ) {
-		ms_error("MSMediaFoundationCap: Cannot use any format on devices");
-		mSourceReader->Release();
-		mSourceReader = NULL;
+		if( mSourceReader ) {
+			mSourceReader->Release();
+			mSourceReader = NULL;
+		}
 	}
 // Cleanup
 	if (source) { source->Release(); source = NULL; }
 	if (attributes) { attributes->Release(); attributes = NULL; }
-	if (mediaType) { mediaType->Release(); mediaType = NULL; }
 	LeaveCriticalSection(&mCriticalSection);
 
 	return hr;
+}
+
+void MSMFoundationCap::setVideoFormat(const GUID &videoFormat){
+	if( videoFormat == MFVideoFormat_Base){// Default format
+		mVideoFormat = MFVideoFormat_NV12;
+		mPixelFormat = MS_YUV420P;
+	}else{
+		mVideoFormat = videoFormat;
+		if(mVideoFormat == MFVideoFormat_NV12)
+			mPixelFormat = MS_YUV420P;
+		//else if(mVideoFormat == MFVideoFormat_MJPG)// Uncomment to support MJPEG
+		//	mPixelFormat = MS_MJPEG;
+	}
+}
+
+HRESULT MSMFoundationCap::restartWithNewConfiguration(GUID videoFormat, UINT32 frameWidth, UINT32 frameHeight, float pFPS){
+	ms_message("MSMediaFoundationCap: Restarting device with a new configuration : %dx%d : %s, %f fps", frameWidth, frameHeight, pixFmtToString(videoFormat), pFPS);
+	HRESULT hr = S_OK;
+	stop(1000);
+	if( mSourceReader ) {
+		mSourceReader->Release();
+		mSourceReader = NULL;
+	}
+	hr = setMediaConfiguration(videoFormat,frameWidth, frameHeight,pFPS );
+	if( SUCCEEDED(hr)) {
+		activate();
+		start();
+	}else
+		ms_error("MSMediaFoundationCap: Cannot restart device with the new configuration (%d)", hr);
+	return hr;
+
 }
 
 HRESULT MSMFoundationCap::getStride(IMFMediaType *pType, LONG * stride){
@@ -387,38 +484,39 @@ HRESULT MSMFoundationCap::getStride(IMFMediaType *pType, LONG * stride){
 	return hr;
 }
 
-HRESULT MSMFoundationCap::getMediaConfiguration(IMFMediaType *pType, GUID *videoFormat, UINT32 * frameWidth, UINT32 * frameHeight) {
-	HRESULT hr = S_OK;
-	BOOL bFound = FALSE;
-	GUID subtype = { 0 };
-
-	if(SUCCEEDED(hr))// Get frame size from media type
-		hr = MFGetAttributeSize(pType, MF_MT_FRAME_SIZE, frameWidth, frameHeight);
-	if (FAILED(hr)) { return hr; }
-	hr = pType->GetGUID(MF_MT_SUBTYPE, &subtype);
-	*videoFormat = subtype;
-	if (FAILED(hr)) { return hr; }
-	return hr;
-}
-
 //Method from IMFSourceReaderCallback
 HRESULT MSMFoundationCap::OnReadSample(HRESULT status, DWORD streamIndex, DWORD streamFlags, LONGLONG timeStamp, IMFSample *sample) {
-	HRESULT hr = S_OK;
+	HRESULT hr = status;
 	IMFMediaBuffer *mediaBuffer = NULL;
 
 	EnterCriticalSection(&mCriticalSection);
 	if(mRunning) {
-		if (FAILED(status))
-			hr = status;
 		if (SUCCEEDED(hr)) {
 			if (sample) {// Get the video frame buffer from the sample.
 				hr = sample->GetBufferByIndex(0, &mediaBuffer);
-				if (SUCCEEDED(hr) && mRawData) {
+				if (SUCCEEDED(hr)) {
+					++mSampleCount;
 					BYTE* data;
-					mediaBuffer->Lock(&data, NULL, &mRawDataLength);
-					CopyMemory(mRawData, data, mRawDataLength);
-					if(!mHaveFrame)
-						mHaveFrame = TRUE;
+					DWORD length = 0;
+					mediaBuffer->Lock(&data, NULL, &length);
+					if(mFrameData) {
+						freemsg(mFrameData);
+						mFrameData = NULL;
+					}
+					if(mVideoFormat == MFVideoFormat_NV12){// Process raw data from NV12
+						mFrameData = copy_ycbcrbiplanar_to_true_yuv_with_rotation(mAllocator, data, data + mPlaneSize, mOrientation, mWidth, mHeight, mStride, mStride, TRUE);
+					}
+//					else if( mVideoFormat == MFVideoFormat_MJPG){
+//						MSPicture pict;
+//						mblk_t *m = ms_yuv_buf_allocator_get(mAllocator, &pict, mWidth, mHeight);
+//						memcpy(pict.planes[0],data,length);
+						/*
+						mblk_t *m=allocb(size+128,0);
+						memcpy(m->b_wptr,data,length);
+						m->b_wptr+=length;
+						mFrameData = ms_yuv_buf_alloc_from_buffer(mWidth,mHeight,m));
+						*/
+//					}
 				}
 			}
 		}	
@@ -445,14 +543,20 @@ template <class T> void SafeRelease(T **ppT) {
 	}
 }
 
+bool_t MSMFoundationCap::isTimeToSend(uint64_t tickerTime){
+	return ms_video_capture_new_frame(&mFramerateController, tickerTime);
+}
+
+bool_t MSMFoundationCap::isSupportedFormat(const GUID &videoFormat)const{
+	return videoFormat == MFVideoFormat_NV12;// || videoFormat == MFVideoFormat_MJPG;
+}
+
 /*******************************************************************************
  * Methods to (de)initialize and run the Media Foundation video capture filter *
  ******************************************************************************/
 
 
-bool_t MSMFoundationCap::isTimeToSend(uint64_t tickerTime){
-	return ms_video_capture_new_frame(&mFramerateController, tickerTime);
-}
+
 
 static void ms_mfoundation_init(MSFilter *filter) {
 	MSMFoundationCap *mf = new MSMFoundationCap();
@@ -472,7 +576,7 @@ static void ms_mfoundation_process(MSFilter *filter) {
 
 static void ms_mfoundation_postprocess(MSFilter *filter) {
 	MSMFoundationCap *mf = static_cast<MSMFoundationCap *>(filter->data);
-	mf->stop();
+	mf->stop(5000);// a maximum of 5s should be enough to empty samples
 	mf->deactivate();
 }
 
@@ -622,51 +726,51 @@ static void ms_mfoundationcap_detect(MSWebCamManager *manager) {
 
 const char *MSMFoundationCap::pixFmtToString(const GUID &guid){
 	IF_EQUAL_RETURN(guid, MFVideoFormat_AI44); //     FCC('AI44')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_ARGB32); //   D3DFMT_A8R8G8B8 
-    IF_EQUAL_RETURN(guid, MFVideoFormat_AYUV); //     FCC('AYUV')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_DV25); //     FCC('dv25')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_DV50); //     FCC('dv50')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_DVH1); //     FCC('dvh1')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_DVSD); //     FCC('dvsd')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_DVSL); //     FCC('dvsl')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_H264); //     FCC('H264')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_I420); //     FCC('I420')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_IYUV); //     FCC('IYUV')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_M4S2); //     FCC('M4S2')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_MJPG);
-    IF_EQUAL_RETURN(guid, MFVideoFormat_MP43); //     FCC('MP43')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_MP4S); //     FCC('MP4S')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_MP4V); //     FCC('MP4V')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_MPG1); //     FCC('MPG1')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_MSS1); //     FCC('MSS1')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_MSS2); //     FCC('MSS2')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_NV11); //     FCC('NV11')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_NV12); //     FCC('NV12')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_P010); //     FCC('P010')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_P016); //     FCC('P016')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_P210); //     FCC('P210')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_P216); //     FCC('P216')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_RGB24); //    D3DFMT_R8G8B8 
-    IF_EQUAL_RETURN(guid, MFVideoFormat_RGB32); //    D3DFMT_X8R8G8B8 
-    IF_EQUAL_RETURN(guid, MFVideoFormat_RGB555); //   D3DFMT_X1R5G5B5 
-    IF_EQUAL_RETURN(guid, MFVideoFormat_RGB565); //   D3DFMT_R5G6B5 
-    IF_EQUAL_RETURN(guid, MFVideoFormat_RGB8);
-    IF_EQUAL_RETURN(guid, MFVideoFormat_UYVY); //     FCC('UYVY')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_v210); //     FCC('v210')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_v410); //     FCC('v410')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_WMV1); //     FCC('WMV1')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_WMV2); //     FCC('WMV2')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_WMV3); //     FCC('WMV3')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_WVC1); //     FCC('WVC1')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_Y210); //     FCC('Y210')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_Y216); //     FCC('Y216')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_Y410); //     FCC('Y410')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_Y416); //     FCC('Y416')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_Y41P);
-    IF_EQUAL_RETURN(guid, MFVideoFormat_Y41T);
-    IF_EQUAL_RETURN(guid, MFVideoFormat_YUY2); //     FCC('YUY2')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_YV12); //     FCC('YV12')
-    IF_EQUAL_RETURN(guid, MFVideoFormat_YVYU);
+	IF_EQUAL_RETURN(guid, MFVideoFormat_ARGB32); //   D3DFMT_A8R8G8B8
+	IF_EQUAL_RETURN(guid, MFVideoFormat_AYUV); //     FCC('AYUV')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_DV25); //     FCC('dv25')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_DV50); //     FCC('dv50')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_DVH1); //     FCC('dvh1')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_DVSD); //     FCC('dvsd')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_DVSL); //     FCC('dvsl')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_H264); //     FCC('H264')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_I420); //     FCC('I420')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_IYUV); //     FCC('IYUV')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_M4S2); //     FCC('M4S2')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_MJPG);
+	IF_EQUAL_RETURN(guid, MFVideoFormat_MP43); //     FCC('MP43')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_MP4S); //     FCC('MP4S')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_MP4V); //     FCC('MP4V')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_MPG1); //     FCC('MPG1')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_MSS1); //     FCC('MSS1')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_MSS2); //     FCC('MSS2')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_NV11); //     FCC('NV11')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_NV12); //     FCC('NV12')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_P010); //     FCC('P010')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_P016); //     FCC('P016')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_P210); //     FCC('P210')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_P216); //     FCC('P216')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_RGB24); //    D3DFMT_R8G8B8
+	IF_EQUAL_RETURN(guid, MFVideoFormat_RGB32); //    D3DFMT_X8R8G8B8
+	IF_EQUAL_RETURN(guid, MFVideoFormat_RGB555); //   D3DFMT_X1R5G5B5
+	IF_EQUAL_RETURN(guid, MFVideoFormat_RGB565); //   D3DFMT_R5G6B5
+	IF_EQUAL_RETURN(guid, MFVideoFormat_RGB8);
+	IF_EQUAL_RETURN(guid, MFVideoFormat_UYVY); //     FCC('UYVY')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_v210); //     FCC('v210')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_v410); //     FCC('v410')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_WMV1); //     FCC('WMV1')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_WMV2); //     FCC('WMV2')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_WMV3); //     FCC('WMV3')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_WVC1); //     FCC('WVC1')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_Y210); //     FCC('Y210')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_Y216); //     FCC('Y216')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_Y410); //     FCC('Y410')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_Y416); //     FCC('Y416')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_Y41P);
+	IF_EQUAL_RETURN(guid, MFVideoFormat_Y41T);
+	IF_EQUAL_RETURN(guid, MFVideoFormat_YUY2); //     FCC('YUY2')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_YV12); //     FCC('YV12')
+	IF_EQUAL_RETURN(guid, MFVideoFormat_YVYU);
 
 	return "Bad format";
 }
