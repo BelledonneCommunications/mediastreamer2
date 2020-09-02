@@ -821,9 +821,7 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 	MSConnectionHelper h;
 	int sample_rate;
 	int nchannels;
-	int err1,err2;
 	bool_t has_builtin_ec=FALSE;
-	bool_t resampler_missing = FALSE;
 	bool_t skip_encoder_and_decoder = FALSE;
 	bool_t do_ts_adjustments = TRUE;
 
@@ -881,7 +879,6 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 	} else {
 		stream->soundread=ms_factory_create_filter(stream->ms.factory, MS_FILE_PLAYER_ID);
 		stream->read_resampler=ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
-		resampler_missing = stream->read_resampler == NULL;
 	}
 	if (io->output.type == MSResourceSoundcard) {
 		if (stream->soundwrite==NULL)
@@ -1032,27 +1029,16 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 	}
 
 	/*don't put these two statements in a single if, because the second one will not be executed if the first one evaluates as true*/
-	err1 = ms_filter_call_method(stream->soundread, MS_FILTER_SET_SAMPLE_RATE, &sample_rate);
-	err2 = ms_filter_call_method(stream->soundread, MS_FILTER_SET_NCHANNELS, &nchannels);
+	ms_filter_call_method(stream->soundread, MS_FILTER_SET_SAMPLE_RATE, &sample_rate);
+	ms_filter_call_method(stream->soundread, MS_FILTER_SET_NCHANNELS, &nchannels);
 	/* give the sound filters some properties */
-	if (err1 != 0 || err2 != 0){
-		/* need to add resampler*/
-		if (stream->read_resampler == NULL) stream->read_resampler = ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
-		resampler_missing = stream->read_resampler == NULL;
-	}
+	/*add resampler*/
+	if (stream->read_resampler == NULL) stream->read_resampler = ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
 
-	err1 = ms_filter_call_method(stream->soundwrite, MS_FILTER_SET_SAMPLE_RATE, &sample_rate);
-	err2 = ms_filter_call_method(stream->soundwrite, MS_FILTER_SET_NCHANNELS, &nchannels);
-	if (err1 !=0 || err2 != 0){
-		/* need to add resampler*/
-		if (stream->write_resampler == NULL) stream->write_resampler = ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
-		resampler_missing = stream->write_resampler == NULL;
-	}
-
-	if (resampler_missing){
-		ms_fatal("AudioStream: no resampler implementation found, but resampler is required to perform the AudioStream. "
-			"Does mediastreamer2 was compiled with libspeex dependency ?");
-	}
+	ms_filter_call_method(stream->soundwrite, MS_FILTER_SET_SAMPLE_RATE, &sample_rate);
+	ms_filter_call_method(stream->soundwrite, MS_FILTER_SET_NCHANNELS, &nchannels);
+	/* need to add resampler*/
+	if (stream->write_resampler == NULL) stream->write_resampler = ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
 
 	if (stream->ec){
 		if (!stream->is_ec_delay_set) {
