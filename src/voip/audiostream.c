@@ -247,7 +247,7 @@ static void write_callback(void *ud, MSFilter *f, unsigned int id, void *arg){
 	AudioStream *stream=(AudioStream *)ud;
 	switch(id){
 		case MS_FILTER_OUTPUT_FMT_CHANGED:
-			if (f==stream->soundwrite){
+			if (f==stream->soundwrite && stream->write_resampler){
 				MSFilter *to = stream->soundwrite;
 				if (stream->write_encoder) to = stream->write_encoder;
 				audio_stream_configure_resampler(stream, stream->write_resampler, stream->ms.decoder, to);
@@ -262,7 +262,7 @@ static void read_callback(void *ud, MSFilter *f, unsigned int id, void *arg){
 	AudioStream *stream=(AudioStream *)ud;
 	switch(id){
 		case MS_FILTER_OUTPUT_FMT_CHANGED:
-			if (f==stream->soundread){
+			if (f==stream->soundread && stream->read_resampler){
 				MSFilter *from = stream->soundread;
 				if (stream->read_decoder) from = stream->read_decoder;
 				audio_stream_configure_resampler(stream, stream->read_resampler, from, stream->ms.encoder);
@@ -878,7 +878,6 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 		stream->read_decoder = ms_factory_create_decoder(stream->ms.factory, pt->mime_type);
 	} else {
 		stream->soundread=ms_factory_create_filter(stream->ms.factory, MS_FILE_PLAYER_ID);
-		stream->read_resampler=ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
 	}
 	if (io->output.type == MSResourceSoundcard) {
 		if (stream->soundwrite==NULL)
@@ -938,8 +937,11 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 	ms_filter_call_method(stream->ms.rtpsend, MS_RTP_SEND_ENABLE_TS_ADJUSTMENT, &do_ts_adjustments);
 
 	if (!skip_encoder_and_decoder) {
+		ms_message("audio_stream_start_from_io: create encoder, decoder and resamplers.");
 		stream->ms.encoder=ms_factory_create_encoder(stream->ms.factory, pt->mime_type);
 		stream->ms.decoder=ms_factory_create_decoder(stream->ms.factory, pt->mime_type);
+		stream->read_resampler = ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
+		stream->write_resampler = ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
 	}
 
 	/* sample rate is already set for rtpsend and rtprcv, check if we have to adjust it to */
@@ -1028,17 +1030,11 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 		ms_filter_call_method(stream->dtmfgen_rtp,MS_FILTER_SET_NCHANNELS,&nchannels);
 	}
 
-	/*don't put these two statements in a single if, because the second one will not be executed if the first one evaluates as true*/
 	ms_filter_call_method(stream->soundread, MS_FILTER_SET_SAMPLE_RATE, &sample_rate);
 	ms_filter_call_method(stream->soundread, MS_FILTER_SET_NCHANNELS, &nchannels);
-	/* give the sound filters some properties */
-	/*add resampler*/
-	if (stream->read_resampler == NULL) stream->read_resampler = ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
 
 	ms_filter_call_method(stream->soundwrite, MS_FILTER_SET_SAMPLE_RATE, &sample_rate);
 	ms_filter_call_method(stream->soundwrite, MS_FILTER_SET_NCHANNELS, &nchannels);
-	/* need to add resampler*/
-	if (stream->write_resampler == NULL) stream->write_resampler = ms_factory_create_filter(stream->ms.factory, MS_RESAMPLE_ID);
 
 	if (stream->ec){
 		if (!stream->is_ec_delay_set) {
