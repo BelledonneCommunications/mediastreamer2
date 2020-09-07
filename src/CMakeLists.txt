@@ -247,6 +247,9 @@ if(ENABLE_VIDEO)
 		list(APPEND VOIP_SOURCE_FILES_C
 			utils/jpgloader-turbojpeg.c
 		)
+		list(APPEND VOIP_SOURCE_FILES_CXX
+			videofilters/msturbojpeg.cpp	#MJPEG using turbojpeg
+		)
 	else()
 		list(APPEND VOIP_SOURCE_FILES_C
 			utils/jpgloader-stub.c
@@ -258,9 +261,9 @@ if(ENABLE_VIDEO)
 			list(APPEND VOIP_SOURCE_FILES_C videofilters/drawdib-display.c)
 		endif()
 		list(APPEND VOIP_SOURCE_FILES_CXX
-											videofilters/msmfoundationcap.cpp	#Media-Foundation
-											videofilters/msmfoundationcap.h
-											videofilters/msdscap.cc				#DirectShow
+			videofilters/msmfoundationcap.cpp	#Media-Foundation
+			videofilters/msmfoundationcap.h
+			videofilters/msdscap.cc				#DirectShow
 		)
 	endif()
 	if(APPLE)

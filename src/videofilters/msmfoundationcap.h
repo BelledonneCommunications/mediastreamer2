@@ -46,7 +46,7 @@ class MSMFoundationCap : public IMFSourceReaderCallback {
 	IMFSourceReader* mSourceReader;	// The source
 	MSYuvBufAllocator * mAllocator;
 	bool_t mRunning;	// The reading process is running or not. Set it to FALSE to stop it.
-	float mFPS;
+	float mFps;
 	unsigned int mPlaneSize;	// Optimization to avoid to compute it on each frame
 	LONG mStride;				// Stride from media type
 	mblk_t * mFrameData;		// Frame to send to MS Queue when it request one
@@ -59,8 +59,8 @@ public:
 
 	void setVSize(MSVideoSize vsize);
 	void setDeviceName(const std::string &name);
-	void setFPS(const float &fps);
-	float getFPS() const;
+	void setFps(const float &fps);
+	float getFps() const;
 	int getDeviceOrientation() const;
 	void setDeviceOrientation(int orientation);
 	void setVideoFormat(const GUID &videoFormat);				// Set videoformat and update MSPixFmt format
@@ -91,7 +91,7 @@ public:
 	UINT32 mWidth;
 	UINT32 mHeight;
 	std::string mDeviceName;
-	MSAverageFPS mAvgFPS;
+	MSAverageFPS mAvgFps;
 	MSFrameRateController mFramerateController;
 
 //----------------------------------------	Special Microsoft Section

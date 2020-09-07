@@ -35,7 +35,6 @@
 #pragma comment(lib,"mfuuid.lib")
 #pragma comment(lib,"shlwapi.lib")
 
-
 class MFDevices {// Store device description with helper
 public:
 	IMFActivate ** mDevices;
@@ -131,22 +130,22 @@ public:
 		auto mediaHeight = mediaWidth->second.lower_bound(*height);
 		if(mediaHeight == mediaWidth->second.end() )
 			--mediaHeight;
-		auto mediaFPS = mediaHeight->second.upper_bound(*fps);// Try to get more FPS than target
-		if(mediaFPS == mediaHeight->second.end() )
-			--mediaFPS;
+		auto mediaFps = mediaHeight->second.upper_bound(*fps);// Try to get more FPS than target
+		if(mediaFps == mediaHeight->second.end() )
+			--mediaFps;
 
-		auto mediaVideo = mediaFPS->second.find(*videoFormat);
-		if( mediaVideo == mediaFPS->second.end())
-			mediaVideo = mediaFPS->second.find(MFVideoFormat_NV12);// The format is not found. Try with NV12
-		if(mediaVideo == mediaFPS->second.end())
-			mediaVideo = mediaFPS->second.find(MFVideoFormat_MJPG);// Try with MFVideoFormat_MJPG format
-		if(mediaVideo == mediaFPS->second.end()){
+		auto mediaVideo = mediaFps->second.find(*videoFormat);
+		if( mediaVideo == mediaFps->second.end())
+			mediaVideo = mediaFps->second.find(MFVideoFormat_NV12);// The format is not found. Try with NV12
+		if(mediaVideo == mediaFps->second.end())
+			mediaVideo = mediaFps->second.find(MFVideoFormat_MJPG);// Try with MFVideoFormat_MJPG format
+		if(mediaVideo == mediaFps->second.end()){
 			return NULL;
 		}else{
 			*videoFormat = mediaVideo->first;
 			*width = mediaWidth->first;
 			*height = mediaHeight->first;
-			*fps = mediaFPS->first;
+			*fps = mediaFps->first;
 			return mediaVideo->second;
 		}
 
@@ -159,13 +158,13 @@ MSMFoundationCap::MSMFoundationCap() {
 	mWidth = MS_VIDEO_SIZE_CIF_W;
 	mHeight = MS_VIDEO_SIZE_CIF_H;
 	mStride = mWidth;
-	setVideoFormat(MFVideoFormat_Base);// Defaut format
+	setVideoFormat(MFVideoFormat_Base);// Default format
 	mAllocator = ms_yuv_buf_allocator_new();
 	mFrameData = NULL;
 	mReferenceCount = 1;
 	mSourceReader = NULL;
 	mRunning = FALSE;
-	mFPS = 60.0;
+	mFps = 60.0;
 	mOrientation = 0;
 	mPlaneSize =  mHeight * abs(mStride);
 	mSampleCount= mProcessCount=0;
@@ -187,21 +186,21 @@ MSMFoundationCap::~MSMFoundationCap() {
 }
 
 void MSMFoundationCap::setVSize(MSVideoSize vsize) {
-	setMediaConfiguration(mVideoFormat, vsize.width, vsize.height, mFPS);
+	setMediaConfiguration(mVideoFormat, vsize.width, vsize.height, mFps);
 }
 
 void MSMFoundationCap::setDeviceName(const std::string &pName) {
 	mDeviceName = pName;
 }
 
-void MSMFoundationCap::setFPS(const float &pFPS){
-	ms_video_init_framerate_controller(&mFramerateController, pFPS);// Set the controller to the target FPS and then try to find a format to fit the configuration
-	setMediaConfiguration(mVideoFormat, mWidth, mHeight, pFPS);// mFPS can change here, but don't use it to the controller
-	ms_average_fps_init(&mAvgFPS,"MSMediaFoundationCap: fps=%f");
+void MSMFoundationCap::setFps(const float &pFps){
+	ms_video_init_framerate_controller(&mFramerateController, pFps);// Set the controller to the target FPS and then try to find a format to fit the configuration
+	setMediaConfiguration(mVideoFormat, mWidth, mHeight, pFps);// mFps can change here, but don't use it to the controller
+	ms_average_fps_init(&mAvgFps,"MSMediaFoundationCap: fps=%f");
 }
 
-float MSMFoundationCap::getFPS() const {
-	return mFPS;
+float MSMFoundationCap::getFps() const {
+	return mFps;
 }
 
 int MSMFoundationCap::getDeviceOrientation() const{
@@ -228,7 +227,7 @@ void MSMFoundationCap::feed(MSFilter * filter) {
 			timestamp = (uint32_t)(filter->ticker->time * 90);// rtp uses a 90000 Hz clockrate for video
 			mblk_set_timestamp_info(*data, timestamp);
 			ms_queue_put(filter->outputs[0], *data);
-			ms_average_fps_update(&mAvgFPS,filter->ticker->time);
+			ms_average_fps_update(&mAvgFps,filter->ticker->time);
 			*data = NULL;
 		}
 	}
@@ -330,13 +329,13 @@ HRESULT MSMFoundationCap::setCaptureDevice(const std::string& pName) {
 	}
 	if(found){
 		hr = setSourceReader(devices.mDevices[currentDeviceIndex]);
-		ms_average_fps_init(&mAvgFPS,"MSMediaFoundationCap: fps=%f");
+		ms_average_fps_init(&mAvgFps,"MSMediaFoundationCap: fps=%f");
 	}
 	devices.clean();
 	return hr;
 }
 
-HRESULT MSMFoundationCap::setMediaConfiguration(GUID videoFormat, UINT32 frameWidth, UINT32 frameHeight, float pFPS){
+HRESULT MSMFoundationCap::setMediaConfiguration(GUID videoFormat, UINT32 frameWidth, UINT32 frameHeight, float pFps){
 	HRESULT hr = S_OK;
 	IMFMediaType *mediaType= NULL;
 	ConfigurationManager configs;
@@ -350,7 +349,7 @@ HRESULT MSMFoundationCap::setMediaConfiguration(GUID videoFormat, UINT32 frameWi
 			ms_error("MSMediaFoundationCap: The Video format is not supported by the filter : %s. Trying to force to MFVideoFormat_NV12", pixFmtToString(videoFormat));
 			videoFormat = MFVideoFormat_NV12;
 		}
-		mediaType = configs.getMediaConfiguration(&videoFormat, &frameWidth, &frameHeight,&pFPS );
+		mediaType = configs.getMediaConfiguration(&videoFormat, &frameWidth, &frameHeight,&pFps );
 		if(mediaType){
 			IMFMediaType * currentMediaType = NULL;
 			DWORD equalFlags = 0;
@@ -363,7 +362,7 @@ HRESULT MSMFoundationCap::setMediaConfiguration(GUID videoFormat, UINT32 frameWi
 			if( doSet ){
 				hr = mSourceReader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, NULL, mediaType);
 				if( hr == MF_E_INVALIDREQUEST){//One or more sample requests are still pending. Flush the device, restart it and try setting format 
-					hr = restartWithNewConfiguration(videoFormat,frameWidth,frameHeight, pFPS  );
+					hr = restartWithNewConfiguration(videoFormat,frameWidth,frameHeight, pFps  );
 				}
 				if(SUCCEEDED(hr)) getStride(mediaType, &stride);
 			}
@@ -372,7 +371,7 @@ HRESULT MSMFoundationCap::setMediaConfiguration(GUID videoFormat, UINT32 frameWi
 	}
 	if(doSet && SUCCEEDED(hr)) {
 		setVideoFormat(videoFormat);
-		mFPS = pFPS;
+		mFps = pFps;
 		if(frameWidth != mWidth || frameHeight != mHeight || stride != mStride){
 			if(mFrameData){
 				freemsg(mFrameData);
@@ -384,11 +383,11 @@ HRESULT MSMFoundationCap::setMediaConfiguration(GUID videoFormat, UINT32 frameWi
 			mPlaneSize = mHeight * abs(mStride);// Details : mWidth * mHeight * abs(mStride) / mWidth;
 		}
 		if(mSourceReader)
-			ms_message("MSMediaFoundationCap: Change the video format : %dx%d : %s, %f fps", mWidth, mHeight, pixFmtToString(mVideoFormat), mFPS);
+			ms_message("MSMediaFoundationCap: Change the video format : %dx%d : %s, %f fps", mWidth, mHeight, pixFmtToString(mVideoFormat), mFps);
 		else
-			ms_message("MSMediaFoundationCap: Change the video format without Reader : %dx%d : %s, %f fps", mWidth, mHeight, pixFmtToString(mVideoFormat), mFPS);
+			ms_message("MSMediaFoundationCap: Change the video format without Reader : %dx%d : %s, %f fps", mWidth, mHeight, pixFmtToString(mVideoFormat), mFps);
 	}else
-		ms_error("MSMediaFoundationCap: Cannot change the video format : %dx%d : %s, %f fps", frameWidth, frameHeight, pixFmtToString(videoFormat), pFPS);
+		ms_error("MSMediaFoundationCap: Cannot change the video format : %dx%d : %s, %f fps", frameWidth, frameHeight, pixFmtToString(videoFormat), pFps);
 	LeaveCriticalSection(&mCriticalSection);
 	configs.clean();
 	return hr;
@@ -410,7 +409,7 @@ HRESULT MSMFoundationCap::setSourceReader(IMFActivate *device) {
 	if (SUCCEEDED(hr)) //Create the source reader
 		hr = MFCreateSourceReaderFromMediaSource(source, attributes, &mSourceReader);	
 	if (SUCCEEDED(hr)){  // Try to find a suitable output type.
-		hr = setMediaConfiguration(mVideoFormat, mWidth, mHeight, mFPS);
+		hr = setMediaConfiguration(mVideoFormat, mWidth, mHeight, mFps);
 	}
 	if( FAILED(hr) ) {
 		if( mSourceReader ) {
@@ -428,26 +427,26 @@ HRESULT MSMFoundationCap::setSourceReader(IMFActivate *device) {
 
 void MSMFoundationCap::setVideoFormat(const GUID &videoFormat){
 	if( videoFormat == MFVideoFormat_Base){// Default format
-		mVideoFormat = MFVideoFormat_NV12;
-		mPixelFormat = MS_YUV420P;
+		//setVideoFormat(MFVideoFormat_MJPG);
+		setVideoFormat(MFVideoFormat_NV12);
 	}else{
 		mVideoFormat = videoFormat;
 		if(mVideoFormat == MFVideoFormat_NV12)
 			mPixelFormat = MS_YUV420P;
-		//else if(mVideoFormat == MFVideoFormat_MJPG)// Uncomment to support MJPEG
-		//	mPixelFormat = MS_MJPEG;
+		else if(mVideoFormat == MFVideoFormat_MJPG)
+			mPixelFormat = MS_MJPEG;
 	}
 }
 
-HRESULT MSMFoundationCap::restartWithNewConfiguration(GUID videoFormat, UINT32 frameWidth, UINT32 frameHeight, float pFPS){
-	ms_message("MSMediaFoundationCap: Restarting device with a new configuration : %dx%d : %s, %f fps", frameWidth, frameHeight, pixFmtToString(videoFormat), pFPS);
+HRESULT MSMFoundationCap::restartWithNewConfiguration(GUID videoFormat, UINT32 frameWidth, UINT32 frameHeight, float pFps){
+	ms_message("MSMediaFoundationCap: Restarting device with a new configuration : %dx%d : %s, %f fps", frameWidth, frameHeight, pixFmtToString(videoFormat), pFps);
 	HRESULT hr = S_OK;
 	stop(1000);
 	if( mSourceReader ) {
 		mSourceReader->Release();
 		mSourceReader = NULL;
 	}
-	hr = setMediaConfiguration(videoFormat,frameWidth, frameHeight,pFPS );
+	hr = setMediaConfiguration(videoFormat,frameWidth, frameHeight,pFps );
 	if( SUCCEEDED(hr)) {
 		activate();
 		start();
@@ -499,24 +498,19 @@ HRESULT MSMFoundationCap::OnReadSample(HRESULT status, DWORD streamIndex, DWORD 
 					BYTE* data;
 					DWORD length = 0;
 					mediaBuffer->Lock(&data, NULL, &length);
-					if(mFrameData) {
+					if(mFrameData) {// Clean memory
 						freemsg(mFrameData);
 						mFrameData = NULL;
 					}
 					if(mVideoFormat == MFVideoFormat_NV12){// Process raw data from NV12
 						mFrameData = copy_ycbcrbiplanar_to_true_yuv_with_rotation(mAllocator, data, data + mPlaneSize, mOrientation, mWidth, mHeight, mStride, mStride, TRUE);
 					}
-//					else if( mVideoFormat == MFVideoFormat_MJPG){
-//						MSPicture pict;
-//						mblk_t *m = ms_yuv_buf_allocator_get(mAllocator, &pict, mWidth, mHeight);
-//						memcpy(pict.planes[0],data,length);
-						/*
-						mblk_t *m=allocb(size+128,0);
-						memcpy(m->b_wptr,data,length);
-						m->b_wptr+=length;
-						mFrameData = ms_yuv_buf_alloc_from_buffer(mWidth,mHeight,m));
-						*/
-//					}
+					else if( mVideoFormat == MFVideoFormat_MJPG){// Process raw data from MJPEG
+						mFrameData = ms_yuv_allocator_get(mAllocator, length, mWidth, mHeight);
+						if(mFrameData ){
+							memcpy(mFrameData->b_rptr,data,length);
+						}
+					}
 				}
 			}
 		}	
@@ -548,7 +542,7 @@ bool_t MSMFoundationCap::isTimeToSend(uint64_t tickerTime){
 }
 
 bool_t MSMFoundationCap::isSupportedFormat(const GUID &videoFormat)const{
-	return videoFormat == MFVideoFormat_NV12;// || videoFormat == MFVideoFormat_MJPG;
+	return videoFormat == MFVideoFormat_NV12 || videoFormat == MFVideoFormat_MJPG;
 }
 
 /*******************************************************************************
@@ -587,16 +581,16 @@ static void ms_mfoundation_uninit(MSFilter *filter) {
 
 static int ms_mfoundation_set_fps(MSFilter *filter, void *arg){
 	MSMFoundationCap *mf=(MSMFoundationCap*)filter->data;
-	mf->setFPS(*(float*)arg);
+	mf->setFps(*(float*)arg);
 	return 0;
 }
 
 static int ms_mfoundation_get_fps(MSFilter *filter, void *arg){
 	MSMFoundationCap *mf=(MSMFoundationCap*)filter->data;
 	if (filter->ticker){
-		*((float*)arg) = ms_average_fps_get(&mf->mAvgFPS);
+		*((float*)arg) = ms_average_fps_get(&mf->mAvgFps);
 	} else {
-		*((float*)arg) = mf->getFPS();
+		*((float*)arg) = mf->getFps();
 	}
 	return 0;
 }
