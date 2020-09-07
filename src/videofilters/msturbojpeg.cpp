@@ -71,7 +71,6 @@ public:
 
 	void decodeFrame(MSFilter *filter, mblk_t *inm){
 		if( mTurboJpegDecompressor){
-			MSPicture pic;
 			unsigned int imageSize = 0;
 			unsigned char * imageData = inm->b_rptr;
 			int flags = 0;
@@ -84,20 +83,20 @@ public:
 #ifdef HAVE_LIBYUV_H
 // Optimized method : decompress with turbojpeg and convert subsampling with libyuv
 					unsigned int neededConversionSize = tjBufSizeYUV2(mSize.width, 4, mSize.height, subSamp);
-					MSPicture source;
+					MSPicture sourcePicture, destPicture;
 					mblk_t *m2;
 					const int padding=16;
-					m = ms_yuv_buf_allocator_get(mAllocator, &pic, mSize.width, mSize.height);
+					m = ms_yuv_buf_allocator_get(mAllocator, &destPicture, mSize.width, mSize.height);
 					m2 = msgb_allocator_alloc(mAllocator, neededConversionSize+padding);
 					if(m2 ){
-						ms_yuv_buf_init(&source,mSize.width,mSize.height,mSize.width,m2->b_wptr);// Get a MSPicture for planes
+						ms_yuv_buf_init(&sourcePicture,mSize.width,mSize.height,mSize.width,m2->b_wptr);// Get a MSPicture for planes
 						m2->b_wptr+=neededConversionSize;
 					}
-					if(tjDecompressToYUVPlanes(mTurboJpegDecompressor,imageData,imageSize,source.planes,mSize.width,source.strides,mSize.height,0)<0 && tjGetErrorCode(mTurboJpegDecompressor) != TJERR_WARNING )
+					if(tjDecompressToYUVPlanes(mTurboJpegDecompressor,imageData,imageSize,sourcePicture.planes,mSize.width,sourcePicture.strides,mSize.height,0)<0 && tjGetErrorCode(mTurboJpegDecompressor) != TJERR_WARNING )
 						ms_error("MSTMJpegDec: tjDecompressToYUVPlanes() failed, error: %s, (%d)", tjGetErrorStr(), tjGetErrorCode(mTurboJpegDecompressor));
 					else
-						libyuv::I422ToI420(source.planes[0],source.strides[0],source.planes[1],source.strides[1],source.planes[2],source.strides[2],
-							pic.planes[0],pic.strides[0],pic.planes[1],pic.strides[1],pic.planes[2],pic.strides[2],
+						libyuv::I422ToI420(sourcePicture.planes[0],sourcePicture.strides[0],sourcePicture.planes[1],sourcePicture.strides[1],sourcePicture.planes[2],sourcePicture.strides[2],
+							destPicture.planes[0],destPicture.strides[0],destPicture.planes[1],destPicture.strides[1],destPicture.planes[2],destPicture.strides[2],
 							mSize.width,mSize.height);
 					freemsg(m2);
 
@@ -145,7 +144,6 @@ static void ms_turbojpeg_dec_process(MSFilter *filter) {
 }
 
 static void ms_turbojpeg_dec_postprocess(MSFilter *filter) {
-	MSTurboJpegDec *dec = static_cast<MSTurboJpegDec *>(filter->data);
 }
 
 static void ms_turbojpeg_dec_uninit(MSFilter *filter) {
