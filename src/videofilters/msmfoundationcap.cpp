@@ -633,6 +633,8 @@ static int ms_mfoundation_set_device_orientation(MSFilter *filter, void *arg) {
 	return 0;
 }
 
+extern "C" {
+
 static MSFilterMethod ms_mfoundation_methods[] = {
 	{ MS_FILTER_SET_FPS,        ms_mfoundation_set_fps },
 	{ MS_FILTER_GET_FPS,        ms_mfoundation_get_fps },
@@ -644,7 +646,7 @@ static MSFilterMethod ms_mfoundation_methods[] = {
 	{ 0,						NULL }
 };
 
-extern "C" MSFilterDesc ms_mfoundation_read_desc = {
+MSFilterDesc ms_mfoundation_read_desc = {
 	MS_FILTER_PLUGIN_ID,
 	"MSMediaFoundationCap",
 	N_("Media Foundation video capture."),
@@ -659,8 +661,11 @@ extern "C" MSFilterDesc ms_mfoundation_read_desc = {
 	ms_mfoundation_uninit,
 	ms_mfoundation_methods
 };
+}//extern "C"
+
 MS_FILTER_DESC_EXPORT(ms_mfoundation_read_desc)
 
+extern "C"{
 // DETECTION
 static MSFilter *ms_mfoundationcap_create_reader(MSWebCam *cam) {
 	MSFactory *factory = ms_web_cam_get_factory(cam);
@@ -672,7 +677,7 @@ static MSFilter *ms_mfoundationcap_create_reader(MSWebCam *cam) {
 
 static void ms_mfoundationcap_detect(MSWebCamManager *manager);
 
-extern "C" MSWebCamDesc ms_mfoundationcap_desc = {
+MSWebCamDesc ms_mfoundationcap_desc = {
 	"MSMediaFoundationCap",
 	ms_mfoundationcap_detect,
 	NULL,
@@ -680,7 +685,7 @@ extern "C" MSWebCamDesc ms_mfoundationcap_desc = {
 	NULL,
 	NULL
 };
-
+}//extern "C"
 
 static void ms_mfoundationcap_detect(MSWebCamManager *manager) {
 	MFDevices devices;

@@ -198,6 +198,8 @@ static int ms_turbojpeg_dec_get_fps(MSFilter *filter, void *arg){
 	return 0;
 }
 
+extern "C" {
+
 static MSFilterMethod methods[]={
 	{	MS_FILTER_ADD_FMTP		,	ms_turbojpeg_dec_add_fmtp	},
 	{	MS_FILTER_GET_VIDEO_SIZE,	ms_turbojpeg_dec_get_vsize	},
@@ -208,10 +210,10 @@ static MSFilterMethod methods[]={
 
 #ifndef _MSC_VER
 
-extern "C" MSFilterDesc ms_mjpeg_dec_desc={
+MSFilterDesc ms_mjpeg_dec_desc={
 	.id=MS_MJPEG_DEC_ID,
 	.name="MSTMJpegDec",// ??MSTMJpegDec
-	.text="A MJEPG decoder using turbojpeg library",
+	.text="A MJPEG decoder using turbojpeg library",
 	.category=MS_FILTER_DECODER,
 	.enc_fmt="MJPEG",
 	.ninputs=1,
@@ -226,7 +228,7 @@ extern "C" MSFilterDesc ms_mjpeg_dec_desc={
 
 #else
 
-extern "C" MSFilterDesc ms_mjpeg_dec_desc={
+MSFilterDesc ms_mjpeg_dec_desc={
 	MS_MJPEG_DEC_ID,
 	"MSTMJpegDec",
 	N_("A MJPEG decoder using turbojpeg library"),
@@ -243,5 +245,5 @@ extern "C" MSFilterDesc ms_mjpeg_dec_desc={
 };
 
 #endif
-
+}// extern "C"
 MS_FILTER_DESC_EXPORT(ms_mjpeg_dec_desc)
