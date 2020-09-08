@@ -140,6 +140,7 @@ static void ms_turbojpeg_dec_process(MSFilter *filter) {
 	mblk_t *inm;
 	while((inm=ms_queue_get(filter->inputs[0]))!=0){
 		dec->decodeFrame(filter,inm);
+		freemsg(inm);
 	}
 }
 
