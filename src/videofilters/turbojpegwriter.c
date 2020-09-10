@@ -23,7 +23,7 @@
 
 #include "mediastreamer2/msjpegwriter.h"
 #include "mediastreamer2/msvideo.h"
-#include "turbojpeg.h"
+#include "turbojpeg/turbojpeg.h"
 
 
 typedef struct {

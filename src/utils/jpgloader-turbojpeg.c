@@ -28,7 +28,7 @@
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #endif
 
-#include "turbojpeg.h"
+#include "turbojpeg/turbojpeg.h"
 
 #ifdef _MSC_VER
 #pragma warning(disable : 4996)

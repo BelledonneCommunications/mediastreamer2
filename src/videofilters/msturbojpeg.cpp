@@ -25,7 +25,7 @@
 #include "mediastreamer2/msvideo.h"
 #include "mediastreamer2/msticker.h"
 #include "../voip/nowebcam.h"
-#include "turbojpeg.h"
+#include "turbojpeg/turbojpeg.h"
 
 #ifdef HAVE_LIBYUV_H
 #include "libyuv/convert.h"
