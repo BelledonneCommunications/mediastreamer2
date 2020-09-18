@@ -162,7 +162,7 @@ static int compute_cross_correlation(int16_t *s1, int n1, int16_t *s2_padded, fl
 	for (i=0; i<xcorr_nsamples; i++){
 		norm2 += s2_padded[step*(i+n1-1)]*s2_padded[step*(i+n1-1)];
 		tmp = scalar_product(s1, s2_padded + i*step, n1, step);
-		xcorr[i] = (float)((double)tmp / sqrt((double)(norm1)*(double)norm2));
+		xcorr[i] = (float)((double)tmp / sqrt((double)(norm1*norm2)));
 		tmp = tmp < 0 ? -tmp : tmp;
 		if (tmp > max){
 			max = tmp;
@@ -204,7 +204,7 @@ static int _ms_audio_diff_one_chunk(int16_t *s1, int16_t *s2, int nsamples, int 
 		
 		max_pos = 0;
 		/*sum the square of r and l xcorr signals to determine the global maximum*/
-		for (i = 0; i < max_shift_samples; ++i){
+		for (i = 0; i <= max_shift_samples; ++i){// max_shift_samples is takken account because of the correlation computation that is about n-1
 			xcorr_r[i] = xcorr_r[i]*xcorr_r[i] + xcorr_l[i]*xcorr_l[i];
 			if (xcorr_r[i] > max){
 				max = xcorr_r[i];
