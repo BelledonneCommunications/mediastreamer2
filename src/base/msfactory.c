@@ -762,7 +762,7 @@ void ms_factory_uninit_plugins(MSFactory *factory){
 	for(elem=factory->ms_plugins_loaded_list;elem!=NULL;elem=elem->next)
 	{
 		HINSTANCE handle=(HINSTANCE )elem->data;
-		//FreeLibrary(handle);
+		FreeLibrary(handle);
 	}
 
 	factory->ms_plugins_loaded_list = bctbx_list_free(factory->ms_plugins_loaded_list);

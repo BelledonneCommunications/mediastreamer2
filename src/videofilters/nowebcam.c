@@ -180,7 +180,7 @@ mblk_t *ms_load_jpeg_as_yuv(const char *jpgpath, MSVideoSize *reqsize) {
 #define NOWEBCAM_JPG "nowebcamCIF"
 #endif
 
-extern char *ms_nowebcam_def_image = NULL;
+static char ms_nowebcam_def_image[512] = {0};
 
 mblk_t *ms_load_nowebcam(MSFactory *factory, MSVideoSize *reqsize, int idx) {
 	mblk_t *m;
@@ -208,7 +208,7 @@ void static_image_init(MSFilter *f) {
 	d->vsize.width = MS_VIDEO_SIZE_CIF_W;
 	d->vsize.height = MS_VIDEO_SIZE_CIF_H;
 
-	if (ms_nowebcam_def_image)
+	if (ms_nowebcam_def_image[0] != 0)
 		d->nowebcamimage=ms_strdup(ms_nowebcam_def_image);
 	d->lasttime = 0;
 	d->pic = NULL;
@@ -345,10 +345,12 @@ static void static_image_detect(MSWebCamManager *obj);
 
 static void static_image_cam_init(MSWebCam *cam) {
 	cam->name=ms_strdup("Static picture");
-	if (ms_nowebcam_def_image == NULL) {
+	if (ms_nowebcam_def_image[0] == 0) {
 		MSFactory *factory = ms_web_cam_get_factory(cam);
 		const char *image_resources_dir = ms_factory_get_image_resources_dir(factory);
-		ms_nowebcam_def_image = ms_strdup_printf("%s/%s.jpg", image_resources_dir, NOWEBCAM_JPG);
+		char * temp = ms_strdup_printf("%s/%s.jpg", image_resources_dir, NOWEBCAM_JPG);
+		strcpy(ms_nowebcam_def_image, temp);
+		ms_free(temp);
 	}
 }
 
@@ -372,9 +374,9 @@ static void static_image_detect(MSWebCamManager *obj){
 
 void ms_static_image_set_default_image(const char *path){
 	if (ms_nowebcam_def_image!=NULL)
-		ms_free(ms_nowebcam_def_image);
-	ms_nowebcam_def_image=NULL;
+		ms_nowebcam_def_image[0] = 0;
 	if (path)
+		strcpy(ms_nowebcam_def_image, path);
 		ms_nowebcam_def_image=ms_strdup(path);
 }
 
