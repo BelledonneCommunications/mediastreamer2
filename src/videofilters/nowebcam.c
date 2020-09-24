@@ -377,7 +377,6 @@ void ms_static_image_set_default_image(const char *path){
 		ms_nowebcam_def_image[0] = 0;
 	if (path)
 		strcpy(ms_nowebcam_def_image, path);
-		ms_nowebcam_def_image=ms_strdup(path);
 }
 
 const char *ms_static_image_get_default_image(){
