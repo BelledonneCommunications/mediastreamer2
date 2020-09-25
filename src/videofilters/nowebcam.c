@@ -182,6 +182,9 @@ mblk_t *ms_load_jpeg_as_yuv(const char *jpgpath, MSVideoSize *reqsize) {
 
 #define DEF_IMAGE_MAX_SIZE 511
 static char ms_nowebcam_def_image[DEF_IMAGE_MAX_SIZE+1] = {0};//+1 to ensure having a final null character
+#ifndef MIN
+#define MIN(a,b) a<=b ? a : b
+#endif
 
 mblk_t *ms_load_nowebcam(MSFactory *factory, MSVideoSize *reqsize, int idx) {
 	mblk_t *m;
@@ -350,7 +353,7 @@ static void static_image_cam_init(MSWebCam *cam) {
 		MSFactory *factory = ms_web_cam_get_factory(cam);
 		const char *image_resources_dir = ms_factory_get_image_resources_dir(factory);
 		char * temp = ms_strdup_printf("%s/%s.jpg", image_resources_dir, NOWEBCAM_JPG);
-		strncpy(ms_nowebcam_def_image, temp, min(DEF_IMAGE_MAX_SIZE, strlen(temp)) );
+		strncpy(ms_nowebcam_def_image, temp, MIN(DEF_IMAGE_MAX_SIZE, strlen(temp)) );
 		ms_free(temp);
 	}
 }
@@ -377,7 +380,7 @@ void ms_static_image_set_default_image(const char *path){
 	if (ms_nowebcam_def_image[0] != 0)
 		ms_nowebcam_def_image[0] = 0;
 	if (path)
-		strncpy(ms_nowebcam_def_image, path, min(DEF_IMAGE_MAX_SIZE, strlen(path)) );
+		strncpy(ms_nowebcam_def_image, path, MIN(DEF_IMAGE_MAX_SIZE, strlen(path)) );
 }
 
 const char *ms_static_image_get_default_image(){
