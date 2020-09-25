@@ -373,7 +373,7 @@ static void static_image_detect(MSWebCamManager *obj){
 }
 
 void ms_static_image_set_default_image(const char *path){
-	if (ms_nowebcam_def_image!=NULL)
+	if (ms_nowebcam_def_image[0] != 0)
 		ms_nowebcam_def_image[0] = 0;
 	if (path)
 		strcpy(ms_nowebcam_def_image, path);
