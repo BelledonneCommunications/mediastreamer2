@@ -246,7 +246,7 @@ JNIEXPORT void JNICALL Java_org_linphone_mediastream_MediastreamerAndroidContext
 
 #else
 
-const static SoundDeviceDescription devices[]={
+static const SoundDeviceDescription devices[]={
 	{ NULL, NULL, NULL, 0, 0, 0, NULL }
 };
 
