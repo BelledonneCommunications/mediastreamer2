@@ -163,7 +163,6 @@ static int compute_cross_correlation(int16_t *s1, int n1, int16_t *s2_padded, fl
 		norm2 += s2_padded[step*(i+n1-1)]*s2_padded[step*(i+n1-1)];
 		tmp = scalar_product(s1, s2_padded + i*step, n1, step);
 		xcorr[i] = (float)((double)tmp / sqrt((double)(norm1)*(double)norm2));
-
 		tmp = tmp < 0 ? -tmp : tmp;
 		if (tmp > max){
 			max = tmp;
