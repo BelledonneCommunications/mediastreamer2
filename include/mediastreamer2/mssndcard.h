@@ -36,10 +36,16 @@
  * @{
  */
 
+static const char * MS_SND_CARD_MANAGER_PARAM_FAST = "FAST";
+static const char * MS_SND_CARD_MANAGER_PARAM_NOVOICEPROC = "NOVOICEPROC";
+static const char * MS_SND_CARD_MANAGER_PARAM_TESTER = "TESTER";
+static const char * MS_SND_CARD_MANAGER_PARAM_RINGER = "RINGER";
+
 struct _MSSndCardManager{
 	MSFactory* factory;
 	MSList *cards;
 	MSList *descs;
+	char *paramString;
 };
 
 /**
@@ -223,6 +229,16 @@ MS2_PUBLIC MSSndCardManager * ms_snd_card_manager_new(void);
  * You usually do not need this function, the ms_factory_destroy() doing this job for you.
  */
 MS2_PUBLIC void ms_snd_card_manager_destroy(MSSndCardManager* sndcardmanager);
+
+/**
+ * Set the sound card manager's parameter string
+ *
+ * @param m    A sound card manager.
+ * @param paramString  A string of the form "param1=true;param2=42;param3=false"
+ *
+ * Returns: MSSndCard if successfull, NULL otherwise.
+ */
+MS2_PUBLIC MSSndCard * ms_snd_card_manager_set_param_string(MSSndCardManager *m, const char *paramString);
 
 /**
  * Retreive a sound card object based on it's id.
