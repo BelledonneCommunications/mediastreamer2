@@ -30,6 +30,11 @@ MSSndCardManager * ms_snd_card_manager_new(void){
 	obj->factory = NULL;
 	obj->cards=NULL;
 	obj->descs=NULL;
+	obj->paramString=bctbx_strdup_printf("%s=false;%s=false;%s=false;%s=false",
+										 MS_SND_CARD_MANAGER_PARAM_FAST,
+										 MS_SND_CARD_MANAGER_PARAM_NOVOICEPROC,
+										 MS_SND_CARD_MANAGER_PARAM_TESTER,
+										 MS_SND_CARD_MANAGER_PARAM_RINGER);
 	return obj;
 }
 
@@ -45,7 +50,14 @@ void ms_snd_card_manager_destroy(MSSndCardManager* scm){
 		bctbx_list_free(scm->cards);
 		bctbx_list_free(scm->descs);
 	}
+	if (scm!=NULL) {
+		bctbx_free(scm->paramString);
+	}
 	ms_free(scm);
+}
+
+void ms_snd_card_manager_set_param_string(MSSndCardManager *m, const char *paramString){
+	m->paramString = bctbx_strdup(paramString);
 }
 
 MSFactory * ms_snd_card_get_factory(MSSndCard * c){
