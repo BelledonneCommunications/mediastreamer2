@@ -394,7 +394,7 @@ static bool_t start_audio_unit (au_card_t* card, uint64_t time) {
 }
 
 static void stop_audio_unit_with_param (au_card_t* d, bool_t isConfigured) {
-	if (d->audio_unit_state == MSAudioUnitStarted) {
+	if (d->audio_unit_state == MSAudioUnitStarted || d->audio_unit_state == MSAudioUnitConfigured) {
 		check_audiounit_call( AudioOutputUnitStop(d->audio_unit) );
 		ms_message("AudioUnit stopped");
 		d->audio_session_configured=isConfigured;
