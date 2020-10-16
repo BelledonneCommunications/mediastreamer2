@@ -219,6 +219,13 @@ MS2_PUBLIC MSAudioEndpoint * ms_audio_endpoint_new_recorder(MSFactory* factory);
 MS2_PUBLIC int ms_audio_recorder_endpoint_start(MSAudioEndpoint *ep, const char *path);
 
 /**
+* Get the list of members, as MSAudioEndpoints.
+* @param obj the conference
+* @return a list of MSAudioEndpoints objects.
+*/
+MS2_PUBLIC const bctbx_list_t* ms_audio_conference_get_members(const MSAudioConference *obj);
+
+/**
  * Stop audio recording.
  * The endpoint must have been created by ms_audio_endpoint_new_recorder().
  * @param ep the endpoint
@@ -319,6 +326,12 @@ MS2_PUBLIC void ms_video_conference_remove_member(MSVideoConference *obj, MSVide
  * @param ep the participant, represented as a MSVideoEndpoint object
  */
 MS2_PUBLIC void ms_video_conference_set_focus(MSVideoConference *obj, MSVideoEndpoint *ep);
+
+/**
+* Switch the focus of the video conf on the static image.
+* @param obj the conference
+*/
+MS2_PUBLIC void ms_video_conference_set_static_focus(MSVideoConference *obj);
 
 /**
  * Get the list of members, as MSVideoEndpoints.

@@ -307,6 +307,10 @@ static void find_filters(bctbx_list_t **filters, MSFilter *f ){
 		link=f->inputs[i];
 		if (link!=NULL) find_filters(filters,link->prev.filter);
 	}
+	// static image pin is sendonly
+	if (f->staticPin) {
+		return;
+	}
 	/* go downstream */
 	for(i=0,found=0;i<f->desc->noutputs;i++){
 		link=f->outputs[i];

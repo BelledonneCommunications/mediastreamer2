@@ -286,6 +286,10 @@ MSAudioEndpoint * ms_audio_endpoint_get_from_stream(AudioStream *st, bool_t is_r
 	return ep;
 }
 
+const bctbx_list_t* ms_audio_conference_get_members(const MSAudioConference *obj){
+	return obj->members;
+}
+
 void ms_audio_endpoint_release_from_stream(MSAudioEndpoint *obj){
 	redo_audio_stream_graph(obj);
 	ms_audio_endpoint_destroy(obj);

@@ -29,6 +29,7 @@ struct _MSVideoConference{
 	MSFilter *mixer;
 	bctbx_list_t *members;
 	int bitrate;
+	MSVideoEndpoint *ep;
 };
 
 struct _MSVideoEndpoint{
@@ -52,6 +53,7 @@ static MSVideoEndpoint *get_endpoint_at_pin(MSVideoConference *obj, int pin){
 		MSVideoEndpoint *ep=(MSVideoEndpoint*)it->data;
 		if (ep->pin==pin) return ep;
 	}
+	if (obj->ep->pin == pin) return obj->ep;
 	return NULL;
 }
 
@@ -104,7 +106,7 @@ static void ms_video_conference_process_encoder_control(VideoStream *vs, unsigne
 	}
 }
 
-
+static void ms_video_conference_add_static_member(MSVideoConference *obj, MSFactory *f);
 MSVideoConference * ms_video_conference_new(MSFactory *f, const MSVideoConferenceParams *params){
 	MSVideoConference *obj=ms_new0(MSVideoConference,1);
 	const MSFmtDescriptor *fmt;
@@ -118,6 +120,7 @@ MSVideoConference * ms_video_conference_new(MSFactory *f, const MSVideoConferenc
 	ms_filter_call_method(obj->mixer, MS_FILTER_SET_INPUT_FMT, (void*)fmt);
 	ms_filter_add_notify_callback(obj->mixer,on_switcher_event,obj,TRUE);
 	obj->params=*params;
+	ms_video_conference_add_static_member(obj, f);
 	return obj;
 }
 
@@ -220,7 +223,7 @@ static void redo_video_stream_graph(MSVideoEndpoint *ep){
 
 static int find_free_pin(MSFilter *mixer){
 	int i;
-	for(i=0;i<mixer->desc->ninputs;++i){
+	for(i=0;i<mixer->desc->ninputs-1;++i){
 		if (mixer->inputs[i]==NULL){
 			return i;
 		}
@@ -246,10 +249,45 @@ static void plumb_to_conf(MSVideoEndpoint *ep){
 	ms_filter_call_method(conf->mixer, MS_VIDEO_SWITCHER_SET_AS_LOCAL_MEMBER, &pc);
 }
 
+static void ms_video_conference_add_static_member(MSVideoConference *obj, MSFactory *f) {
+	// create an endpoint for static image
+	VideoStream *stream = video_stream_new(f, 65004, 65005, FALSE);
+	media_stream_set_direction(&stream->ms, MediaStreamSendOnly);
+	MSMediaStreamIO io = MS_MEDIA_STREAM_IO_INITIALIZER;
+	io.input.type = MSResourceCamera;
+	io.output.type = MSResourceVoid;
+	MSWebCam *nowebcam = ms_web_cam_manager_get_cam(f->wbcmanager, "StaticImage: Static picture");
+	io.input.camera = nowebcam;
+	RtpProfile *prof = rtp_profile_new("dummy video");
+	PayloadType *pt = payload_type_clone(&payload_type_vp8);
+	pt->clock_rate = 90000;
+	rtp_profile_set_payload(prof, 95, pt);
+	video_stream_start_from_io(stream, prof, "127.0.0.1",65004, "127.0.0.1", 65005, 95, &io);
+	obj->ep = ms_video_endpoint_get_from_stream(stream, FALSE);
+
+	ms_message("add static image to pin %i", obj->mixer->desc->ninputs-1);
+	// add point to conference
+	obj->ep->conference = obj;
+	obj->ep->pin = obj->mixer->desc->ninputs-1;
+	if (obj->ep->mixer_in.filter){
+		ms_filter_link(obj->ep->mixer_in.filter,obj->ep->mixer_in.pin,obj->mixer,obj->ep->pin);
+	}
+	MSVideoSwitcherPinControl pc;
+	pc.pin = obj->ep->pin;
+	pc.enabled = !obj->ep->is_remote;
+	ms_filter_call_method(obj->mixer, MS_VIDEO_SWITCHER_SET_AS_LOCAL_MEMBER, &pc);
+	video_stream_set_encoder_control_callback(obj->ep->st, ms_video_conference_process_encoder_control, obj->ep);
+	obj->mixer->staticPin = TRUE;
+	ms_ticker_attach(obj->ticker,obj->mixer);
+}
+
 void ms_video_conference_add_member(MSVideoConference *obj, MSVideoEndpoint *ep){
 	/* now connect to the mixer */
 	ep->conference=obj;
-	if (obj->members!=NULL) ms_ticker_detach(obj->ticker,obj->mixer);
+	if (obj->mixer->staticPin || obj->members!=NULL) {
+		ms_ticker_detach(obj->ticker,obj->mixer);
+		obj->mixer->staticPin = FALSE;
+	}
 	plumb_to_conf(ep);
 	video_stream_set_encoder_control_callback(ep->st, ms_video_conference_process_encoder_control, ep);
 	ms_ticker_attach(obj->ticker,obj->mixer);
@@ -274,10 +312,24 @@ void ms_video_conference_remove_member(MSVideoConference *obj, MSVideoEndpoint *
 	ep->conference=NULL;
 	obj->members=bctbx_list_remove(obj->members,ep);
 	if (obj->members!=NULL) ms_ticker_attach(obj->ticker,obj->mixer);
+
+	if (obj->members == NULL) {
+		ms_message("remove static image pin");
+		video_stream_set_encoder_control_callback(obj->ep->st, NULL, NULL);
+		if (obj->ep->mixer_in.filter){
+			ms_filter_unlink(obj->ep->mixer_in.filter,obj->ep->mixer_in.pin,obj->mixer,obj->ep->pin);
+		}
+		obj->ep =  NULL;
+	}
 }
 
 void ms_video_conference_set_focus(MSVideoConference *obj, MSVideoEndpoint *ep){
 	ms_filter_call_method(obj->mixer, MS_VIDEO_SWITCHER_SET_FOCUS, &ep->pin);
+}
+
+void ms_video_conference_set_static_focus(MSVideoConference *obj) {
+	int pin = obj->mixer->desc->ninputs-1;
+	ms_filter_call_method(obj->mixer, MS_VIDEO_SWITCHER_SET_FOCUS, &pin);
 }
 
 static void ms_video_conference_apply_new_bitrate_request(MSVideoConference *obj){

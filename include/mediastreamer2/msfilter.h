@@ -193,6 +193,7 @@ struct _MSFilter{
 	MSFilterStats *stats;
 	int postponed_task; /*number of postponed tasks*/
 	bool_t seen;
+	bool_t staticPin;
 };
 
 
