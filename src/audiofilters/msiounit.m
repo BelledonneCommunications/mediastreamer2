@@ -27,6 +27,7 @@
 #import "mediastreamer2/mssndcard.h"
 #import "mediastreamer2/msfilter.h"
 #import "mediastreamer2/msticker.h"
+#include <bctoolbox/param_string.h>
 
 static const int flowControlInterval = 5000; // ms
 static const int flowControlThreshold = 40; // ms
@@ -78,19 +79,19 @@ static const char *audio_unit_format_error (OSStatus error) {
 }
 
 #define check_au_session_result(au,method) \
-if (au!=AVAudioSessionErrorInsufficientPriority && au!=0) ms_error("AudioSession error for %s: ret=%i (%s:%d)",method, au, __FILE__, __LINE__ )
+if (au!=AVAudioSessionErrorInsufficientPriority && au!=0) ms_error("AudioSession error for %s: ret=%i (%s:%d)",method, au, __FILE__, __LINE__)
 
 #define check_au_unit_result(au,method) \
-if (au!=0) ms_error("AudioUnit error for %s: ret=%s (%li) (%s:%d)",method, audio_unit_format_error(au), (long)au, __FILE__, __LINE__ )
+if (au!=0) ms_error("AudioUnit error for %s: ret=%s (%li) (%s:%d)",method, audio_unit_format_error(au), (long)au, __FILE__, __LINE__)
 
 #define check_session_call(call)   do { OSStatus res = (call); check_au_session_result(res, #call); } while(0)
 #define check_audiounit_call(call) do { OSStatus res = (call); check_au_unit_result(res, #call); } while(0)
 
-static const char* AU_CARD_RECEIVER = "Audio Unit Receiver";
-static const char* AU_CARD_NOVOICEPROC = "Audio Unit NoVoiceProc";
-static const char* AU_CARD_FAST_IOUNIT = "Audio Unit Fast Receiver"; // Same as AU_CARD_RECEIVER but whiout audio session handling which are delegated to the application
-static const char* AU_CARD_SPEAKER = "Audio Unit Speaker";
-static const char* AU_CARD_TESTER = "Audio Unit Tester";
+static const char * SCM_PARAM_FAST = "FAST";
+static const char * SCM_PARAM_NOVOICEPROC = "NOVOICEPROC";
+static const char * SCM_PARAM_TESTER = "TESTER";
+static const char * SCM_PARAM_RINGER = "RINGER";
+static const char* SPEAKER_CARD_NAME = "Speaker";
 
 static MSFilter *ms_au_read_new(MSSndCard *card);
 static MSFilter *ms_au_write_new(MSSndCard *card);
@@ -105,31 +106,41 @@ typedef enum _MSAudioUnitState{
 	MSAudioUnitStarted
 } MSAudioUnitState;
 
-typedef struct au_card {
-	AudioUnit	audio_unit;
-	MSAudioUnitState audio_unit_state;
-	ms_mutex_t	mutex;
-	unsigned int	rate;
-	unsigned int	bits;
-	unsigned int	nchannels;
-	uint64_t last_failed_iounit_start_time;
-	au_filter_read_data_t* read_filter_data;
-	au_filter_write_data_t* write_filter_data;
-	MSSndCard* ms_snd_card;
-	bool_t is_ringer;
-	bool_t is_fast;
-	bool_t is_tester;
-	bool_t audio_session_configured;
-	bool_t read_started;
-	bool_t write_started;
-	bool_t will_be_used;
-	bool_t audio_session_activated;
-	bool_t callkit_enabled;
-	bool_t mic_enabled;
-} au_card_t;
+@interface AudioUnitHolder : NSObject
+
+@property AudioUnit	audio_unit;
+@property MSAudioUnitState audio_unit_state;
+@property unsigned int	rate;
+@property unsigned int	bits;
+@property unsigned int	nchannels;
+@property uint64_t last_failed_iounit_start_time;
+@property au_filter_read_data_t* read_filter_data;
+@property au_filter_write_data_t* write_filter_data;
+@property MSSndCard* ms_snd_card;
+@property bool_t audio_session_configured;
+@property bool_t read_started;
+@property bool_t write_started;
+@property bool_t will_be_used;
+@property bool_t audio_session_activated;
+@property bool_t callkit_enabled;
+@property bool_t mic_enabled;
+
++(AudioUnitHolder *)sharedInstance;
+- (id)init;
+-(void)create_audio_unit;
+-(void)configure_audio_unit;
+-(bool_t)start_audio_unit:(uint64_t) time;
+-(void)stop_audio_unit_with_param:(bool_t) isConfigured;
+-(void)stop_audio_unit;
+-(void)destroy_audio_unit;
+-(void)mutex_lock;
+-(void)mutex_unlock;
+
+-(void) check_audio_unit_is_up;
+-(void) configure_audio_session;
+@end
 
 typedef struct au_filter_base {
-	au_card_t* card;
 	int muted;
 } au_filter_base_t;
 
@@ -149,13 +160,7 @@ struct au_filter_write_data{
 	MSFlowControlledBufferizer *bufferizer;
 	unsigned int n_lost_frame;
 };
-
-static void create_audio_unit(au_card_t *d);
-static void configure_audio_unit(au_card_t *d);
-
-static bool_t start_audio_unit(au_card_t* card, uint64_t time);
-static void stop_audio_unit(au_card_t *d);
-
+ 
 /*
  mediastreamer2 function
  */
@@ -176,7 +181,7 @@ static OSStatus au_render_cb (
 							  UInt32                      inNumberFrames,
 							  AudioBufferList             *ioData
 							  );
-
+	
 static OSStatus au_read_cb (
 							  void                        *inRefCon,
 							  AudioUnitRenderActionFlags  *ioActionFlags,
@@ -198,15 +203,44 @@ static OSStatus au_write_cb (
 /**
  * AudioUnit helper functions, to associate the AudioUnit with the MSSndCard object used by mediastreamer2.
  */
- 
-static void create_audio_unit(au_card_t *card) {
+
+@implementation AudioUnitHolder
+
+ms_mutex_t mutex;
+
++ (AudioUnitHolder *)sharedInstance {
+	static AudioUnitHolder *sharedInstance = nil;
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+		sharedInstance = [[self alloc] init];
+	});
+	return sharedInstance;
+}
+
+- (id)init {
+	if (self = [super init]) {
+	 ms_debug("au_init");
+	 _bits=16;
+	 _rate=AVAudioSession.sharedInstance.sampleRate; /*not set*/
+	 _nchannels=1;
+	 _ms_snd_card=NULL;
+	 _will_be_used = FALSE;
+	 ms_mutex_init(&mutex,NULL);
+	 _mic_enabled = TRUE;
+	}
+	return self;
+}
+
+-(void)create_audio_unit {
 	AudioComponentDescription au_description;
 	AudioComponent foundComponent;
-	MSSndCard* sndcard = card->ms_snd_card;
 
-	if (card->audio_unit != NULL) return;
-	
-	bool_t noVoiceProc = (strcasecmp(sndcard->name, AU_CARD_NOVOICEPROC) == 0) || card->ms_snd_card->streamType == MS_SND_CARD_STREAM_MEDIA;
+	if (_audio_unit != NULL) return;
+	if (_ms_snd_card == NULL) {
+		ms_error("create_audio_unit(): not created because no associated ms_snd_card was found");
+		return;
+	}
+	bool_t noVoiceProc = bctbx_param_string_get_bool_value(_ms_snd_card->sndcardmanager->paramString, SCM_PARAM_NOVOICEPROC) || _ms_snd_card->streamType == MS_SND_CARD_STREAM_MEDIA;
 	OSType subtype = noVoiceProc ? kAudioUnitSubType_RemoteIO : kAudioUnitSubType_VoiceProcessingIO;
 
 	au_description.componentType          = kAudioUnitType_Output;
@@ -217,32 +251,33 @@ static void create_audio_unit(au_card_t *card) {
 
 	foundComponent = AudioComponentFindNext (NULL,&au_description);
 
-	check_audiounit_call( AudioComponentInstanceNew(foundComponent, &card->audio_unit) );
+	check_audiounit_call( AudioComponentInstanceNew(foundComponent, &_audio_unit) );
 
 	//Always configure readcb
 	AURenderCallbackStruct renderCallbackStruct;
 	renderCallbackStruct.inputProc       = au_read_cb;
-	renderCallbackStruct.inputProcRefCon = card;
+	//renderCallbackStruct.inputProcRefCon = au_holder;
 	check_audiounit_call(AudioUnitSetProperty (
-								   card->audio_unit,
-								   kAudioOutputUnitProperty_SetInputCallback,
-								   kAudioUnitScope_Input,
-								   outputBus,
-								   &renderCallbackStruct,
-								   sizeof (renderCallbackStruct)
-								   ));
+											   _audio_unit,
+											   kAudioOutputUnitProperty_SetInputCallback,
+											   kAudioUnitScope_Input,
+											   outputBus,
+											   &renderCallbackStruct,
+											   sizeof (renderCallbackStruct)
+											   ));
 
-	if (card->audio_unit) {
+	if (_audio_unit) {
 		ms_message("AudioUnit created with type %s.", subtype==kAudioUnitSubType_RemoteIO ? "kAudioUnitSubType_RemoteIO" : "kAudioUnitSubType_VoiceProcessingIO" );
-		card->audio_unit_state = MSAudioUnitCreated;
+		_audio_unit_state =MSAudioUnitCreated;
 	}
+	return;
 }
 
-static void configure_audio_unit(au_card_t *card){
+-(void)configure_audio_unit {
 	OSStatus auresult;
 	
-	if (card->audio_unit_state != MSAudioUnitCreated){
-		ms_error("configure_audio_unit(): not created, in state %i", card->audio_unit_state);
+	if (_audio_unit_state != MSAudioUnitCreated){
+		ms_error("configure_audio_unit(): not created, in state %i", _audio_unit_state);
 		return;
 	}
 	uint64_t time_start, time_end;
@@ -252,21 +287,21 @@ static void configure_audio_unit(au_card_t *card){
 	
 	AudioStreamBasicDescription audioFormat;
 	/*card sampling rate is fixed at that time*/
-	audioFormat.mSampleRate			= card->rate;
+	audioFormat.mSampleRate			= _rate;
 	audioFormat.mFormatID			= kAudioFormatLinearPCM;
 	audioFormat.mFormatFlags		= kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
 	audioFormat.mFramesPerPacket	= 1;
-	audioFormat.mChannelsPerFrame	= card->nchannels;
-	audioFormat.mBitsPerChannel		= card->bits;
-	audioFormat.mBytesPerPacket		= card->bits / 8;
-	audioFormat.mBytesPerFrame		= card->nchannels * card->bits / 8;
+	audioFormat.mChannelsPerFrame	= _nchannels;
+	audioFormat.mBitsPerChannel		= _bits;
+	audioFormat.mBytesPerPacket		= _bits / 8;
+	audioFormat.mBytesPerFrame		= _nchannels * _bits / 8;
 
 	UInt32 doNotSetProperty    = 0;
 	UInt32 doSetProperty    = 1;
 
 	//enable speaker output
 	auresult =AudioUnitSetProperty (
-									card->audio_unit,
+									_audio_unit,
 									kAudioOutputUnitProperty_EnableIO,
 									kAudioUnitScope_Output ,
 									outputBus,
@@ -277,17 +312,17 @@ static void configure_audio_unit(au_card_t *card){
 
 	/*enable mic for scheduling render call back, why ?*/
 	auresult=AudioUnitSetProperty (/*enable mic input*/
-								   card->audio_unit,
+								   _audio_unit,
 								   kAudioOutputUnitProperty_EnableIO,
 								   kAudioUnitScope_Input ,
 								   inputBus,
-								   (card->mic_enabled) ? &doSetProperty : &doNotSetProperty,
-								   sizeof ((card->mic_enabled) ? doSetProperty : doNotSetProperty)
+								   _mic_enabled ? &doSetProperty : &doNotSetProperty,
+								   sizeof (_mic_enabled ? doSetProperty : doNotSetProperty)
 								   );
-    
+	
 	check_au_unit_result(auresult,"kAudioOutputUnitProperty_EnableIO,kAudioUnitScope_Input");
 	auresult=AudioUnitSetProperty (
-								   card->audio_unit,
+								   _audio_unit,
 								   kAudioUnitProperty_StreamFormat,
 								   kAudioUnitScope_Output,
 								   inputBus,
@@ -296,10 +331,10 @@ static void configure_audio_unit(au_card_t *card){
 								   );
 	check_au_unit_result(auresult,"kAudioUnitProperty_StreamFormat,kAudioUnitScope_Output");
 	/*end of: enable mic for scheduling render call back, why ?*/
-    
+	
 	//setup stream format
 	auresult=AudioUnitSetProperty (
-								   card->audio_unit,
+								   _audio_unit,
 								   kAudioUnitProperty_StreamFormat,
 								   kAudioUnitScope_Input,
 								   outputBus,
@@ -310,7 +345,7 @@ static void configure_audio_unit(au_card_t *card){
 
 	//disable unit buffer allocation
 	auresult=AudioUnitSetProperty (
-								   card->audio_unit,
+								   _audio_unit,
 								   kAudioUnitProperty_ShouldAllocateBuffer,
 								   kAudioUnitScope_Output,
 								   outputBus,
@@ -320,10 +355,10 @@ static void configure_audio_unit(au_card_t *card){
 	check_au_unit_result(auresult,"kAudioUnitProperty_ShouldAllocateBuffer,kAudioUnitScope_Output");
 	AURenderCallbackStruct renderCallbackStruct;
 	renderCallbackStruct.inputProc       = au_write_cb;
-	renderCallbackStruct.inputProcRefCon = card;
+	//renderCallbackStruct.inputProcRefCon = au_holder;
 
 	auresult=AudioUnitSetProperty (
-								   card->audio_unit,
+								   _audio_unit,
 								   kAudioUnitProperty_SetRenderCallback,
 								   kAudioUnitScope_Input,
 								   outputBus,
@@ -333,25 +368,26 @@ static void configure_audio_unit(au_card_t *card){
 	check_au_unit_result(auresult,"kAudioUnitProperty_SetRenderCallback,kAudioUnitScope_Input");
 	time_end = ortp_get_cur_time_ms();
 	ms_message("configure_audio_unit() took %i ms.", (int)(time_end - time_start));
-	card->audio_unit_state = MSAudioUnitConfigured;
+	_audio_unit_state=MSAudioUnitConfigured;
 }
 
-static bool_t start_audio_unit (au_card_t* card, uint64_t time) {
-	if (card->audio_unit_state != MSAudioUnitConfigured){
-		ms_error("start_audio_unit(): state is %i", card->audio_unit_state);
+-(bool_t)start_audio_unit: (uint64_t) time {
+	
+	if (_audio_unit_state != MSAudioUnitConfigured){
+		ms_error("start_audio_unit(): state is %i", _audio_unit_state);
 		return FALSE;
 	}
 	uint64_t time_start, time_end;
 	
 	
-	if (card->last_failed_iounit_start_time == 0 || (time - card->last_failed_iounit_start_time)>100) {
+	if (_last_failed_iounit_start_time == 0 || (time - _last_failed_iounit_start_time)>100) {
 		time_start = ortp_get_cur_time_ms();
 		ms_message("start_audio_unit(): about to start audio unit.");
-		check_audiounit_call(AudioUnitInitialize(card->audio_unit));
+		check_audiounit_call(AudioUnitInitialize(_audio_unit));
 		
 		Float64 delay;
 		UInt32 delaySize = sizeof(delay);
-		check_audiounit_call(AudioUnitGetProperty(card->audio_unit
+		check_audiounit_call(AudioUnitGetProperty(_audio_unit
 									  ,kAudioUnitProperty_Latency
 									  , kAudioUnitScope_Global
 									  , 0
@@ -360,7 +396,7 @@ static bool_t start_audio_unit (au_card_t* card, uint64_t time) {
 
 		UInt32 quality;
 		UInt32 qualitySize = sizeof(quality);
-		check_audiounit_call(AudioUnitGetProperty(card->audio_unit
+		check_audiounit_call(AudioUnitGetProperty(_audio_unit
 									  ,kAudioUnitProperty_RenderQuality
 									  , kAudioUnitScope_Global
 									  , 0
@@ -377,290 +413,88 @@ static bool_t start_audio_unit (au_card_t* card, uint64_t time) {
 		Float64 hwsamplerate = audioSession.sampleRate;
 
 		OSStatus auresult;
-		check_audiounit_call( (auresult = AudioOutputUnitStart(card->audio_unit)) );
+		check_audiounit_call( (auresult = AudioOutputUnitStart(_audio_unit)) );
 		if (auresult == 0){
-			card->audio_unit_state = MSAudioUnitStarted;
+			_audio_unit_state = MSAudioUnitStarted;
 		}
-		if (card->audio_unit_state != MSAudioUnitStarted) {
+		if (_audio_unit_state != MSAudioUnitStarted) {
 			ms_message("AudioUnit could not be started, current hw output latency [%f] input [%f] iobuf[%f] hw sample rate [%f]",hwoutputlatency,hwinputlatency,hwiobuf,hwsamplerate);
-			card->last_failed_iounit_start_time=time;
+			_last_failed_iounit_start_time = time;
 		} else {
 			ms_message("AudioUnit started, current hw output latency [%f] input [%f] iobuf[%f] hw sample rate [%f]",hwoutputlatency,hwinputlatency,hwiobuf,hwsamplerate);
-			card->last_failed_iounit_start_time=0;
+			_last_failed_iounit_start_time = 0;
 		}
 		time_end = ortp_get_cur_time_ms();
 		ms_message("start_audio_unit() took %i ms.", (int)(time_end - time_start));
 	}
-	return card->audio_unit_state == MSAudioUnitStarted;
+	return (_audio_unit_state == MSAudioUnitStarted);
 }
 
-static void stop_audio_unit_with_param (au_card_t* d, bool_t isConfigured) {
-	if (d->audio_unit_state == MSAudioUnitStarted) {
-		check_audiounit_call( AudioOutputUnitStop(d->audio_unit) );
+-(void)stop_audio_unit_with_param: (bool_t) isConfigured {
+	if (_audio_unit_state == MSAudioUnitStarted) {
+		check_audiounit_call( AudioOutputUnitStop(_audio_unit) );
 		ms_message("AudioUnit stopped");
-		d->audio_session_configured=isConfigured;
-		check_audiounit_call( AudioUnitUninitialize(d->audio_unit) );
-		d->audio_unit_state = MSAudioUnitCreated;
+		_audio_session_configured = isConfigured;
+		check_audiounit_call( AudioUnitUninitialize(_audio_unit) );
+		_audio_unit_state = MSAudioUnitCreated;
 	}
 }
 
-static void stop_audio_unit (au_card_t* d) {
-	stop_audio_unit_with_param(d, FALSE);
+-(void)stop_audio_unit {
+	[self stop_audio_unit_with_param:FALSE];
 }
 
-static void destroy_audio_unit (au_card_t* d) {
-	stop_audio_unit(d);
-	if (d->audio_unit) {
-		AudioComponentInstanceDispose (d->audio_unit);
-		d->audio_unit = NULL;
-		if (!d->is_fast) {
+-(void)destroy_audio_unit {
+	[self stop_audio_unit];
+	
+	if (_audio_unit) {
+		AudioComponentInstanceDispose (_audio_unit);
+		_audio_unit = NULL;
+		
+		if ( !bctbx_param_string_get_bool_value(_ms_snd_card->sndcardmanager->paramString, SCM_PARAM_FAST) ) {
 			NSError *err = nil;;
 			[[AVAudioSession sharedInstance] setActive:FALSE withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:&err];
 			if(err) ms_error("Unable to activate audio session because : %s", [err localizedDescription].UTF8String);
 			err = nil;
 		}
 		ms_message("AudioUnit destroyed");
-		d->audio_unit_state = MSAudioUnitNotCreated;
+		_audio_unit_state = MSAudioUnitNotCreated;
 	}
 }
 
-/* the interruption listener is not reliable, it can be overriden by other parts of the application */
-/* as a result, we do nothing with it*/
-static void au_interruption_listener (void *inClientData, UInt32 inInterruptionState) {}
-
-static void au_init(MSSndCard *card){
-	ms_debug("au_init");
-	au_card_t *d=ms_new0(au_card_t,1);
-
-	if (strcmp(card->name,AU_CARD_SPEAKER)==0) {
-		d->is_ringer=TRUE;
-	} else if (strcmp(card->name,AU_CARD_FAST_IOUNIT)==0) {
-		d->is_fast=TRUE;
-	} else if( strcmp(card->name,AU_CARD_TESTER)==0){
-		d->is_tester=TRUE;
-	}
-	d->bits=16;
-	d->rate=AVAudioSession.sharedInstance.sampleRate; /*not set*/
-	d->nchannels=1;
-	d->ms_snd_card=card;
-	d->will_be_used = FALSE;
-	card->preferred_sample_rate=44100;
-	card->capabilities|=MS_SND_CARD_CAP_BUILTIN_ECHO_CANCELLER|MS_SND_CARD_CAP_IS_SLOW;
-	ms_mutex_init(&d->mutex,NULL);
-	card->data=d;
-	d->mic_enabled = TRUE;
+-(void)mutex_lock {
+	ms_mutex_lock(&mutex);
+}
+-(void)mutex_unlock {
+	ms_mutex_unlock(&mutex);
 }
 
-static void au_uninit(MSSndCard *card){
-	au_card_t *d=(au_card_t*)card->data;
-	stop_audio_unit(d);
-	destroy_audio_unit(d);
-	ms_mutex_destroy(&d->mutex);
-	ms_free(d);
-	card->data = NULL;
-}
-
-static void check_unused(au_card_t *card){
-	if (card->read_filter_data || card->write_filter_data)
-		return;
-
-	if (card->is_tester || !card->will_be_used){
-		stop_audio_unit(card);
-		destroy_audio_unit(card);
-	}
-}
-
-static void au_usage_hint(MSSndCard *card, bool_t used){
-	au_card_t *d = (au_card_t*)card->data;
-	if (!d)
-		return;
-
-	d->will_be_used = used;
-	check_unused(d);
-}
-
-static void au_detect(MSSndCardManager *m);
-static MSSndCard *au_duplicate(MSSndCard *obj);
-
-static void au_audio_session_activated(MSSndCard *obj, bool_t actived) {
-	au_card_t *d = (au_card_t*)obj->data;
-	d->audio_session_activated = actived;
-	if (actived && d->audio_unit_state == MSAudioUnitConfigured){
-		dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH,0), ^{
-				start_audio_unit(d, 0);});
-	}else if (!actived && d->audio_unit_state == MSAudioUnitStarted) {
-		stop_audio_unit_with_param(d, TRUE);
-		configure_audio_unit(d);
-	}
-}
-
-static void au_callkit_enabled(MSSndCard *obj, bool_t enabled) {
-	au_card_t *d = (au_card_t*)obj->data;
-	d->callkit_enabled = enabled;
-	if (!enabled || TARGET_IPHONE_SIMULATOR) {
-		// There is only callKit can notify audio session is activated or not.
-		// So set audio session always activated when callkit is disabled.
-		d->audio_session_activated = true;
-	}
-}
-
-MSSndCardDesc au_card_desc={
-.driver_type="AU",
-.detect=au_detect,
-.init=au_init,
-.set_level=au_set_level,
-.get_level=au_get_level,
-.set_capture=au_set_source,
-.set_control=NULL,
-.get_control=NULL,
-.create_reader=ms_au_read_new,
-.create_writer=ms_au_write_new,
-.uninit=au_uninit,
-.duplicate=au_duplicate,
-.usage_hint=au_usage_hint,
-.audio_session_activated=au_audio_session_activated,
-.callkit_enabled=au_callkit_enabled
-};
-
-static MSSndCard *au_duplicate(MSSndCard *obj){
-	MSSndCard *card=ms_snd_card_new_with_name(&au_card_desc,obj->name);
-	return card;
-}
-
-static MSSndCard *au_card_new(const char* name){
-	MSSndCard *card=ms_snd_card_new_with_name(&au_card_desc,name);
-	return card;
-}
-
-static void au_detect(MSSndCardManager *m){
-	ms_debug("au_detect");
-	MSSndCard *card=au_card_new(AU_CARD_RECEIVER);
-	ms_snd_card_manager_add_card(m,card);
-	card=au_card_new(AU_CARD_FAST_IOUNIT);
-	ms_snd_card_manager_add_card(m,card);
-	card = au_card_new(AU_CARD_NOVOICEPROC);
-	ms_snd_card_manager_add_card(m,card);
-	card = au_card_new(AU_CARD_TESTER);
-	ms_snd_card_manager_add_card(m,card);
-}
-
-/********************write cb only used for write operation******************/
-static OSStatus au_read_cb (
-							  void                        *inRefCon,
-							  AudioUnitRenderActionFlags  *ioActionFlags,
-							  const AudioTimeStamp        *inTimeStamp,
-							  UInt32                      inBusNumber,
-							  UInt32                      inNumberFrames,
-							  AudioBufferList             *ioData
-)
-{
-	au_card_t* card = (au_card_t*)inRefCon;
-	ms_mutex_lock(&card->mutex);
-	if (!card->read_filter_data) {
-		//just return from now;
-		ms_mutex_unlock(&card->mutex);
-		return 0;
-	}
-	au_filter_read_data_t *d = card->read_filter_data;
-	if (d->readTimeStamp.mSampleTime <0) {
-		d->readTimeStamp=*inTimeStamp;
-	}
-	OSStatus err=0;
-	mblk_t * rm=NULL;
-	AudioBufferList readAudioBufferList;
-	readAudioBufferList.mBuffers[0].mDataByteSize=inNumberFrames*d->base.card->bits/8;
-	readAudioBufferList.mNumberBuffers=1;
-	readAudioBufferList.mBuffers[0].mNumberChannels=d->base.card->nchannels;
-
-	if (d->base.card->read_started) {
-		rm=allocb(readAudioBufferList.mBuffers[0].mDataByteSize,0);
-		readAudioBufferList.mBuffers[0].mData=rm->b_wptr;
-		err = AudioUnitRender(d->base.card->audio_unit, ioActionFlags, &d->readTimeStamp, inBusNumber,inNumberFrames, &readAudioBufferList);
-		if (err == 0) {
-			rm->b_wptr += readAudioBufferList.mBuffers[0].mDataByteSize;
-			ms_mutex_lock(&d->mutex);
-			putq(&d->rq,rm);
-			ms_mutex_unlock(&d->mutex);
-			d->readTimeStamp.mSampleTime+=readAudioBufferList.mBuffers[0].mDataByteSize/(d->base.card->bits/2);
-		} else {
-			check_au_unit_result(err, "AudioUnitRender");
-			freeb(rm);
-		}
-	}
-	ms_mutex_unlock(&card->mutex);
-	return err;
-}
-
-static OSStatus au_write_cb (
-							  void                        *inRefCon,
-							  AudioUnitRenderActionFlags  *ioActionFlags,
-							  const AudioTimeStamp        *inTimeStamp,
-							  UInt32                      inBusNumber,
-							  UInt32                      inNumberFrames,
-							  AudioBufferList             *ioData
-							 ) {
-	ms_debug("render cb");
-	au_card_t* card = (au_card_t*)inRefCon;
-	
-	ioData->mBuffers[0].mDataByteSize=inNumberFrames*card->bits/8;
-	ioData->mNumberBuffers=1;
-	
-	ms_mutex_lock(&card->mutex);
-	if( !card->write_filter_data ){
-		ms_mutex_unlock(&card->mutex);
-		memset(ioData->mBuffers[0].mData, 0,ioData->mBuffers[0].mDataByteSize);
-		return 0;
-	}
-	
-
-	au_filter_write_data_t *d=card->write_filter_data;
-
-	if (d!=NULL){
-		unsigned int size;
-		ms_mutex_lock(&d->mutex);
-		size = inNumberFrames*d->base.card->bits/8;
-		if (ms_flow_controlled_bufferizer_get_avail(d->bufferizer) >= size) {
-			ms_flow_controlled_bufferizer_read(d->bufferizer, ioData->mBuffers[0].mData, size);
-		} else {
-			//writing silence;
-			memset(ioData->mBuffers[0].mData, 0,ioData->mBuffers[0].mDataByteSize);
-			ms_debug("nothing to write, pushing silences,  framezize is %u bytes mDataByteSize %u"
-					 ,inNumberFrames*card->bits/8
-					 ,(unsigned int)ioData->mBuffers[0].mDataByteSize);
-		}
-		ms_mutex_unlock(&d->mutex);
-	}
-	ms_mutex_unlock(&card->mutex);
-	return 0;
-}
-
-/****************config**************/
-static void configure_audio_session(au_card_t* d) {
+-(void) configure_audio_session {
 	NSError *err = nil;;
 	//UInt32 audioCategorySize=sizeof(audioCategory);
 	AVAudioSession *audioSession = [AVAudioSession sharedInstance];
 
-	if (d->audio_unit_state == MSAudioUnitStarted){
+		if (_audio_unit_state == MSAudioUnitStarted){
 		ms_message("configure_audio_session(): AudioUnit is already started, skipping this process.");
 		return;
 	}
-	
-	if (!d->is_fast){
+
+	if ( !bctbx_param_string_get_bool_value(_ms_snd_card->sndcardmanager->paramString, SCM_PARAM_FAST) ) {
 		/*check that category wasn't changed*/
 		NSString *currentCategory = audioSession.category;
 		NSString *newCategory = AVAudioSessionCategoryPlayAndRecord;
 		
-		if (d->ms_snd_card->streamType == MS_SND_CARD_STREAM_MEDIA){
+		if (_ms_snd_card->streamType == MS_SND_CARD_STREAM_MEDIA){
 			newCategory = AVAudioSessionCategoryPlayback;
-		}else if (d->is_ringer){
+		}else if (bctbx_param_string_get_bool_value(_ms_snd_card->sndcardmanager->paramString, SCM_PARAM_RINGER) ){
 			newCategory = AVAudioSessionCategoryAmbient;
 		}
 
 		if (currentCategory != newCategory){
-			d->audio_session_configured = FALSE;
+			_audio_session_configured = FALSE;
 		}
 
-		if (!d->audio_session_configured) {
+		if (!_audio_session_configured) {
 			uint64_t time_start, time_end;
 			
 			time_start = ortp_get_cur_time_ms();
@@ -679,10 +513,10 @@ static void configure_audio_session(au_card_t* d) {
 				}
 			} else {
 				ms_message("Configuring audio session for playback/record");
-    	
+		
 				[audioSession   setCategory:AVAudioSessionCategoryPlayAndRecord
 						withOptions:AVAudioSessionCategoryOptionAllowBluetooth| AVAudioSessionCategoryOptionAllowBluetoothA2DP
-						      error:&err];
+							  error:&err];
 				if (err) {
 					ms_error("Unable to change audio category because : %s", [err localizedDescription].UTF8String);
 					err = nil;
@@ -728,7 +562,7 @@ static void configure_audio_session(au_card_t* d) {
 			}
 			time_end = ortp_get_cur_time_ms();
 			ms_message("MSAURead/MSAUWrite: configureAudioSession() took %i ms.", (int)(time_end - time_start));
-			d->audio_session_configured=TRUE;
+			_audio_session_configured = TRUE;
 		} else {
 			ms_message("Audio session already correctly configured.");
 		}
@@ -737,58 +571,272 @@ static void configure_audio_session(au_card_t* d) {
 		ms_message("Fast iounit mode, audio session configuration must be done at application level.");
 	}
 	/*now that the AudioSession is configured, take the audioSession's sampleRate*/
-	d->rate = (int)[audioSession sampleRate];
-	ms_message("MSAURead/MSAUWrite: AVAudioSession is configured at sample rate %i.", d->rate);
+	_rate = (int)[audioSession sampleRate];
+	ms_message("MSAURead/MSAUWrite: AVAudioSession is configured at sample rate %i.", _rate);
 }
 
 
-static void check_audio_unit_is_up(au_card_t *card){
-	configure_audio_session(card);
-	if (card->audio_unit_state == MSAudioUnitNotCreated){
-		create_audio_unit(card);
+-(void) check_audio_unit_is_up {
+	[self configure_audio_session];
+	if (_audio_unit_state == MSAudioUnitNotCreated){
+		[self create_audio_unit];
 	}
-	if (card->audio_unit_state == MSAudioUnitCreated){
-		configure_audio_unit(card);
+	if (_audio_unit_state == MSAudioUnitCreated){
+		[self configure_audio_unit];
 	}
-	if (card->audio_session_activated && card->audio_unit_state == MSAudioUnitConfigured){
-		start_audio_unit(card, 0);
+	if (_audio_session_activated && _audio_unit_state == MSAudioUnitConfigured){
+		[self start_audio_unit:0];
 	}
-	if (card->audio_unit_state == MSAudioUnitStarted){
+	if (_audio_unit_state == MSAudioUnitStarted){
 		ms_message("check_audio_unit_is_up(): audio unit is started.");
 	}
 }
+@end
+
+/* the interruption listener is not reliable, it can be overriden by other parts of the application */
+/* as a result, we do nothing with it*/
+static void au_interruption_listener (void *inClientData, UInt32 inInterruptionState) {}
+
+static void au_init(MSSndCard *card){
+	ms_debug("au_init");
+	card->preferred_sample_rate=44100;
+	card->capabilities|=MS_SND_CARD_CAP_BUILTIN_ECHO_CANCELLER|MS_SND_CARD_CAP_IS_SLOW;
+}
+
+static void au_uninit(MSSndCard *card){
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
+	if ([au_holder ms_snd_card] == card)
+	{
+		[au_holder stop_audio_unit];
+		[au_holder destroy_audio_unit];
+	}
+}
+
+static void check_unused(){
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
+	if ([au_holder read_filter_data] || [au_holder write_filter_data])
+		return;
+	
+	if ( ([au_holder ms_snd_card] != NULL && bctbx_param_string_get_bool_value([au_holder ms_snd_card]->sndcardmanager->paramString, SCM_PARAM_TESTER)) || ![au_holder will_be_used] ) {
+		[au_holder stop_audio_unit];
+		[au_holder destroy_audio_unit];
+	}
+}
+
+static void au_usage_hint(MSSndCard *card, bool_t used){
+	[[AudioUnitHolder sharedInstance] setWill_be_used:used];
+	check_unused();
+}
+
+static void au_detect(MSSndCardManager *m);
+static MSSndCard *au_duplicate(MSSndCard *obj);
+
+static void au_audio_session_activated(MSSndCard *obj, bool_t actived) {
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
+	[au_holder setAudio_session_activated:actived];
+	if (actived && [au_holder audio_unit_state] == MSAudioUnitConfigured){
+		dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH,0), ^{
+			[[AudioUnitHolder sharedInstance] start_audio_unit:0];});
+	}else if (!actived && [au_holder audio_unit_state] == MSAudioUnitStarted) {
+		[au_holder stop_audio_unit_with_param:TRUE];
+		[au_holder  configure_audio_unit];
+	}
+}
+
+static void au_callkit_enabled(MSSndCard *obj, bool_t enabled) {
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
+	[au_holder setCallkit_enabled:enabled];
+	if (!enabled || TARGET_IPHONE_SIMULATOR) {
+		// There is only callKit can notify audio session is activated or not.
+		// So set audio session always activated when callkit is disabled.
+		[au_holder setAudio_session_activated:true];
+	}
+}
+
+MSSndCardDesc au_card_desc={
+.driver_type="AU",
+.detect=au_detect,
+.init=au_init,
+.set_level=au_set_level,
+.get_level=au_get_level,
+.set_capture=au_set_source,
+.set_control=NULL,
+.get_control=NULL,
+.create_reader=ms_au_read_new,
+.create_writer=ms_au_write_new,
+.uninit=au_uninit,
+.duplicate=au_duplicate,
+.usage_hint=au_usage_hint,
+.audio_session_activated=au_audio_session_activated,
+.callkit_enabled=au_callkit_enabled
+};
+
+static MSSndCard *au_duplicate(MSSndCard *obj){
+	MSSndCard *card=ms_snd_card_new_with_name(&au_card_desc,obj->name);
+	card->device_type = obj->device_type;
+	return card;
+}
+
+static MSSndCard *au_card_new(const char* name){
+	MSSndCard *card=ms_snd_card_new_with_name(&au_card_desc,name);
+	return card;
+}
+
+MSSndCardDeviceType deduceDeviceTypeFromInputAudioPortType(AVAudioSessionPort inputPort)
+{
+	if ([inputPort isEqualToString:(AVAudioSessionPortBuiltInMic)])
+	{
+		return MS_SND_CARD_DEVICE_TYPE_MICROPHONE;
+	}
+	else if ([inputPort isEqualToString:(AVAudioSessionPortBluetoothHFP)])
+	{
+		return MS_SND_CARD_DEVICE_TYPE_BLUETOOTH;
+	}
+	else if ([inputPort isEqualToString:(AVAudioSessionPortHeadsetMic)])
+	{
+		return MS_SND_CARD_DEVICE_TYPE_HEADPHONES;
+	}
+	
+	return MS_SND_CARD_DEVICE_TYPE_UNKNOWN;
+}
+
+static void au_detect(MSSndCardManager *m){
+	ms_debug("au_detect");
+	
+	NSArray *inputs = [[AVAudioSession sharedInstance] availableInputs];
+	
+	for (AVAudioSessionPortDescription *input in inputs) {
+		MSSndCard *card = au_card_new(ms_strdup_printf("%s", [input.portName UTF8String]));
+		card->device_type = deduceDeviceTypeFromInputAudioPortType(input.portType);
+		ms_snd_card_manager_add_card(m, card);
+		ms_message("au_detect, creating snd card %p", card);
+	}
+	
+	MSSndCard *speakerCard = au_card_new(SPEAKER_CARD_NAME);
+	speakerCard->device_type = MS_SND_CARD_DEVICE_TYPE_SPEAKER;
+	ms_snd_card_manager_add_card(m, speakerCard);
+	ms_message("au_detect -- speaker snd card %p", speakerCard);
+}
+
+/********************write cb only used for write operation******************/
+static OSStatus au_read_cb (
+							  void                        *inRefCon,
+							  AudioUnitRenderActionFlags  *ioActionFlags,
+							  const AudioTimeStamp        *inTimeStamp,
+							  UInt32                      inBusNumber,
+							  UInt32                      inNumberFrames,
+							  AudioBufferList             *ioData
+)
+{
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
+
+	[au_holder mutex_lock];
+	if (![au_holder read_filter_data]) {
+		//just return from now;
+		[au_holder mutex_unlock];
+		return 0;
+	}
+	au_filter_read_data_t *d = [au_holder read_filter_data];
+	if (d->readTimeStamp.mSampleTime <0) {
+		d->readTimeStamp=*inTimeStamp;
+	}
+	OSStatus err=0;
+	mblk_t * rm=NULL;
+	AudioBufferList readAudioBufferList;
+	readAudioBufferList.mBuffers[0].mDataByteSize=inNumberFrames * [au_holder bits]/8;
+	readAudioBufferList.mNumberBuffers=1;
+	readAudioBufferList.mBuffers[0].mNumberChannels= [au_holder nchannels];
+
+	if ([au_holder read_started]) {
+		rm=allocb(readAudioBufferList.mBuffers[0].mDataByteSize,0);
+		readAudioBufferList.mBuffers[0].mData=rm->b_wptr;
+		err = AudioUnitRender([au_holder audio_unit], ioActionFlags, &d->readTimeStamp, inBusNumber,inNumberFrames, &readAudioBufferList);
+		if (err == 0) {
+			rm->b_wptr += readAudioBufferList.mBuffers[0].mDataByteSize;
+			ms_mutex_lock(&d->mutex);
+			putq(&d->rq,rm);
+			ms_mutex_unlock(&d->mutex);
+			d->readTimeStamp.mSampleTime+=readAudioBufferList.mBuffers[0].mDataByteSize/([au_holder bits]/2);
+		} else {
+			check_au_unit_result(err, "AudioUnitRender");
+			freeb(rm);
+		}
+	}
+	[au_holder mutex_unlock];
+	return err;
+}
+
+static OSStatus au_write_cb (
+							  void                        *inRefCon,
+							  AudioUnitRenderActionFlags  *ioActionFlags,
+							  const AudioTimeStamp        *inTimeStamp,
+							  UInt32                      inBusNumber,
+							  UInt32                      inNumberFrames,
+							  AudioBufferList             *ioData
+							 ) {
+	ms_debug("render cb");
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
+	
+	ioData->mBuffers[0].mDataByteSize=inNumberFrames*[au_holder bits]/8;
+	ioData->mNumberBuffers=1;
+	
+	[au_holder mutex_lock];
+	au_filter_write_data_t *d = [au_holder write_filter_data];
+	if( d==NULL ){
+		[au_holder mutex_unlock];
+		memset(ioData->mBuffers[0].mData, 0,ioData->mBuffers[0].mDataByteSize);
+		return 0;
+	}
+
+	unsigned int size;
+	ms_mutex_lock(&d->mutex);
+	size = inNumberFrames*[au_holder bits]/8;
+	if (ms_flow_controlled_bufferizer_get_avail(d->bufferizer) >= size) {
+		ms_flow_controlled_bufferizer_read(d->bufferizer, ioData->mBuffers[0].mData, size);
+	} else {
+		//writing silence;
+		memset(ioData->mBuffers[0].mData, 0,ioData->mBuffers[0].mDataByteSize);
+		ms_debug("nothing to write, pushing silences,  framezize is %u bytes mDataByteSize %u"
+				 ,inNumberFrames * [au_holder bits]/8
+				 ,(unsigned int)ioData->mBuffers[0].mDataByteSize);
+	}
+	ms_mutex_unlock(&d->mutex);
+	[au_holder mutex_unlock];
+	return 0;
+}
+
 
 /***********************************read function********************/
 
 static void au_read_preprocess(MSFilter *f){
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
 	au_filter_read_data_t *d= (au_filter_read_data_t*)f->data;
-	au_card_t* card=d->base.card;
 
-	check_audio_unit_is_up(card);
+	[au_holder check_audio_unit_is_up];
 	d->ticker_synchronizer = ms_ticker_synchronizer_new();
 	ms_ticker_set_synchronizer(f->ticker, d->ticker_synchronizer);
-	d->base.card->read_started = TRUE;
+	[au_holder setRead_started:TRUE];
 }
 
 static void au_read_process(MSFilter *f){
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
 	au_filter_read_data_t *d=(au_filter_read_data_t*)f->data;
 	mblk_t *m;
 
-	bool_t read_something = FALSE;
-	
+	//bool_t read_something = FALSE; (never used, commented)
 	/*
 	If audio unit is not started, it means audsion session is not yet activated. Do not ms_ticker_synchronizer_update.
 	*/
-	if (d->base.card->audio_unit_state != MSAudioUnitStarted) return;
+	if ([au_holder audio_unit_state] != MSAudioUnitStarted) return;
 
 	ms_mutex_lock(&d->mutex);
 	while((m = getq(&d->rq)) != NULL){
-		d->read_samples += (msgdsize(m) / 2) / d->base.card->nchannels;
+		d->read_samples += (msgdsize(m) / 2) / [au_holder nchannels];
 		ms_queue_put(f->outputs[0],m);
 	}
 	ms_mutex_unlock(&d->mutex);
 
-	ms_ticker_synchronizer_update(d->ticker_synchronizer, d->read_samples, d->base.card->rate);
+	ms_ticker_synchronizer_update(d->ticker_synchronizer, d->read_samples, [au_holder rate]);
 }
 
 static void au_read_postprocess(MSFilter *f){
@@ -797,7 +845,7 @@ static void au_read_postprocess(MSFilter *f){
 	flushq(&d->rq,0);
 	ms_ticker_set_synchronizer(f->ticker, NULL);
 	ms_ticker_synchronizer_destroy(d->ticker_synchronizer);
-	d->base.card->read_started = FALSE;
+	[[AudioUnitHolder sharedInstance] setRead_started:FALSE];
 	ms_mutex_unlock(&d->mutex);
 }
 
@@ -807,20 +855,20 @@ static void au_write_preprocess(MSFilter *f){
 	ms_debug("au_write_preprocess");
 	
 	au_filter_write_data_t *d= (au_filter_write_data_t*)f->data;
-	au_card_t* card=d->base.card;
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
 	
-	check_audio_unit_is_up(card);
+	[au_holder check_audio_unit_is_up];
 	/*configure our flow-control buffer*/
-	ms_flow_controlled_bufferizer_set_samplerate(d->bufferizer, d->base.card->rate);
-	ms_flow_controlled_bufferizer_set_nchannels(d->bufferizer, d->base.card->nchannels);
-	d->base.card->write_started = TRUE;
+	ms_flow_controlled_bufferizer_set_samplerate(d->bufferizer, [au_holder rate]);
+	ms_flow_controlled_bufferizer_set_nchannels(d->bufferizer, [au_holder nchannels]);
+	[au_holder setWrite_started:TRUE];
 }
 
 static void au_write_process(MSFilter *f){
 	ms_debug("au_write_process");
 	au_filter_write_data_t *d=(au_filter_write_data_t*)f->data;
 
-	if (d->base.muted || d->base.card->audio_unit_state != MSAudioUnitStarted){
+	if (d->base.muted || [[AudioUnitHolder sharedInstance] audio_unit_state] != MSAudioUnitStarted){
 		ms_queue_flush(f->inputs[0]);
 		return;
 	}
@@ -835,18 +883,18 @@ static void au_write_postprocess(MSFilter *f){
 	ms_mutex_lock(&d->mutex);
 	ms_flow_controlled_bufferizer_flush(d->bufferizer);
 	ms_mutex_unlock(&d->mutex);
-	d->base.card->write_started = FALSE;
+	[[AudioUnitHolder sharedInstance] setWrite_started:FALSE];
 }
 
 
 
 static int read_set_rate(MSFilter *f, void *arg){
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
 	int proposed_rate = *((int*)arg);
 	ms_debug("set_rate %d",proposed_rate);
-	au_filter_read_data_t *d=(au_filter_read_data_t*)f->data;
 	/*The AudioSession must be configured before we decide of which sample rate we will use*/
-	configure_audio_session(d->base.card);
-	if ((unsigned int)proposed_rate != d->base.card->rate){
+	[au_holder configure_audio_session];
+	if ((unsigned int)proposed_rate != [au_holder rate]){
 		return -1;//only support 1 rate
 	} else {
 		return 0;
@@ -854,12 +902,12 @@ static int read_set_rate(MSFilter *f, void *arg){
 }
 
 static int write_set_rate(MSFilter *f, void *arg){
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
 	int proposed_rate = *((int*)arg);
 	ms_debug("set_rate %d",proposed_rate);
-	au_filter_write_data_t *d=(au_filter_write_data_t*)f->data;
 	/*The AudioSession must be configured before we decide of which sample rate we will use*/
-	configure_audio_session(d->base.card);
-	if ((unsigned int)proposed_rate != d->base.card->rate){
+	[au_holder configure_audio_session];
+	if ((unsigned int)proposed_rate != [au_holder rate]){
 		return -1;//only support 1 rate
 	} else {
 		return 0;
@@ -867,44 +915,35 @@ static int write_set_rate(MSFilter *f, void *arg){
 }
 
 static int get_rate(MSFilter *f, void *data){
-	au_filter_base_t *d=(au_filter_base_t*)f->data;
-	configure_audio_session(d->card);
-	*(int*)data=d->card->rate;
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
+	[au_holder configure_audio_session];
+	*(int*)data= [au_holder rate];
 	return 0;
 }
 
-static int read_set_nchannels(MSFilter *f, void *arg){
+static int set_nchannels(MSFilter *f, void *arg){
 	ms_debug("set_nchannels %d", *((int*)arg));
-	au_filter_base_t *d=(au_filter_base_t*)f->data;
-	d->card->nchannels=*(int*)arg;
-	return 0;
-}
-
-static int write_set_nchannels(MSFilter *f, void *arg){
-	ms_debug("set_nchannels %d", *((int*)arg));
-	au_filter_write_data_t *d=(au_filter_write_data_t*)f->data;
-	d->base.card->nchannels=*(int*)arg;
+	[[AudioUnitHolder sharedInstance] setNchannels:*(int*)arg];
 	return 0;
 }
 
 static int get_nchannels(MSFilter *f, void *data) {
-	au_filter_base_t *d=(au_filter_base_t *)f->data;
-	*(int *)data = d->card->nchannels;
+	*(int *)data = [[AudioUnitHolder sharedInstance] nchannels];
 	return 0;
 }
 
 static int mute_mic(MSFilter *f, void *data){
     UInt32 enableMic = *((bool *)data) ? 0 : 1;
-    au_filter_base_t *d=(au_filter_base_t*)f->data;
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
     
-    if (enableMic == d->card->mic_enabled)
+    if (enableMic == [au_holder mic_enabled])
         return 0;
     
-    d->card->mic_enabled = enableMic;
+	[au_holder setMic_enabled:enableMic];
     OSStatus auresult;
     
-    if (d->card->audio_unit_state != MSAudioUnitStarted) {
-        auresult=AudioUnitSetProperty (d->card->audio_unit,
+    if ([au_holder audio_unit_state] != MSAudioUnitStarted) {
+        auresult=AudioUnitSetProperty ([au_holder audio_unit],
                                        kAudioOutputUnitProperty_EnableIO,
                                        kAudioUnitScope_Input,
                                        inputBus,
@@ -913,9 +952,9 @@ static int mute_mic(MSFilter *f, void *data){
                                        );
         check_au_unit_result(auresult,"kAudioOutputUnitProperty_EnableIO,kAudioUnitScope_Input");
     } else {
-        stop_audio_unit_with_param(d->card, TRUE);
-        configure_audio_unit(d->card);
-        start_audio_unit(d->card, 0);
+		[au_holder stop_audio_unit_with_param:TRUE];
+        [au_holder configure_audio_unit];
+		[au_holder start_audio_unit:0];
     }
     
     return 0;
@@ -927,35 +966,72 @@ static int set_muted(MSFilter *f, void *data){
 	return 0;
 }
 
-
+static int audio_playback_set_internal_id(MSFilter *f, void * newSndCard)
+{
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
+	MSSndCard *newCard = (MSSndCard *)newSndCard;
+	MSSndCard *oldCard = [au_holder ms_snd_card];
+	
+	// Handle the internal linphone part with the MSSndCards
+	if (strcmp(newCard->name, oldCard->name)==0) {
+		return 0;
+	}
+	[au_holder mutex_lock];
+	[au_holder setMs_snd_card:newSndCard];
+	[au_holder mutex_unlock];
+	
+	// Make sure the apple audio route matches this state
+	AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+	AVAudioSessionRouteDescription *currentRoute = [audioSession currentRoute];
+	NSError *err=nil;
+	if (newCard->device_type == MS_SND_CARD_DEVICE_TYPE_SPEAKER && currentRoute.outputs[0].portType != AVAudioSessionPortBuiltInSpeaker) {
+		// If we're switching to speaker and the route output isn't the speaker already
+		[audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&err];
+	}
+	else {
+		// As AudioSession do not allow a way to nicely change the output port except with the override to Speaker,
+		// we assume that input ports also come with a playback port (bluetooth earpiece, headset...) and change the input port.
+		NSString *newPortName = [NSString stringWithUTF8String:newCard->name];
+		NSArray *inputs = [audioSession availableInputs];
+		for (AVAudioSessionPortDescription *input in inputs) {
+			if ([input.portName isEqualToString:newPortName ]) {
+				[audioSession setPreferredInput:input error:&err];
+				break;
+			}
+		}
+	}
+	return 0;
+}
 
 static MSFilterMethod au_read_methods[]={
-	{	MS_FILTER_SET_SAMPLE_RATE	, read_set_rate	},
-	{	MS_FILTER_GET_SAMPLE_RATE	, get_rate	},
-	{	MS_FILTER_SET_NCHANNELS		, read_set_nchannels	},
-	{	MS_FILTER_GET_NCHANNELS		, get_nchannels	},
-	{	MS_AUDIO_CAPTURE_MUTE		, mute_mic },
+	{	MS_FILTER_SET_SAMPLE_RATE		 , read_set_rate					},
+	{	MS_FILTER_GET_SAMPLE_RATE		 , get_rate							},
+	{	MS_FILTER_SET_NCHANNELS			 , set_nchannels					},
+	{	MS_FILTER_GET_NCHANNELS			 , get_nchannels					},
+	{	MS_AUDIO_CAPTURE_MUTE			 , mute_mic 						},
+	{	MS_AUDIO_CAPTURE_SET_INTERNAL_ID , audio_playback_set_internal_id	},
 	{	0				, NULL		}
 };
 
 static MSFilterMethod au_write_methods[]={
-	{	MS_FILTER_SET_SAMPLE_RATE	, write_set_rate	},
-	{	MS_FILTER_GET_SAMPLE_RATE	, get_rate	},
-	{	MS_FILTER_SET_NCHANNELS		, write_set_nchannels	},
-	{	MS_FILTER_GET_NCHANNELS		, get_nchannels	},
-	{	MS_AUDIO_PLAYBACK_MUTE	 	, set_muted	},
+	{	MS_FILTER_SET_SAMPLE_RATE	, write_set_rate							},
+	{	MS_FILTER_GET_SAMPLE_RATE	, get_rate									},
+	{	MS_FILTER_SET_NCHANNELS		, set_nchannels								},
+	{	MS_FILTER_GET_NCHANNELS		, get_nchannels								},
+	{	MS_AUDIO_PLAYBACK_MUTE	 	, set_muted									},
+	{	MS_AUDIO_PLAYBACK_SET_INTERNAL_ID	, audio_playback_set_internal_id	},
 	{	0				, NULL		}
 };
 
 static void au_read_uninit(MSFilter *f) {
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
 	au_filter_read_data_t *d=(au_filter_read_data_t*)f->data;
-	au_card_t* card=d->base.card;
 
-	ms_mutex_lock(&card->mutex);
-	card->read_filter_data=NULL;
-	ms_mutex_unlock(&card->mutex);
+	[au_holder mutex_lock];
+	[au_holder setRead_filter_data:NULL];
+	[au_holder mutex_unlock];
 
-	check_unused(card);
+	check_unused();
 
 	ms_mutex_destroy(&d->mutex);
 
@@ -965,13 +1041,13 @@ static void au_read_uninit(MSFilter *f) {
 
 static void au_write_uninit(MSFilter *f) {
 	au_filter_write_data_t *d=(au_filter_write_data_t*)f->data;
-	au_card_t* card=d->base.card;
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
 
-	ms_mutex_lock(&card->mutex);
-	card->write_filter_data=NULL;
-	ms_mutex_unlock(&card->mutex);
+	[au_holder mutex_lock];
+	[au_holder setWrite_filter_data:NULL];
+	[au_holder mutex_unlock];
 
-	check_unused(card);
+	check_unused();
 
 	ms_mutex_destroy(&d->mutex);
 	ms_flow_controlled_bufferizer_destroy(d->bufferizer);
@@ -1007,31 +1083,33 @@ MSFilterDesc au_write_desc={
 .methods=au_write_methods
 };
 
+// This interface gives the impression that there will be 2 different MSSndCard for the Read filter and the Write filter.
+// In reality, we'll always be using a single same card for both.
 static MSFilter *ms_au_read_new(MSSndCard *mscard){
 	ms_debug("ms_au_read_new");
-	au_card_t* card=(au_card_t*)(mscard->data);
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
+	[au_holder setMs_snd_card:mscard];
 	MSFilter *f=ms_factory_create_filter_from_desc(ms_snd_card_get_factory(mscard), &au_read_desc);
 	au_filter_read_data_t *d=ms_new0(au_filter_read_data_t,1);
 	qinit(&d->rq);
 	d->readTimeStamp.mSampleTime=-1;
 	ms_mutex_init(&d->mutex,NULL);
-	d->base.card=card;
-	card->read_filter_data=d;
+	[au_holder setRead_filter_data:d];
 	f->data=d;
 	return f;
 }
 
 static MSFilter *ms_au_write_new(MSSndCard *mscard){
 	ms_debug("ms_au_write_new");
-	au_card_t* card=(au_card_t*)(mscard->data);
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
+	[au_holder setMs_snd_card:mscard];
 	MSFilter *f=ms_factory_create_filter_from_desc(ms_snd_card_get_factory(mscard), &au_write_desc);
 	au_filter_write_data_t *d=ms_new0(au_filter_write_data_t,1);
-	d->bufferizer= ms_flow_controlled_bufferizer_new(f, card->rate, card->nchannels);
+	d->bufferizer= ms_flow_controlled_bufferizer_new(f, [au_holder rate], [au_holder nchannels]);
 	ms_flow_controlled_bufferizer_set_max_size_ms(d->bufferizer, flowControlThreshold);
 	ms_flow_controlled_bufferizer_set_flow_control_interval_ms(d->bufferizer, flowControlInterval);
 	ms_mutex_init(&d->mutex,NULL);
-	d->base.card=card;
-	card->write_filter_data=d;
+	[au_holder setWrite_filter_data:d];
 	f->data=d;
 	return f;
 }

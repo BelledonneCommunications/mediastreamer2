@@ -25,11 +25,14 @@
 
 static bool_t bypass_sndcard_detection = FALSE;
 
+
+
 MSSndCardManager * ms_snd_card_manager_new(void){
 	MSSndCardManager *obj=(MSSndCardManager *)ms_new0(MSSndCardManager,1);
 	obj->factory = NULL;
 	obj->cards=NULL;
 	obj->descs=NULL;
+	obj->paramString=bctbx_strdup_printf("FAST=false;NOVOICEPROC=false;TESTER=false;RINGER=false");
 	return obj;
 }
 
@@ -45,7 +48,17 @@ void ms_snd_card_manager_destroy(MSSndCardManager* scm){
 		bctbx_list_free(scm->cards);
 		bctbx_list_free(scm->descs);
 	}
+	if (scm!=NULL && scm->paramString!= NULL) {
+		bctbx_free(scm->paramString);
+	}
 	ms_free(scm);
+}
+
+void ms_snd_card_manager_set_param_string(MSSndCardManager *m, const char *paramString){
+	if (m->paramString!=NULL) {
+		bctbx_free(m->paramString);
+	}
+	m->paramString = bctbx_strdup(paramString);
 }
 
 MSFactory * ms_snd_card_get_factory(MSSndCard * c){
@@ -260,12 +273,39 @@ void ms_snd_card_manager_unregister_desc(MSSndCardManager *m, MSSndCardDesc *des
 
 void ms_snd_card_manager_reload(MSSndCardManager *m){
 	bctbx_list_t *elem;
+	bctbx_list_t *cardsToKeep = NULL;
+	bctbx_list_t *oldCardsIt, *newCardsIt;
+	
+	// Keep a copy of the old cards
+	for (oldCardsIt = m->cards; oldCardsIt != NULL; oldCardsIt = oldCardsIt->next) {
+		MSSndCard *sndCard = (MSSndCard *)oldCardsIt->data;
+		cardsToKeep = bctbx_list_append(cardsToKeep, ms_snd_card_ref(sndCard));
+	}
+	
 	bctbx_list_for_each(m->cards, (void (*)(void*))ms_snd_card_unref);
 	bctbx_list_free(m->cards);
 	m->cards = NULL;
 	for (elem = m->descs; elem != NULL; elem = elem->next) {
 		card_detect(m, (MSSndCardDesc*)elem->data);
 	}
+	
+	// When a new card is actually the same as the old one, keep using the old one instead
+	for (newCardsIt = m->cards; newCardsIt != NULL; newCardsIt = newCardsIt->next) {
+		MSSndCard *newCard = (MSSndCard *)newCardsIt->data;
+		for (oldCardsIt = cardsToKeep; oldCardsIt != NULL; oldCardsIt = oldCardsIt->next) {
+			MSSndCard *oldCard = (MSSndCard *)oldCardsIt->data;
+			if (strcmp(ms_snd_card_get_string_id(newCard), ms_snd_card_get_string_id(oldCard)) == 0)
+			{
+				ms_snd_card_ref(oldCard);
+				newCardsIt->data = oldCard;
+				ms_snd_card_unref(newCard);
+				break;
+			}
+		}
+	}
+	
+	bctbx_list_free_with_data(cardsToKeep, (void (*)(void*))ms_snd_card_unref);
+	
 #ifdef __ANDROID__
 	// Put earpiece and speaker as first devices of every filter
 	ms_snd_card_sort(m);
