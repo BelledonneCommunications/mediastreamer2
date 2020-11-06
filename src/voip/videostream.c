@@ -333,7 +333,10 @@ static void video_stream_check_camera(VideoStream *stream) {
 				if (stream->dead_camera_check_count >= 5){
 					MSWebCam *nowebcam = ms_web_cam_manager_get_cam(camera->wbcmanager, "StaticImage: Static picture");
 					ms_error("Camera is not delivering any frames over last 5 seconds, switching to no-webcam placeholder.");
-					video_stream_change_camera(stream, nowebcam);
+					if( stream->output)
+					    video_stream_change_camera(stream, nowebcam);
+					if(stream->output2)
+					    video_preview_change_camera(stream, nowebcam);
 					stream->dead_camera_check_count = 0;
 					if (stream->cameracb != NULL) {
 						stream->cameracb(stream->camera_pointer, camera);
@@ -2068,6 +2071,9 @@ static MSFilter* _video_preview_change_camera(VideoPreview *stream, MSWebCam *ca
 		if (stream->tee) {
 			ms_connection_helper_link(&ch, stream->tee, 0, 0);
 			if (stream->output2) {
+				if (ms_filter_get_id(stream->output2) == MS_OGL_ID) {
+				    assign_value_to_mirroring_flag_to_preview(stream);
+				}
 				ms_filter_link(stream->tee, 1, stream->output2, 0);
 			}
 			if (stream->local_jpegwriter) {
