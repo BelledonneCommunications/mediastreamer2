@@ -102,10 +102,12 @@ stream_manager_t * stream_manager_new(MSFormatType type) {
 	mgr->user_data = 0;
 
 	if (mgr->type==MSAudio){
-		mgr->audio_stream=audio_stream_new (_factory, mgr->local_rtp, mgr->local_rtcp,FALSE);
+		// Set the last argument to FALSE as it will match the legacy behaviour - if port is -1, then SO_REUSEADDR and SO_REUSEPORT are set to false
+		mgr->audio_stream=audio_stream_new (_factory, mgr->local_rtp, mgr->local_rtcp,FALSE,FALSE);
 	}else{
 #if VIDEO_ENABLED
-		mgr->video_stream=video_stream_new (_factory, mgr->local_rtp, mgr->local_rtcp,FALSE);
+		// Set the last argument to FALSE as it will match the legacy behaviour - if port is -1, then SO_REUSEADDR and SO_REUSEPORT are set to false
+		mgr->video_stream=video_stream_new (_factory, mgr->local_rtp, mgr->local_rtcp,FALSE,FALSE);
 		mgr->bw_controller = ms_bandwidth_controller_new();
 #else
 		ms_fatal("Unsupported stream type [%s]",ms_format_type_to_string(mgr->type));

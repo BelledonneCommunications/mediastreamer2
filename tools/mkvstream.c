@@ -107,7 +107,8 @@ int main(int argc, char *argv[]){
 	factory = ms_factory_new_with_voip();
 	
 	/*create the video stream */
-	stream = video_stream_new(factory, local_port, local_port+1, FALSE);
+	// Set the last argument to FALSE as it will match the legacy behaviour - if port is -1, then SO_REUSEADDR and SO_REUSEPORT are set to false
+	stream = video_stream_new(factory, local_port, local_port+1, FALSE, FALSE);
 	
 	/*define its local input and outputs with the MSMediaStreamIO structure*/
 	if (mode == PLAY_MODE){

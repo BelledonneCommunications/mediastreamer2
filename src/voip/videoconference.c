@@ -253,7 +253,8 @@ static void plumb_to_conf(MSVideoEndpoint *ep){
 
 static void ms_video_conference_add_video_placeholder_member(MSVideoConference *obj) {
 	// create an endpoint for static image
-	VideoStream *stream = video_stream_new(obj->mixer->factory, 65004, 65005, FALSE);
+	// Set the last argument to FALSE as it will match the legacy behaviour - if port is -1, then SO_REUSEADDR and SO_REUSEPORT are set to false
+	VideoStream *stream = video_stream_new(obj->mixer->factory, 65004, 65005, FALSE, FALSE);
 	media_stream_set_direction(&stream->ms, MediaStreamSendOnly);
 	MSMediaStreamIO io = MS_MEDIA_STREAM_IO_INITIALIZER;
 	io.input.type = MSResourceCamera;

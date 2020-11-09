@@ -817,7 +817,8 @@ void setup_media_streams(MediastreamDatas* args) {
 				get_sound_card(manager,args->capture_card);
 		MSSndCard *play= args->playback_card==NULL ? ms_snd_card_manager_get_default_capture_card(manager) :
 				get_sound_card(manager,args->playback_card);
-		args->audio=audio_stream_new(factory, args->localport,args->localport+1,ms_is_ipv6(args->ip));
+		// Set the last argument to FALSE as it will match the legacy behaviour - if port is -1, then SO_REUSEADDR and SO_REUSEPORT are set to false
+		args->audio=audio_stream_new(factory, args->localport,args->localport+1,ms_is_ipv6(args->ip),FALSE);
 		if (args->bw_controller){
 			ms_bandwidth_controller_add_stream(args->bw_controller, (MediaStream*)args->audio);
 		}
@@ -927,7 +928,8 @@ void setup_media_streams(MediastreamDatas* args) {
 			exit(-1);
 		}
 		ms_message("Starting video stream.\n");
-		args->video=video_stream_new(factory, args->localport, args->localport+1, ms_is_ipv6(args->ip));
+		// Set the last argument to FALSE as it will match the legacy behaviour - if port is -1, then SO_REUSEADDR and SO_REUSEPORT are set to false
+		args->video=video_stream_new(factory, args->localport, args->localport+1, ms_is_ipv6(args->ip), FALSE);
 		if (args->bw_controller){
 			ms_bandwidth_controller_add_stream(args->bw_controller, (MediaStream*)args->video);
 		}

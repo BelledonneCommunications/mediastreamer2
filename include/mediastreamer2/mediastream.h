@@ -518,20 +518,22 @@ MS2_PUBLIC void audio_stream_play_received_dtmfs(AudioStream *st, bool_t yesno);
  * @param loc_rtp_port the local UDP port to listen for RTP packets.
  * @param loc_rtcp_port the local UDP port to listen for RTCP packets
  * @param ipv6 TRUE if ipv6 must be used.
+ * @param is_multicast the RTP port is part of a multicast
  * @param factory
  * @return a new AudioStream.
 **/
-MS2_PUBLIC AudioStream *audio_stream_new(MSFactory* factory, int loc_rtp_port, int loc_rtcp_port, bool_t ipv6);
+MS2_PUBLIC AudioStream *audio_stream_new(MSFactory* factory, int loc_rtp_port, int loc_rtcp_port, bool_t ipv6, bool_t is_multicast);
 
 /**
  * Creates an AudioStream object listening on a RTP port for a dedicated address.
  * @param loc_ip the local ip to listen for RTP packets. Can be ::, O.O.O.O or any ip4/6 addresses
  * @param loc_rtp_port the local UDP port to listen for RTP packets.
  * @param loc_rtcp_port the local UDP port to listen for RTCP packets
+ * @param is_multicast the RTP port is part of a multicast
  * @param factory
  * @return a new AudioStream.
 **/
-MS2_PUBLIC AudioStream *audio_stream_new2(MSFactory* factory, const char* ip, int loc_rtp_port, int loc_rtcp_port);
+MS2_PUBLIC AudioStream *audio_stream_new2(MSFactory* factory, const char* ip, int loc_rtp_port, int loc_rtcp_port, bool_t is_multicast);
 
 
 /**Creates an AudioStream object from initialized MSMediaStreamSessions.
@@ -922,15 +924,16 @@ typedef struct _VideoStream VideoStream;
 
 
 
-MS2_PUBLIC VideoStream *video_stream_new(MSFactory* factory, int loc_rtp_port, int loc_rtcp_port, bool_t use_ipv6);
+MS2_PUBLIC VideoStream *video_stream_new(MSFactory* factory, int loc_rtp_port, int loc_rtcp_port, bool_t use_ipv6, bool_t is_multicast);
 /**
  * Creates a VideoStream object listening on a RTP port for a dedicated address.
  * @param loc_ip the local ip to listen for RTP packets. Can be ::, O.O.O.O or any ip4/6 addresses
  * @param [in] loc_rtp_port the local UDP port to listen for RTP packets.
  * @param [in] loc_rtcp_port the local UDP port to listen for RTCP packets
+ * @param [in] is_multicast the RTP port is part of a multicast
  * @return a new VideoStream.
 **/
-MS2_PUBLIC VideoStream *video_stream_new2(MSFactory* factory, const char* ip, int loc_rtp_port, int loc_rtcp_port);
+MS2_PUBLIC VideoStream *video_stream_new2(MSFactory* factory, const char* ip, int loc_rtp_port, int loc_rtcp_port, bool_t is_multicast);
 
 MS2_PUBLIC VideoStream *video_stream_new_with_sessions(MSFactory* factory, const MSMediaStreamSessions *sessions);
 
@@ -1299,8 +1302,9 @@ MS2_PUBLIC MSWebCamDesc *ms_mire_webcam_desc_get(void);
  * @param[in] local_ip The local IP to bind the RTP and RTCP sockets to.
  * @param[in] local_rtp_port The local port to bind the RTP socket to.
  * @param[in] local_rtcp_port The local port to bind the RTCP socket to.
+ * @param[in] is_multicast the RTP port is part of a multicast
  */
-MS2_PUBLIC RtpSession * ms_create_duplex_rtp_session(const char* local_ip, int loc_rtp_port, int loc_rtcp_port, int mtu);
+MS2_PUBLIC RtpSession * ms_create_duplex_rtp_session(const char* local_ip, int loc_rtp_port, int loc_rtcp_port, int mtu, bool_t is_multicast);
 
 /**
  * Asks the audio playback filter to route to the selected device (currently only used for blackberry)
@@ -1360,10 +1364,11 @@ typedef struct _TextStream TextStream;
  * @param loc_rtp_port the local UDP port to listen for RTP packets.
  * @param loc_rtcp_port the local UDP port to listen for RTCP packets
  * @param ipv6 TRUE if ipv6 must be used.
+ * @param is_multicast the RTP port is part of a multicast
  * @param factory
  * @return a new TextStream.
 **/
-MS2_PUBLIC TextStream *text_stream_new(MSFactory *factory, int loc_rtp_port, int loc_rtcp_port, bool_t ipv6);
+MS2_PUBLIC TextStream *text_stream_new(MSFactory *factory, int loc_rtp_port, int loc_rtcp_port, bool_t ipv6, bool_t is_multicast);
 
 /**
  * Creates a TextStream object from initialized MSMediaStreamSessions.
@@ -1378,10 +1383,11 @@ MS2_PUBLIC TextStream *text_stream_new_with_sessions(MSFactory *factory, const M
  * @param loc_ip the local ip to listen for RTP packets. Can be ::, O.O.O.O or any ip4/6 addresses
  * @param [in] loc_rtp_port the local UDP port to listen for RTP packets.
  * @param [in] loc_rtcp_port the local UDP port to listen for RTCP packets
+ * @param [in] is_multicast the RTP port is part of a multicast
  * @param factory
  * @return a new TextStream.
 **/
-MS2_PUBLIC TextStream *text_stream_new2(MSFactory *factory, const char* ip, int loc_rtp_port, int loc_rtcp_port);
+MS2_PUBLIC TextStream *text_stream_new2(MSFactory *factory, const char* ip, int loc_rtp_port, int loc_rtcp_port, bool_t is_multicast);
 
 /**
  * Starts a text stream.

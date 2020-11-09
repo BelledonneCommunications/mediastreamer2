@@ -99,7 +99,8 @@ void text_stream_tester_destroy(text_stream_tester_t* obj) {
 }
 
 static void create_text_stream(text_stream_tester_t *tst, int payload_type) {
-	tst->ts = text_stream_new2(_factory, tst->local_ip, tst->local_rtp, tst->local_rtcp);
+	// Set the last argument to FALSE as it will match the legacy behaviour - if port is -1, then SO_REUSEADDR and SO_REUSEPORT are set to false
+	tst->ts = text_stream_new2(_factory, tst->local_ip, tst->local_rtp, tst->local_rtcp, FALSE);
 	tst->local_rtp = rtp_session_get_local_port(tst->ts->ms.sessions.rtp_session);
 	tst->local_rtcp = rtp_session_get_local_rtcp_port(tst->ts->ms.sessions.rtp_session);
 	reset_stats(&tst->stats);

@@ -136,7 +136,7 @@ void media_stream_remove_tmmbr_handler(MediaStream *stream, void (*on_tmmbr_rece
 							, (OrtpEvDispatcherCb)on_tmmbr_received);
 }
 
-RtpSession * ms_create_duplex_rtp_session(const char* local_ip, int loc_rtp_port, int loc_rtcp_port, int mtu) {
+RtpSession * ms_create_duplex_rtp_session(const char* local_ip, int loc_rtp_port, int loc_rtcp_port, int mtu, bool_t is_multicast) {
 	RtpSession *rtpr;
 	const int socket_buf_size=2000000;
 	
@@ -146,6 +146,7 @@ RtpSession * ms_create_duplex_rtp_session(const char* local_ip, int loc_rtp_port
 	rtp_session_set_blocking_mode(rtpr, 0);
 	rtp_session_enable_adaptive_jitter_compensation(rtpr, TRUE);
 	rtp_session_set_symmetric_rtp(rtpr, TRUE);
+	rtp_session_set_multicast(rtpr, is_multicast); /*very useful, specially for testing purposes*/
 	if (local_ip) {
 		rtp_session_set_local_addr(rtpr, local_ip, loc_rtp_port, loc_rtcp_port);
 	} else {

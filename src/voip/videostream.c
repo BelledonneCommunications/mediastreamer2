@@ -384,14 +384,14 @@ static float video_stream_get_rtcp_xr_average_lq_quality_rating(void *userdata) 
 }
 
 
-VideoStream *video_stream_new(MSFactory* factory, int loc_rtp_port, int loc_rtcp_port, bool_t use_ipv6){
-	return video_stream_new2(factory, use_ipv6 ? "::" : "0.0.0.0", loc_rtp_port, loc_rtcp_port);
+VideoStream *video_stream_new(MSFactory* factory, int loc_rtp_port, int loc_rtcp_port, bool_t use_ipv6, bool_t is_multicast){
+	return video_stream_new2(factory, use_ipv6 ? "::" : "0.0.0.0", loc_rtp_port, loc_rtcp_port, is_multicast);
 }
 
-VideoStream *video_stream_new2(MSFactory* factory, const char* ip, int loc_rtp_port, int loc_rtcp_port) {
+VideoStream *video_stream_new2(MSFactory* factory, const char* ip, int loc_rtp_port, int loc_rtcp_port, bool_t is_multicast) {
 	MSMediaStreamSessions sessions={0};
 	VideoStream *obj;
-	sessions.rtp_session=ms_create_duplex_rtp_session(ip,loc_rtp_port,loc_rtcp_port, ms_factory_get_mtu(factory));
+	sessions.rtp_session=ms_create_duplex_rtp_session(ip,loc_rtp_port,loc_rtcp_port, ms_factory_get_mtu(factory), is_multicast);
 	obj=video_stream_new_with_sessions(factory, &sessions);
 	obj->ms.owns_sessions=TRUE;
 	return obj;

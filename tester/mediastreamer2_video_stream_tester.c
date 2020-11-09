@@ -317,7 +317,8 @@ static void event_queue_cb(MediaStream *ms, void *user_pointer) {
 }
 
 static void create_video_stream(video_stream_tester_t *vst, int payload_type) {
-	vst->vs = video_stream_new2(_factory, vst->local_ip, vst->local_rtp, vst->local_rtcp);
+	// Set the last argument to FALSE as it will match the legacy behaviour - if port is -1, then SO_REUSEADDR and SO_REUSEPORT are set to false
+	vst->vs = video_stream_new2(_factory, vst->local_ip, vst->local_rtp, vst->local_rtcp, FALSE);
 	vst->vs->staticimage_webcam_fps_optimization = FALSE;
 	vst->local_rtp = rtp_session_get_local_port(vst->vs->ms.sessions.rtp_session);
 	vst->local_rtcp = rtp_session_get_local_rtcp_port(vst->vs->ms.sessions.rtp_session);

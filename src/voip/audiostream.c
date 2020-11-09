@@ -1385,7 +1385,8 @@ AudioStream *audio_stream_start(MSFactory* factory, RtpProfile *prof,int locport
 	sndcard_playback=ms_snd_card_manager_get_default_playback_card(ms_factory_get_snd_card_manager(factory));
 	if (sndcard_capture==NULL || sndcard_playback==NULL)
 		return NULL;
-	stream=audio_stream_new(factory, locport, locport+1, ms_is_ipv6(remip));
+	// Set the last argument to FALSE as it will match the legacy behaviour - if port is -1, then SO_REUSEADDR and SO_REUSEPORT are set to false
+	stream=audio_stream_new(factory, locport, locport+1, ms_is_ipv6(remip), FALSE);
 	if (audio_stream_start_full(stream,prof,remip,remport,remip,remport+1,profile,jitt_comp,NULL,NULL,sndcard_playback,sndcard_capture,use_ec)==0) return stream;
 	audio_stream_free(stream);
 	return NULL;
@@ -1402,7 +1403,8 @@ AudioStream *audio_stream_start_with_sndcards(MSFactory* factory, RtpProfile *pr
 		ms_error("No capture card.");
 		return NULL;
 	}
-	stream=audio_stream_new(factory, locport, locport+1, ms_is_ipv6(remip));
+	// Set the last argument to FALSE as it will match the legacy behaviour - if port is -1, then SO_REUSEADDR and SO_REUSEPORT are set to false
+	stream=audio_stream_new(factory, locport, locport+1, ms_is_ipv6(remip), FALSE);
 	if (audio_stream_start_full(stream,prof,remip,remport,remip,remport+1,profile,jitt_comp,NULL,NULL,playcard,captcard,use_ec)==0) return stream;
 	audio_stream_free(stream);
 	return NULL;
@@ -1575,14 +1577,14 @@ AudioStream *audio_stream_new_with_sessions(MSFactory *factory, const MSMediaStr
 	return stream;
 }
 
-AudioStream *audio_stream_new(MSFactory* factory, int loc_rtp_port, int loc_rtcp_port, bool_t ipv6){
-	return audio_stream_new2(factory, ipv6 ? "::" : "0.0.0.0", loc_rtp_port, loc_rtcp_port);
+AudioStream *audio_stream_new(MSFactory* factory, int loc_rtp_port, int loc_rtcp_port, bool_t ipv6, bool_t is_multicast){
+	return audio_stream_new2(factory, ipv6 ? "::" : "0.0.0.0", loc_rtp_port, loc_rtcp_port, is_multicast);
 }
 
-AudioStream *audio_stream_new2(MSFactory* factory, const char* ip, int loc_rtp_port, int loc_rtcp_port) {
+AudioStream *audio_stream_new2(MSFactory* factory, const char* ip, int loc_rtp_port, int loc_rtcp_port, bool_t is_multicast) {
 	AudioStream *obj;
 	MSMediaStreamSessions sessions={0};
-	sessions.rtp_session=ms_create_duplex_rtp_session(ip,loc_rtp_port,loc_rtcp_port, ms_factory_get_mtu(factory));
+	sessions.rtp_session=ms_create_duplex_rtp_session(ip,loc_rtp_port,loc_rtcp_port, ms_factory_get_mtu(factory), is_multicast);
 	obj=audio_stream_new_with_sessions(factory, &sessions);
 	obj->ms.owns_sessions=TRUE;
 	obj->last_mic_gain_level_db = 0;

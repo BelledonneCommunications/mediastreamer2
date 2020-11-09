@@ -81,14 +81,14 @@ TextStream *text_stream_new_with_sessions(MSFactory *factory, const MSMediaStrea
 	return stream;
 }
 
-TextStream *text_stream_new(MSFactory *factory, int loc_rtp_port, int loc_rtcp_port, bool_t ipv6) {
-	return text_stream_new2(factory, ipv6 ? "::" : "0.0.0.0", loc_rtp_port, loc_rtcp_port);
+TextStream *text_stream_new(MSFactory *factory, int loc_rtp_port, int loc_rtcp_port, bool_t ipv6, bool_t is_multicast) {
+	return text_stream_new2(factory, ipv6 ? "::" : "0.0.0.0", loc_rtp_port, loc_rtcp_port, is_multicast);
 }
 
-TextStream *text_stream_new2(MSFactory *factory, const char* ip, int loc_rtp_port, int loc_rtcp_port) {
+TextStream *text_stream_new2(MSFactory *factory, const char* ip, int loc_rtp_port, int loc_rtcp_port, bool_t is_multicast) {
 	TextStream *stream;
 	MSMediaStreamSessions sessions = {0};
-	sessions.rtp_session = ms_create_duplex_rtp_session(ip, loc_rtp_port, loc_rtcp_port, ms_factory_get_mtu(factory));
+	sessions.rtp_session = ms_create_duplex_rtp_session(ip, loc_rtp_port, loc_rtcp_port, ms_factory_get_mtu(factory), is_multicast);
 	stream = text_stream_new_with_sessions(factory, &sessions);
 	stream->ms.owns_sessions = TRUE;
 	return stream;

@@ -438,7 +438,8 @@ static void dtmfgen_enc_rtp_dec_tonedet(void) {
 	ms_tester_codec_mime = "pcmu";
 	ms_tester_create_filters(filter_mask, msFactory);
 	ms_filter_add_notify_callback(ms_tester_tonedet, (MSFilterNotifyFunc)tone_detected_cb, NULL,TRUE);
-	rtps = ms_create_duplex_rtp_session("0.0.0.0", 50060, 0, ms_factory_get_mtu(msFactory));
+	// Set the last argument to FALSE as it will match the legacy behaviour - if port is -1, then SO_REUSEADDR and SO_REUSEPORT are set to false
+	rtps = ms_create_duplex_rtp_session("0.0.0.0", 50060, 0, ms_factory_get_mtu(msFactory),FALSE);
 	rtp_session_set_remote_addr_full(rtps, "127.0.0.1", 50060, "127.0.0.1", 50061);
 	rtp_session_set_payload_type(rtps, 8);
 	rtp_session_enable_rtcp(rtps,FALSE);
