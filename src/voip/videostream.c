@@ -1184,8 +1184,7 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 			if (stream->preview_window_id!=0){
 				ms_filter_call_method(stream->output2, MS_VIDEO_DISPLAY_SET_NATIVE_WINDOW_ID,&stream->preview_window_id);
 			}
-
-			if (ms_filter_get_id(stream->output2) == MS_OGL_ID) {
+			if( ms_filter_implements_interface(stream->output2, MSFilterVideoDisplayInterface) ) {
 				assign_value_to_mirroring_flag_to_preview(stream);
 			}
 			ms_filter_link(stream->tee,1,stream->output2,0);
@@ -1534,7 +1533,7 @@ static MSFilter* _video_stream_change_camera(VideoStream *stream, MSWebCam *cam,
 		}
 
 		// Change value of mirroring as potentially the webcam was changed
-		if (stream->output2 && ms_filter_get_id(stream->output2) == MS_OGL_ID) {
+		if (stream->output2 && ms_filter_implements_interface(stream->output2, MSFilterVideoDisplayInterface) ) {
 			assign_value_to_mirroring_flag_to_preview(stream);
 		}
 
@@ -2071,7 +2070,7 @@ static MSFilter* _video_preview_change_camera(VideoPreview *stream, MSWebCam *ca
 		if (stream->tee) {
 			ms_connection_helper_link(&ch, stream->tee, 0, 0);
 			if (stream->output2) {
-				if (ms_filter_get_id(stream->output2) == MS_OGL_ID) {
+				if( ms_filter_implements_interface(stream->output2, MSFilterVideoDisplayInterface) ) {
 				    assign_value_to_mirroring_flag_to_preview(stream);
 				}
 				ms_filter_link(stream->tee, 1, stream->output2, 0);
