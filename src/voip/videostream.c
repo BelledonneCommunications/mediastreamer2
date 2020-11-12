@@ -333,10 +333,7 @@ static void video_stream_check_camera(VideoStream *stream) {
 				if (stream->dead_camera_check_count >= 5){
 					MSWebCam *nowebcam = ms_web_cam_manager_get_cam(camera->wbcmanager, "StaticImage: Static picture");
 					ms_error("Camera is not delivering any frames over last 5 seconds, switching to no-webcam placeholder.");
-					if( stream->output)
-					    video_stream_change_camera(stream, nowebcam);
-					if(stream->output2)
-					    video_preview_change_camera(stream, nowebcam);
+					video_stream_change_camera(stream, nowebcam);
 					stream->dead_camera_check_count = 0;
 					if (stream->cameracb != NULL) {
 						stream->cameracb(stream->camera_pointer, camera);
@@ -714,12 +711,13 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate, boo
 	}
 	stream->configured_fps=vconf.fps;
 
-	ms_filter_call_method(stream->ms.encoder, MS_VIDEO_ENCODER_SET_CONFIGURATION, &vconf);
+	if(stream->ms.encoder)
+	    ms_filter_call_method(stream->ms.encoder, MS_VIDEO_ENCODER_SET_CONFIGURATION, &vconf);
 
 	encoder_supports_source_format.supported = FALSE;
 	encoder_supports_source_format.pixfmt = format;
 
-	if (ms_filter_has_method(stream->ms.encoder, MS_VIDEO_ENCODER_SUPPORTS_PIXFMT) == TRUE) {
+	if (stream->ms.encoder && ms_filter_has_method(stream->ms.encoder, MS_VIDEO_ENCODER_SUPPORTS_PIXFMT) == TRUE) {
 		ret = ms_filter_call_method(stream->ms.encoder, MS_VIDEO_ENCODER_SUPPORTS_PIXFMT, &encoder_supports_source_format);
 	} else {
 		ret = -1;
@@ -757,7 +755,7 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate, boo
 		ms_bitrate_controller_destroy(stream->ms.rc);
 		stream->ms.rc=NULL;
 	}
-	if (stream->ms.rc_enable){
+	if (stream->ms.rc_enable && stream->ms.encoder){
 		switch (stream->ms.rc_algorithm){
 		case MSQosAnalyzerAlgorithmSimple:
 			stream->ms.rc=ms_av_bitrate_controller_new(NULL,NULL,stream->ms.sessions.rtp_session,stream->ms.encoder);
@@ -1444,13 +1442,15 @@ static MSFilter* _video_stream_change_camera(VideoStream *stream, MSWebCam *cam,
 			if (stream->sizeconv) {
 				ms_filter_unlink (stream->tee, 0, stream->sizeconv, 0);
 				if (stream->source_performs_encoding == FALSE) {
-					ms_filter_unlink(stream->sizeconv, 0, stream->ms.encoder, 0);
+					if( stream->ms.encoder)
+						ms_filter_unlink(stream->sizeconv, 0, stream->ms.encoder, 0);
 				} else {
 					ms_filter_unlink(stream->sizeconv, 0, stream->ms.rtpsend, 0);
 				}
 			} else {
 				if (stream->source_performs_encoding == FALSE) {
-					ms_filter_unlink(stream->tee, 0, stream->ms.encoder, 0);
+					if(stream->ms.encoder)
+						ms_filter_unlink(stream->tee, 0, stream->ms.encoder, 0);
 				} else {
 					ms_filter_unlink(stream->tee, 0, stream->ms.rtpsend, 0);
 				}
@@ -1491,7 +1491,7 @@ static MSFilter* _video_stream_change_camera(VideoStream *stream, MSWebCam *cam,
 			ms_filter_call_method(stream->output,MS_VIDEO_DISPLAY_SET_DEVICE_ORIENTATION,&stream->device_orientation);
 		}
 
-		if (!skip_payload_config) {
+		if (!skip_payload_config && stream->ms.sessions.rtp_session) {
 			PayloadType *pt;
 			RtpProfile *profile;
 			int payload;
@@ -1519,13 +1519,15 @@ static MSFilter* _video_stream_change_camera(VideoStream *stream, MSWebCam *cam,
 			if (stream->sizeconv) {
 				ms_filter_link (stream->tee, 0, stream->sizeconv, 0);
 				if (stream->source_performs_encoding == FALSE) {
-					ms_filter_link(stream->sizeconv, 0, stream->ms.encoder, 0);
+					if(stream->ms.encoder)
+						ms_filter_link(stream->sizeconv, 0, stream->ms.encoder, 0);
 				} else {
 					ms_filter_link(stream->sizeconv, 0, stream->ms.rtpsend, 0);
 				}
 			} else {
 				if (stream->source_performs_encoding == FALSE) {
-					ms_filter_link(stream->tee, 0, stream->ms.encoder, 0);
+					if(stream->ms.encoder)
+						ms_filter_link(stream->tee, 0, stream->ms.encoder, 0);
 				} else {
 					ms_filter_link(stream->tee, 0, stream->ms.rtpsend, 0);
 				}
