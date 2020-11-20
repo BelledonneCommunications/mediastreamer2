@@ -71,11 +71,11 @@ public:
 
 	void decodeFrame(MSFilter *filter, mblk_t *inm){
 		if( mTurboJpegDecompressor){
-			unsigned int imageSize = 0;
+			unsigned long imageSize = 0;
 			unsigned char * imageData = inm->b_rptr;
 			int flags = 0;
 			int subSamp = TJSAMP_420, colorSpace = 0;
-			imageSize = inm->b_wptr-inm->b_rptr;
+			imageSize = (unsigned long)(inm->b_wptr-inm->b_rptr);
 			tjDecompressHeader3(mTurboJpegDecompressor,imageData,imageSize , &mSize.width, &mSize.height, &subSamp, &colorSpace);
 
 			mblk_t *m = nullptr;
@@ -101,7 +101,7 @@ public:
 					freemsg(m2);
 
 #else
-					m = jpeg2yuv(inm->b_rptr, inm->b_wptr-inm->b_rptr, &mSize);// This function is not fully optimized as memory is not managed
+					m = jpeg2yuv(inm->b_rptr, (int)(inm->b_wptr-inm->b_rptr), &mSize);// This function is not fully optimized as memory is not managed
 #endif
 			}else{
 				unsigned int neededSize = tjBufSizeYUV2(mSize.width, 4, mSize.height, TJSAMP_420);

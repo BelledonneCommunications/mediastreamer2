@@ -17,6 +17,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdint.h>
 #define bool_t matroska_bool_t
 extern "C" {
 #include <matroska/matroska.h>

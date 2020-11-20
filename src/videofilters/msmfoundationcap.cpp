@@ -35,6 +35,54 @@
 #pragma comment(lib,"mfuuid.lib")
 #pragma comment(lib,"shlwapi.lib")
 
+
+/*
+#include <WinRTBase.h>
+#include <wrl\implements.h>
+#include <ppltasks.h>
+#include <windows.devices.enumeration.h>
+#include <windows.foundation.h>
+
+//using namespace Windows::Devices::Enumeration;
+using namespace Windows::Devices::Enumeration;
+*/
+#include <agile.h>
+#include <windows.h>
+#include <mfidl.h>
+#include <mfapi.h>
+#include <mferror.h>
+#include <algorithm>
+
+#include <mutex>
+#include <collection.h>
+#include <windows.foundation.h>
+#include <windows.foundation.collections.h>
+#include <windows.media.h>
+#include <windows.media.capture.h>
+#include <windows.media.capture.frames.h>
+#include <windows.media.mediaproperties.h>
+#include <wrl\implements.h>
+#include <wrl\ftm.h>
+#include <ppltasks.h>
+#include <wrl\implements.h>
+#include <ppltasks.h>
+
+using namespace Platform;
+using namespace Microsoft::WRL;
+using namespace Windows::Foundation::Collections;
+using namespace Windows::Storage::Streams;
+using namespace Windows::Networking;
+using namespace Windows::Networking::Sockets;
+using namespace Windows::Media;
+
+using namespace Windows::Media::Capture;
+using namespace Windows::Media::Devices;
+using namespace Windows::Media::MediaProperties;
+using namespace Windows::Foundation;
+using namespace Windows::Devices::Enumeration;
+using namespace Windows::Storage;
+
+
 class MFDevices {// Store device description with helper
 public:
 	IMFActivate ** mDevices;
@@ -60,11 +108,16 @@ public:
 		CoTaskMemFree(mDevices);
 		mDevicesCount = 0;
 	}
-	HRESULT getDevices(){
+	HRESULT getDevices();
+	
+};
+HRESULT MFDevices::getDevices(){
 		HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 		UINT32 count = 0;
 		if (FAILED(hr)) return hr;
 		// Create an attribute store to specify enumeration parameters.
+		
+#ifndef MS2_WINDOWS_UWP
 		hr = MFCreateAttributes(&mAttributes, 1);
 		if (FAILED(hr)) {
 			clean();
@@ -80,10 +133,92 @@ public:
 		hr =  MFEnumDeviceSources(mAttributes, &mDevices, &mDevicesCount);//[desktop apps only]
 		if (FAILED(hr))
 			clean();
+#elif 0
+		HANDLE eventCompleted = CreateEventEx(NULL, NULL, 0, EVENT_ALL_ACCESS);
+		if (!eventCompleted) {
+			ms_error("[MSMediaFoundationCap] Could not create camera detection event [%i]", GetLastError());
+			return E_FAIL;
+		}
+		IAsyncOperation<DeviceInformationCollection^>^ enumOperation = DeviceInformation::FindAllAsync(DeviceClass::VideoCapture);
+		enumOperation->Completed = ref new AsyncOperationCompletedHandler<DeviceInformationCollection^>(
+		[this, eventCompleted](IAsyncOperation<DeviceInformationCollection^>^ asyncOperation, Windows::Foundation::AsyncStatus asyncStatus) {
+		if (asyncStatus == Windows::Foundation::AsyncStatus::Completed) {
+			DeviceInformationCollection^ DeviceInfoCollection = asyncOperation->GetResults();
+			if ((DeviceInfoCollection == nullptr) || (DeviceInfoCollection->Size == 0)) {
+				ms_error("[MSMediaFoundationCap] No webcam found");
+			}
+			else {
+				try {
+					mDevicesCount = DeviceInfoCollection->Size;
+					mDevices = (IMFActivate**)CoTaskMemAlloc (sizeof(IMFActivate*) * mDevicesCount);
+					for (unsigned int i = 0; i < DeviceInfoCollection->Size; i++) {
+						HRESULT hr = S_OK;
+						IMFMediaSource *source = NULL;
+						IMFAttributes *attributes = NULL;
+						IMFSourceReader* mSourceReader = NULL;
+
+
+						//IMFGetService::GetService(MF_MEDIASOURCE_SERVICE, DeviceInfoCollection->GetAt(i)->Id , (void**)&source);//IID_IMFMediaSource
+						MediaCapture mediaCapture; //Windows::Media::Capture::MediaCapture
+						MediaCaptureInitializationSettings^ settings = ref new MediaCaptureInitializationSettings();//Windows.Media.Capture.
+						settings->VideoDeviceId = DeviceInfoCollection->GetAt(i)->Id;
+						mediaCapture.InitializeAsync(settings);
+						std::for_each(begin(mediaCapture.FrameSources), end(mediaCapture.FrameSources), []( IKeyValuePair<String^, Frames::MediaFrameSource ^>^M ){
+							auto c = M;
+							ms_message("[MSMediaFoundationCap] No webcam found");
+							ms_message("[MSMediaFoundationCap] No webcam found");
+						});
+						
+
+						/*
+						MediaSource mediaSource = MediaSource::CreateFromMediaFrameSource(MediaFrameSource frameSource);
+
+						if (SUCCEEDED(hr)) //Allocate attributes
+							hr = MFCreateAttributes(&attributes, 2);
+						if (SUCCEEDED(hr)) //get attributes
+							hr = attributes->SetUINT32(MF_READWRITE_DISABLE_CONVERTERS, TRUE);	
+						//if (SUCCEEDED(hr)) // Set the callback pointer.
+							//hr = attributes->SetUnknown(MF_SOURCE_READER_ASYNC_CALLBACK, this);	
+						if (SUCCEEDED(hr)) //Create the source reader
+							hr = MFCreateSourceReaderFromMediaSource(source, attributes, &mSourceReader);	
+						if (SUCCEEDED(hr)){  // Try to find a suitable output type.
+							hr = setMediaConfiguration(mVideoFormat, mWidth, mHeight, mFps);
+						}
+						if( FAILED(hr) ) {
+							if( mSourceReader ) {
+								mSourceReader->Release();
+								mSourceReader = NULL;
+							}
+						}*/
+					// Cleanup
+						if (source) { source->Release(); source = NULL; }
+						if (attributes) { attributes->Release(); attributes = NULL; }
+						
+						/*
+						MediaCapture mediaCapture; //Windows::Media::Capture::MediaCapture
+						MediaCaptureInitializationSettings settings;//Windows.Media.Capture.
+						settings.VideoDeviceId = DeviceInfoCollection[i].Id;
+						mediaCapture.InitializeAsync(settings);
+						*/
+						//IPropertySet prop;
+						//MFCreateMediaExtensionActivate(__uuidof(IMFMediaSource), NULL, IMFActivate, &mDevices[i]);
+						//addCamera(manager, desc, DeviceInfoCollection->GetAt(i));
+					}
+				}
+				catch (Platform::Exception^ e) {
+					ms_error("[MSMediaFoundationCap] Error of webcam detection");
+				}
+			}
+		} else {
+			ms_error("[MSMediaFoundationCap] Cannot enumerate webcams");
+		}
+		SetEvent(eventCompleted);
+	});
+	WaitForSingleObjectEx(eventCompleted, INFINITE, FALSE);
+
+#endif
 		return hr;
 	}
-};
-
 // GUID hack to allow storing it into map
 struct GUIDComparer{
     bool operator()(const GUID & Left, const GUID & Right) const{
@@ -280,10 +415,15 @@ void MSMFoundationCap::deactivate() {
 
 //From IUnknown
 STDMETHODIMP MSMFoundationCap::QueryInterface(REFIID riid, void** ppvObject) {
+#ifndef MS2_WINDOWS_UWP	
 	static const QITAB qit[] = { QITABENT(MSMFoundationCap, IMFSourceReaderCallback),{ 0 }, };
 	return QISearch(this, qit, riid, ppvObject);
+#else
+	return S_OK;
+#endif
 }
 //From IUnknown
+
 ULONG MSMFoundationCap::Release() {
 	ULONG count = InterlockedDecrement(&mReferenceCount);
 	if (count == 0)
@@ -293,6 +433,7 @@ ULONG MSMFoundationCap::Release() {
 }
 //From IUnknown
 ULONG MSMFoundationCap::AddRef() { return InterlockedIncrement(&mReferenceCount); }
+
 //Method from IMFSourceReaderCallback
 STDMETHODIMP MSMFoundationCap::OnEvent(DWORD, IMFMediaEvent * mediaEvent) { return S_OK; }
 //Method from IMFSourceReaderCallback
@@ -313,13 +454,13 @@ HRESULT MSMFoundationCap::setCaptureDevice(const std::string& pName) {
 	while(!found && currentDeviceIndex < devices.mDevicesCount) {
 		WCHAR *nameString = NULL;		
 		UINT32 cchName; 
-		hr = devices.mDevices[currentDeviceIndex]->GetAllocatedString(MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, &nameString, &cchName);
+		hr = devices.mDevices[currentDeviceIndex]->GetAllocatedString(MFT_FRIENDLY_NAME_Attribute, &nameString, &cchName);
 		if (SUCCEEDED(hr)) {
 			size_t inputlen = wcslen(nameString) + 1;
 			UINT currentCodePage = GetACP();
-			int sizeNeeded = WideCharToMultiByte(currentCodePage, 0, nameString, inputlen, NULL, 0, NULL, NULL);
+			int sizeNeeded = WideCharToMultiByte(currentCodePage, 0, nameString, (int)inputlen, NULL, 0, NULL, NULL);
 			char strConversion[256] = {0};
-			if(WideCharToMultiByte(currentCodePage, 0, nameString, inputlen, &strConversion[0], sizeNeeded, NULL, NULL) && pName == strConversion) {
+			if(WideCharToMultiByte(currentCodePage, 0, nameString, (int)inputlen, &strConversion[0], (int)sizeNeeded, NULL, NULL) && pName == strConversion) {
 					found = TRUE;
 			}else
 				++currentDeviceIndex;
@@ -400,6 +541,10 @@ HRESULT MSMFoundationCap::setSourceReader(IMFActivate *device) {
 
 	EnterCriticalSection(&mCriticalSection);
 	hr = device->ActivateObject(__uuidof(IMFMediaSource), (void**)&source);
+
+	//IMFGetService::GetService(MF_MEDIASOURCE_SERVICE, IID_IMFMediaSource, (void**)&source)
+
+
 	if (SUCCEEDED(hr)) //Allocate attributes
 		hr = MFCreateAttributes(&attributes, 2);
 	if (SUCCEEDED(hr)) //get attributes
@@ -471,12 +616,14 @@ HRESULT MSMFoundationCap::getStride(IMFMediaType *pType, LONG * stride){
 		//obtain the width and height
 		if (SUCCEEDED(hr))
 			hr = MFGetAttributeSize(pType, MF_MT_FRAME_SIZE, &width, &height);
+#ifndef MS2_WINDOWS_UWP		
 		//Calculate the stride based on the subtype and width
 		if (SUCCEEDED(hr))
 			hr = MFGetStrideForBitmapInfoHeader(subtype.Data1, width, &tempStride); //[desktop apps only]
 		// set the attribute so it can be read
 		if (SUCCEEDED(hr))
 			(void)pType->SetUINT32(MF_MT_DEFAULT_STRIDE, UINT32(tempStride));
+#endif		
 	}
 	if( SUCCEEDED(hr) && stride)
 		*stride = tempStride;
@@ -664,8 +811,9 @@ MSFilterDesc ms_mfoundation_read_desc = {
 }//extern "C"
 
 MS_FILTER_DESC_EXPORT(ms_mfoundation_read_desc)
-
+#ifdef __cplusplus
 extern "C"{
+#endif
 // DETECTION
 static MSFilter *ms_mfoundationcap_create_reader(MSWebCam *cam) {
 	MSFactory *factory = ms_web_cam_get_factory(cam);
@@ -685,7 +833,9 @@ MSWebCamDesc ms_mfoundationcap_desc = {
 	NULL,
 	NULL
 };
+#ifdef __cplusplus
 }//extern "C"
+#endif
 
 static void ms_mfoundationcap_detect(MSWebCamManager *manager) {
 	MFDevices devices;
@@ -693,14 +843,14 @@ static void ms_mfoundationcap_detect(MSWebCamManager *manager) {
 	for (UINT32 i = 0; i < devices.mDevicesCount; ++i) { // Get the human-friendly name of the device
 		WCHAR *nameString = NULL;		
 		UINT32 cchName; 
-		HRESULT hr = devices.mDevices[i]->GetAllocatedString(MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, &nameString, &cchName);
+		HRESULT hr = devices.mDevices[i]->GetAllocatedString(MFT_FRIENDLY_NAME_Attribute, &nameString, &cchName);
 		if (SUCCEEDED(hr)) {
 			size_t inputlen = wcslen(nameString) + 1;
 			UINT currentCodePage = GetACP();
-			int sizeNeeded = WideCharToMultiByte(currentCodePage, 0, nameString, inputlen, NULL, 0, NULL, NULL);
+			int sizeNeeded = WideCharToMultiByte(currentCodePage, 0, nameString, (int)inputlen, NULL, 0, NULL, NULL);
 			std::string strConversion( sizeNeeded, 0 );
 			char *nameStr = NULL;
-			if(WideCharToMultiByte(currentCodePage, 0, nameString, inputlen, &strConversion[0], sizeNeeded, NULL, NULL)){
+			if(WideCharToMultiByte(currentCodePage, 0, nameString, (int)inputlen, &strConversion[0], sizeNeeded, NULL, NULL)){
 				nameStr = (char *)ms_malloc(strConversion.length()+1 );
 				strcpy(nameStr, strConversion.c_str());
 			}

@@ -23,8 +23,11 @@
 cmake_minimum_required(VERSION 3.1)
 project(mediastreamer2 VERSION 4.5.0 LANGUAGES C CXX)
 
+message("TOTO:${CMAKE_SYSTEM_NAME} : ${CMAKE_BUILD_TYPE}")
 if(WIN32)
-	add_compile_definitions(_WIN32_WINNT=0x0601 _ALLOW_KEYWORD_MACROS)	#_WIN32_WINNT_WIN7
+    if( NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
+        add_compile_definitions(_WIN32_WINNT=0x0601 _ALLOW_KEYWORD_MACROS)	#_WIN32_WINNT_WIN7
+    endif()
 endif()
 
 # See: https://cmake.org/cmake/help/v3.12/policy/CMP0072.html
@@ -380,7 +383,6 @@ include_directories(
 
 set(MEDIASTREAMER2_INCLUDE_DIRS )
 set(LINK_LIBS bctoolbox ortp)
-
 if(WIN32)
 	if(NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsPhone" AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
 		list(APPEND LINK_LIBS ${LIBGCC} ${LIBMINGWEX} ole32 oleaut32 uuid Winmm Ws2_32)
@@ -590,6 +592,8 @@ if(APPLE)
 		endif()
 		add_definitions("-DTARGET_OS_MAC=1")
 	endif()
+elseif(WIN32 AND CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")#Fix error on 'vccorlib_lib_should_be_specified_before_msvcrt_lib_to_linker''
+    list(APPEND LINK_FLAGS "/nodefaultlib:vccorlib /nodefaultlib:msvcrt vccorlib.lib msvcrt.lib")
 endif()
 string(REPLACE ";" " " LINK_FLAGS_STR "${LINK_FLAGS}")
 
