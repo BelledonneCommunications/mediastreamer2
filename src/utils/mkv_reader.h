@@ -119,28 +119,28 @@ class MKVTrackReader;
 class MKVReader{
 public:
 	MKVReader() = default;
-	MKVReader(const std::string &filename) {open(filename);}
+	MKVReader(const std::string &filename) {openReader(filename);}
 	MKVReader(const MKVReader &) = delete;
 	MKVReader(MKVReader &&) = delete;
-	~MKVReader() noexcept {close();}
+	~MKVReader() noexcept {closeReader();}
 
 	/**
 	 * @brief Open a MKV file for reading
 	 * @param filename Name of the file to open
-	 * @return A pointer on a MKVReader. NULL if opening fails
 	 */
-	void open(const std::string &filename);
+	void openReader(const std::string &filename);
+
 	/**
 	 * @brief Close a MKV file.
 	 * All associated track readers will be automatically destroyed
 	 * @param obj MKVReader
 	 */
-	void close() noexcept;
+	void closeReader() noexcept;
 
 	/**
-     * @brief Get information about the Matroska segment
-     * @return Matroska segment information
-     */
+	 * @brief Get information about the Matroska segment
+	 * @return Matroska segment information
+	*/
 	const MKVSegmentInfo *getSegmentInfo() const noexcept {return mInfo.get();}
 	/**
 	 * @brief Get the default track for a specified track type

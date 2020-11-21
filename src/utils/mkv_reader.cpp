@@ -213,7 +213,7 @@ void MKVAudioTrack::parse(const ebml_element *track_elt) noexcept {
 	mChannels = (uint8_t)EBML_IntegerValue((ebml_integer *)EBML_MasterGetChild((ebml_master *)audio_info_elt, &MATROSKA_ContextChannels));
 }
 
-void MKVReader::open(const std::string &filename) {
+void MKVReader::openReader(const std::string &filename) {
 	try {
 		mParserCtx = make_unique<MKVParserCtx>();
 
@@ -226,12 +226,12 @@ void MKVReader::open(const std::string &filename) {
 			throw runtime_error("MKVParser: error while parsing EBML header");
 		}
 	} catch (...) {
-		close();
+		closeReader();
 		throw;
 	}
 }
 
-void MKVReader::close() noexcept {
+void MKVReader::closeReader() noexcept {
 	mFile.reset();
 	mInfoElt.reset();
 	mTracksElt.clear();
