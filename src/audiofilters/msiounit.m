@@ -503,9 +503,13 @@ static void au_audio_route_changed(MSSndCard *obj) {
 	}
 }
 
+static void configure_audio_session(au_card_t* d);
 static void au_audio_session_activated(MSSndCard *obj, bool_t actived) {
 	au_card_t *d = (au_card_t*)obj->data;
 	d->audio_session_activated = actived;
+	if(actived) {
+		configure_audio_session(d);
+	}
 	if (actived && d->audio_unit_state == MSAudioUnitConfigured){
 		dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH,0), ^{
 				start_audio_unit(d, 0);});
