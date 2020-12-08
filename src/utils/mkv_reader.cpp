@@ -65,7 +65,7 @@ static std::string mkvStringToCppString(const MkvStrT &mkvString) {
 #ifdef UNICODE
 	strOut.resize(wcslen(mkvString.data()) * 2);
 #ifdef _WIN32
-	WideCharToMultiByte(CP_UTF8, 0, mkvString.data(), -1, &strOut[0], mkvString.size(), NULL, NULL);
+	WideCharToMultiByte(CP_UTF8, 0, mkvString.data(), -1, &strOut[0], (int)mkvString.size(), NULL, NULL);
 #else
 	wcstombs(&strOut[0], mkvString.data(), strOut.size());
 #endif
