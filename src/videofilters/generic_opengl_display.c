@@ -26,6 +26,13 @@
 
 // =============================================================================
 
+#ifdef MS2_WINDOWS_UWP
+struct _ContextInfo {
+	EGLNativeWindowType window;
+	
+	OpenGlFunctions *functions;
+};
+#else
 struct _ContextInfo {
 	GLuint width;
 	GLuint height;
@@ -33,6 +40,7 @@ struct _ContextInfo {
 	OpenGlFunctions *functions;
 };
 
+#endif
 typedef struct _ContextInfo ContextInfo;
 
 struct _FilterData {
@@ -84,7 +92,11 @@ static void ogl_process (MSFilter *f) {
 	context_info = &data->context_info;
 
 	// No context given or video disabled.
-	if (!context_info->width || !context_info->height || !context_info->functions || !data->show_video)
+#ifdef MS2_WINDOWS_UWP	
+	if ( !data->show_video)
+#else	
+	if (!context_info->width || !context_info->height || !data->show_video)
+#endif
 		goto end;
 
 	if (
@@ -140,10 +152,15 @@ static int ogl_set_native_window_id (MSFilter *f, void *arg) {
 	context_info = *((ContextInfo **)arg);
 
 	if (context_info && (unsigned long long)context_info != (unsigned long long)MS_FILTER_VIDEO_NONE) {
+#ifdef MS2_WINDOWS_UWP    
 		ms_message(
-			"set native window id: %p (width: %d, height: %d)\n",
-			(void*)context_info, (int)context_info->width, (int)context_info->height
-		);
+			"set native window id for UWP: %p \n", (void*)context_info);
+#else
+	    ms_message(
+		    "set native window id: %p (width: %d, height: %d)\n",
+		    (void*)context_info, (int)context_info->width, (int)context_info->height
+	    );
+#endif
 		data->context_info = *context_info;
 	} else {
 		ms_message("reset native window id");
@@ -201,10 +218,17 @@ static int ogl_call_render (MSFilter *f, void *arg) {
 
 	data = f->data;
 	context_info = &data->context_info;
-
-	if (context_info->width && context_info->height && context_info->functions && data->show_video) {
+#ifdef MS2_WINDOWS_UWP
+	if (data->show_video && context_info->window) {
+#else	
+	if (context_info->width && context_info->height && data->show_video) {
+#endif
 		if (data->update_context) {
+#ifdef MS2_WINDOWS_UWP
+			ogl_display_auto_init(data->display, context_info->functions, context_info->window);
+#else		    
 			ogl_display_init(data->display, context_info->functions, context_info->width, context_info->height);
+#endif
 			data->update_context = FALSE;
 		}
 

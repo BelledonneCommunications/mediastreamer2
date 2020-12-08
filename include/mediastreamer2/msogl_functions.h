@@ -35,7 +35,11 @@
 	#include <GLES2/gl2ext.h>
 #elif _WIN32
 	#if !defined(QOPENGLFUNCTIONS_H)
-		#include <GLES3/gl3.h>
+		#define GL_GLEXT_PROTOTYPES
+		#include <EGL/egl.h>
+		#include <EGL/eglext.h>
+		#include <GLES2/gl2.h>
+		#include <GLES2/gl2ext.h>
 	#endif
 #elif !defined(QOPENGLFUNCTIONS_H) // glew is already included by QT.
 	#include <GL/glew.h>
@@ -188,6 +192,25 @@ typedef void (*resolveGlViewport)(GLint x, GLint y, GLsizei width, GLsizei heigh
 
 // -----------------------------------------------------------------------------
 
+typedef EGLDisplay (*resolveEGLGetPlatformDisplayEXT)(EGLenum platform, void *native_display, const EGLint *attrib_list);
+typedef EGLBoolean (*resolveEGLInitialize)(EGLDisplay dpy, EGLint *major, EGLint *minor);
+typedef EGLBoolean (*resolveEGLChooseConfig)(EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
+typedef EGLContext (*resolveEGLCreateContext)(EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list);
+typedef EGLBoolean (*resolveEGLMakeCurrent)(EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext ctx);
+typedef EGLint (*resolveEGLGetError)();
+typedef EGLBoolean (*resolveEGLSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
+typedef EGLBoolean (*resolveEGLQuerySurface)(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint *value);
+typedef EGLBoolean (*resolveEGLDestroySurface)(EGLDisplay dpy, EGLSurface surface);
+typedef EGLBoolean (*resolveEGLDestroyContext)(EGLDisplay dpy, EGLContext ctx);
+typedef EGLBoolean (*resolveEGLTerminate)(EGLDisplay dpy);
+
+
+
+typedef EGLSurface (*resolveEGLCreateWindowSurface)(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list);
+
+
+
+// -----------------------------------------------------------------------------
 struct OpenGlFunctions {
 	resolveGlActiveTexture glActiveTexture;
 	resolveGlAttachShader glAttachShader;
@@ -331,6 +354,20 @@ struct OpenGlFunctions {
 	// resolveGlVertexAttrib4fv glVertexAttrib4fv;
 	resolveGlVertexAttribPointer glVertexAttribPointer;
 	resolveGlViewport glViewport;
+	
+	
+	resolveEGLGetPlatformDisplayEXT eglGetPlatformDisplayEXT;
+	resolveEGLInitialize eglInitialize;
+	resolveEGLChooseConfig eglChooseConfig;
+	resolveEGLCreateContext eglCreateContext;
+	resolveEGLCreateWindowSurface eglCreateWindowSurface;
+	resolveEGLMakeCurrent eglMakeCurrent;
+	resolveEGLGetError eglGetError;
+	resolveEGLSwapBuffers eglSwapBuffers;
+	resolveEGLQuerySurface eglQuerySurface;
+	resolveEGLDestroySurface eglDestroySurface;
+	resolveEGLDestroyContext eglDestroyContext;
+	resolveEGLTerminate eglTerminate;
 };
 
 typedef struct OpenGlFunctions OpenGlFunctions;
