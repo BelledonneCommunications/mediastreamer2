@@ -23,7 +23,6 @@
 cmake_minimum_required(VERSION 3.1)
 project(mediastreamer2 VERSION 4.5.0 LANGUAGES C CXX)
 
-message("TOTO:${CMAKE_SYSTEM_NAME} : ${CMAKE_BUILD_TYPE}")
 if(WIN32)
     if( NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
         add_compile_definitions(_WIN32_WINNT=0x0601 _ALLOW_KEYWORD_MACROS)	#_WIN32_WINNT_WIN7
