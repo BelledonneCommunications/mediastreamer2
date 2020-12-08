@@ -27,6 +27,8 @@
 #include <mmreg.h>
 #endif
 
+#include "fd_portab.h"
+
 #define ms_filter_destroy_and_reset(obj) \
 	ms_filter_destroy(obj); \
 	obj = NULL
@@ -218,6 +220,9 @@ bool_t ms_media_player_open(MSMediaPlayer *obj, const char *filepath) {
 	}
 	ms_filter_add_notify_callback(obj->player, _eof_filter_notify_cb, obj, FALSE);
 	ms_filter_call_method(obj->player, MS_PLAYER_SET_LOOP, &obj->loop_interval);
+	if (obj->snd_card) {
+		ms_snd_card_notify_audio_session_activated(obj->snd_card, TRUE);
+	}
 	obj->ticker = ms_ticker_new();
 	ms_ticker_set_name(obj->ticker, "Player");
 	ms_ticker_attach(obj->ticker, obj->player);
