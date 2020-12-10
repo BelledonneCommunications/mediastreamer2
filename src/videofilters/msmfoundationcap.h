@@ -97,9 +97,11 @@ public:
 //----------------------------------------	Special Microsoft Section
 
 	// the class must implement the methods from IUnknown
+
 	STDMETHODIMP QueryInterface(REFIID iid, void** ppv);
 	STDMETHODIMP_(ULONG) AddRef();
 	STDMETHODIMP_(ULONG) Release();
+
 
 	//  the class must implement the methods from IMFSourceReaderCallback
 	STDMETHODIMP OnReadSample(HRESULT status, DWORD streamIndex, DWORD streamFlags, LONGLONG timeStamp, IMFSample *sample);

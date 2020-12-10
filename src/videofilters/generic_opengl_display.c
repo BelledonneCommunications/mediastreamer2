@@ -139,7 +139,7 @@ static int ogl_set_native_window_id (MSFilter *f, void *arg) {
 	data = f->data;
 	context_info = *((ContextInfo **)arg);
 
-	if (context_info && (unsigned long)context_info != MS_FILTER_VIDEO_NONE) {
+	if (context_info && (unsigned long long)context_info != (unsigned long long)MS_FILTER_VIDEO_NONE) {
 		ms_message(
 			"set native window id: %p (width: %d, height: %d)\n",
 			(void*)context_info, (int)context_info->width, (int)context_info->height
