@@ -17,12 +17,14 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdint.h>
 #include <algorithm>
 #include <array>
 #include <cwchar>
 #include <list>
 #include <memory>
 #include <vector>
+
 
 #define bool_t mkv_bool_t
 extern "C" {

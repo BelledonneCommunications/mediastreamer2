@@ -35,7 +35,7 @@
 #pragma comment(lib,"mfuuid.lib")
 #pragma comment(lib,"shlwapi.lib")
 
-
+#ifdef MS2_WINDOWS_UWP
 /*
 #include <WinRTBase.h>
 #include <wrl\implements.h>
@@ -81,7 +81,7 @@ using namespace Windows::Media::MediaProperties;
 using namespace Windows::Foundation;
 using namespace Windows::Devices::Enumeration;
 using namespace Windows::Storage;
-
+#endif
 
 class MFDevices {// Store device description with helper
 public:

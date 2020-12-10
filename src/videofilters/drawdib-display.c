@@ -218,15 +218,19 @@ static HWND create_window(int w, int h, DDDisplay *dd)
 		ms_error("AdjustWindowRect failed.");
 	}
 	ms_message("AdjustWindowRect: %li,%li %li,%li",rect.left,rect.top,rect.right,rect.bottom);
-	hwnd=CreateWindow(
+
 #ifdef MS2_WINDOWS_UWP
-		    L"Video Window", L"Video window", 
-#else
-		    "Video Window", "Video window", 
-#endif
+	hwnd=CreateWindow(L"Video Window", L"Video window",
 		WS_OVERLAPPEDWINDOW /*WS_THICKFRAME*/ | WS_VISIBLE ,
 		CW_USEDEFAULT, CW_USEDEFAULT, rect.right-rect.left,rect.bottom-rect.top,
 		NULL, NULL, hInstance, dd);
+#else
+	hwnd=CreateWindow("Video Window", "Video window",
+		WS_OVERLAPPEDWINDOW /*WS_THICKFRAME*/ | WS_VISIBLE ,
+		CW_USEDEFAULT, CW_USEDEFAULT, rect.right-rect.left,rect.bottom-rect.top,
+		NULL, NULL, hInstance, dd);
+#endif
+
 	if (hwnd==NULL){
 		ms_error("Fail to create video window");
 	}

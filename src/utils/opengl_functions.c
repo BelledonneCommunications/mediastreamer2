@@ -40,7 +40,7 @@ void opengl_functions_default_init (OpenGlFunctions *f) {
 #ifdef UNICODE
 	openglLibrary = LoadLibraryExW(L"libGLESv2.dll", NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
 #else
-	openglLibrary = LoadLibraryExA(L"libGLESv2.dll", NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
+	openglLibrary = LoadLibraryExA("libGLESv2.dll", NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
 #endif
 	if (openglLibrary==NULL)
 	{
@@ -48,7 +48,7 @@ void opengl_functions_default_init (OpenGlFunctions *f) {
 #ifdef UNICODE
 		openglLibrary = LoadLibraryExW(L"libGLESv2.dll", NULL, 0);
 #else
-		openglLibrary = LoadLibraryExA(L"libGLESv2.dll", NULL, 0);
+		openglLibrary = LoadLibraryExA("libGLESv2.dll", NULL, 0);
 #endif
 	}
 #else
@@ -105,7 +105,7 @@ void opengl_functions_default_init (OpenGlFunctions *f) {
 #ifdef UNICODE
 	openglLibrary = LoadLibraryExW(L"libEGL.dll", NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
 #else
-	openglLibrary = LoadLibraryExA(L"libEGL.dll", NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
+	openglLibrary = LoadLibraryExA("libEGL.dll", NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
 #endif
 	if (openglLibrary==NULL)
 	{
@@ -113,7 +113,7 @@ void opengl_functions_default_init (OpenGlFunctions *f) {
 #ifdef UNICODE
 		openglLibrary = LoadLibraryExW(L"libEGL.dll", NULL, 0);
 #else
-		openglLibrary = LoadLibraryExA(L"libEGL.dll", NULL, 0);
+		openglLibrary = LoadLibraryExA("libEGL.dll", NULL, 0);
 #endif
 	}
 #else

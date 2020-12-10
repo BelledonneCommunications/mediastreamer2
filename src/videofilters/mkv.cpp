@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <memory>
 
+#include <stdint.h>
 #define bool_t matroska_bool_t
 extern "C" {
 #include <matroska/matroska.h>
