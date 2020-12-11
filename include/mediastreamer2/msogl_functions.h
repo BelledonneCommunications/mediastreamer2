@@ -145,7 +145,13 @@ typedef void (*resolveGlRenderbufferStorage)(GLenum target, GLenum internalforma
 typedef void (*resolveGlSampleCoverage)(GLclampf value, GLboolean invert);
 typedef void (*resolveGlScissor)(GLint x, GLint y, GLsizei width, GLsizei height);
 typedef void (*resolveGlShaderBinary)(GLint n, const GLuint *shaders, GLenum binaryformat, const void *binary, GLint length);
+
+#ifdef MS2_USE_OLD_OPENGL_PROTOTYPE
+typedef void (*resolveGlShaderSource)(GLuint shader, GLsizei count, const char **string, const GLint *length);
+#else
 typedef void (*resolveGlShaderSource)(GLuint shader, GLsizei count, const char *const*string, const GLint *length);
+#endif
+
 typedef void (*resolveGlStencilFunc)(GLenum func, GLint ref, GLuint mask);
 typedef void (*resolveGlStencilFuncSeparate)(GLenum face, GLenum func, GLint ref, GLuint mask);
 typedef void (*resolveGlStencilMask)(GLuint mask);
