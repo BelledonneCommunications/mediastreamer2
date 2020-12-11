@@ -57,7 +57,7 @@ void opengl_functions_default_init (OpenGlFunctions *f) {
 	if( openglLibrary == NULL ){
 		ms_error("MSOpenGL Function : Fail to load plugin %s: error %i", L"libGLESv2.dll", (int)GetLastError());
 	}else{
-#endif// WIN32
+#endif// _WIN32
 		
 		f->glActiveTexture = CAST(resolveGlActiveTexture, glActiveTexture);
 		f->glAttachShader = CAST(resolveGlAttachShader, glAttachShader);
@@ -95,10 +95,12 @@ void opengl_functions_default_init (OpenGlFunctions *f) {
 		f->glValidateProgram = CAST(resolveGlValidateProgram, glValidateProgram);
 		f->glVertexAttribPointer = CAST(resolveGlVertexAttribPointer, glVertexAttribPointer);
 		f->glViewport = CAST(resolveGlViewport, glViewport);
-#ifdef WIN32
+#ifdef _WIN32
 	}
 #endif
 	//----------------------    EGL        
+#if _WIN32	// Just to be sure to use egl only on Windows (for the moment)
+	
 #if defined(_WIN32)// On Windows, load dynamically library as is it not deployed by the system. Clients must be sure to embedd "libEGL.dll" with the app
 #if defined(MS2_WINDOWS_DESKTOP) && !defined(MS2_WINDOWS_UWP)
 	
@@ -122,7 +124,7 @@ void opengl_functions_default_init (OpenGlFunctions *f) {
 	if( openglLibrary == NULL ){
 		ms_error("MSOpenGL Function : Fail to load plugin %s: error %i", L"libEGL.dll", (int)GetLastError());
 	}else{
-#endif// WIN32
+#endif// _WIN32
 		
 		f->eglGetPlatformDisplayEXT = CAST(resolveEGLGetPlatformDisplayEXT, eglGetPlatformDisplayEXT);
 		f->eglInitialize = CAST(resolveEGLInitialize, eglInitialize);
@@ -137,7 +139,8 @@ void opengl_functions_default_init (OpenGlFunctions *f) {
 		f->eglDestroyContext = CAST( resolveEGLDestroyContext, eglDestroyContext);
 		f->eglTerminate = CAST( resolveEGLTerminate, eglTerminate);
 		
-#ifdef WIN32
+#ifdef _WIN32
 	}
 #endif
+#endif	// WIN32
 }

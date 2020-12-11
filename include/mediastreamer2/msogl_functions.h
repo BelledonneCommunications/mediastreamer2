@@ -145,7 +145,7 @@ typedef void (*resolveGlRenderbufferStorage)(GLenum target, GLenum internalforma
 typedef void (*resolveGlSampleCoverage)(GLclampf value, GLboolean invert);
 typedef void (*resolveGlScissor)(GLint x, GLint y, GLsizei width, GLsizei height);
 typedef void (*resolveGlShaderBinary)(GLint n, const GLuint *shaders, GLenum binaryformat, const void *binary, GLint length);
-typedef void (*resolveGlShaderSource)(GLuint shader, GLsizei count, const char **string, const GLint *length);
+typedef void (*resolveGlShaderSource)(GLuint shader, GLsizei count, const char *const*string, const GLint *length);
 typedef void (*resolveGlStencilFunc)(GLenum func, GLint ref, GLuint mask);
 typedef void (*resolveGlStencilFuncSeparate)(GLenum face, GLenum func, GLint ref, GLuint mask);
 typedef void (*resolveGlStencilMask)(GLuint mask);
@@ -191,7 +191,7 @@ typedef void (*resolveGlVertexAttribPointer)(GLuint indx, GLint size, GLenum typ
 typedef void (*resolveGlViewport)(GLint x, GLint y, GLsizei width, GLsizei height);
 
 // -----------------------------------------------------------------------------
-
+#if _WIN32
 typedef EGLDisplay (*resolveEGLGetPlatformDisplayEXT)(EGLenum platform, void *native_display, const EGLint *attrib_list);
 typedef EGLBoolean (*resolveEGLInitialize)(EGLDisplay dpy, EGLint *major, EGLint *minor);
 typedef EGLBoolean (*resolveEGLChooseConfig)(EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
@@ -207,7 +207,7 @@ typedef EGLBoolean (*resolveEGLTerminate)(EGLDisplay dpy);
 
 
 typedef EGLSurface (*resolveEGLCreateWindowSurface)(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list);
-
+#endif
 
 
 // -----------------------------------------------------------------------------
@@ -355,7 +355,7 @@ struct OpenGlFunctions {
 	resolveGlVertexAttribPointer glVertexAttribPointer;
 	resolveGlViewport glViewport;
 	
-	
+#if _WIN32
 	resolveEGLGetPlatformDisplayEXT eglGetPlatformDisplayEXT;
 	resolveEGLInitialize eglInitialize;
 	resolveEGLChooseConfig eglChooseConfig;
@@ -368,6 +368,7 @@ struct OpenGlFunctions {
 	resolveEGLDestroySurface eglDestroySurface;
 	resolveEGLDestroyContext eglDestroyContext;
 	resolveEGLTerminate eglTerminate;
+#endif	
 };
 
 typedef struct OpenGlFunctions OpenGlFunctions;
