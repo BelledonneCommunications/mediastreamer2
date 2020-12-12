@@ -27,7 +27,7 @@
 #include "mediastreamer2/mscommon.h"
 #define CAST(type, fn) (type)GetProcAddress( openglLibrary, #fn)
 #else
-#define CAST(type, fn) fn
+#define CAST(type, fn) (type)fn
 #endif
 
 void opengl_functions_default_init (OpenGlFunctions *f) {
