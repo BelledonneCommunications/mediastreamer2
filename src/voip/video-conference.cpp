@@ -246,6 +246,10 @@ VideoConferenceOneToAll::VideoConferenceOneToAll(MSFactory *f, const MSVideoConf
 	ms_filter_call_method(mMixer, MS_FILTER_SET_INPUT_FMT, (void*)fmt);
 	ms_filter_add_notify_callback(mMixer,on_switcher_event,this,TRUE);
 	mCfparams=*params;
+
+	mMembers = NULL;
+	mBitrate = 0;
+	mVideoPlaceholderMember = NULL;
 }
 
 void VideoConferenceOneToAll::addVideoPlaceholderMember() {
