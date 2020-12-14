@@ -132,6 +132,7 @@ set(VOIP_SOURCE_FILES_CXX
 	utils/filter-wrapper/decoding-filter-wrapper.cpp
 	utils/filter-wrapper/encoding-filter-wrapper.cpp
 	voip/turn_tcp.cpp
+	voip/video-conference.cpp
 )
 set(VOIP_SOURCE_FILES_OBJC )
 set(VOIP_SOURCE_FILES_ASM )
@@ -235,7 +236,6 @@ if(ENABLE_VIDEO)
 		voip/video_preset_high_fps.c
 		voip/videostarter.c
 		voip/videostream.c
-		voip/videoconference.c
 		voip/vp8rtpfmt.c
 		voip/vp8rtpfmt.h
 	)

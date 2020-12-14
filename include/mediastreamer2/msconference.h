@@ -253,10 +253,23 @@ struct _MSVideoConferenceParams{
 	const char *codec_mime_type;
 };
 
+
 /**
  * Typedef to structure that holds conference parameters
 **/
 typedef struct _MSVideoConferenceParams MSVideoConferenceParams;
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * The MSVideoEndpoint represents a participant in the conference.
+ * It can be constructed from an existing VideoStream object with
+ * ms_video_endpoint_get_from_stream().
+**/
+typedef struct _MSVideoEndpoint MSVideoEndpoint;
 
 /**
  * The MSVideoConference is the object representing a video conference.
@@ -268,21 +281,6 @@ typedef struct _MSVideoConferenceParams MSVideoConferenceParams;
  * When all participants are removed, the MSVideoConference object can then be safely destroyed with ms_video_conference_destroy().
 **/
 typedef struct _MSVideoConference MSVideoConference;
-
-
-/**
- * The MSVideoEndpoint represents a participant in the conference.
- * It can be constructed from an existing VideoStream object with
- * ms_video_endpoint_get_from_stream().
-**/
-typedef struct _MSVideoEndpoint MSVideoEndpoint;
-
-
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /**
  * Creates a conference.
