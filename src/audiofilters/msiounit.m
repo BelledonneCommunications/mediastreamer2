@@ -28,6 +28,7 @@
 #import "mediastreamer2/msfilter.h"
 #import "mediastreamer2/msticker.h"
 
+static const int defaultSampleRate = 48000;
 static const int flowControlInterval = 5000; // ms
 static const int flowControlThreshold = 40; // ms
 
@@ -146,6 +147,7 @@ struct au_filter_write_data{
 	au_filter_base_t base;
 	ms_mutex_t mutex;
 	MSFlowControlledBufferizer *bufferizer;
+	AudioTimeStamp writeTimeStamp;
 	unsigned int n_lost_frame;
 };
 
@@ -342,54 +344,51 @@ static bool_t start_audio_unit (au_card_t* card, uint64_t time) {
 	}
 	uint64_t time_start, time_end;
 	
+	time_start = ortp_get_cur_time_ms();
+	ms_message("start_audio_unit(): about to start audio unit.");
+	check_audiounit_call(AudioUnitInitialize(card->audio_unit));
 	
-	if (card->last_failed_iounit_start_time == 0 || (time - card->last_failed_iounit_start_time)>100) {
-		time_start = ortp_get_cur_time_ms();
-		ms_message("start_audio_unit(): about to start audio unit.");
-		check_audiounit_call(AudioUnitInitialize(card->audio_unit));
-		
-		Float64 delay;
-		UInt32 delaySize = sizeof(delay);
-		check_audiounit_call(AudioUnitGetProperty(card->audio_unit
-									  ,kAudioUnitProperty_Latency
-									  , kAudioUnitScope_Global
-									  , 0
-									  , &delay
-									  , &delaySize));
+	Float64 delay;
+	UInt32 delaySize = sizeof(delay);
+	check_audiounit_call(AudioUnitGetProperty(card->audio_unit
+								  ,kAudioUnitProperty_Latency
+								  , kAudioUnitScope_Global
+								  , 0
+								  , &delay
+								  , &delaySize));
 
-		UInt32 quality;
-		UInt32 qualitySize = sizeof(quality);
-		check_audiounit_call(AudioUnitGetProperty(card->audio_unit
-									  ,kAudioUnitProperty_RenderQuality
-									  , kAudioUnitScope_Global
-									  , 0
-									  , &quality
-									  , &qualitySize));
-		ms_message("I/O unit latency [%f], quality [%u]",delay,(unsigned)quality);
-		AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-		Float32 hwoutputlatency = audioSession.outputLatency;
+	UInt32 quality;
+	UInt32 qualitySize = sizeof(quality);
+	check_audiounit_call(AudioUnitGetProperty(card->audio_unit
+								  ,kAudioUnitProperty_RenderQuality
+								  , kAudioUnitScope_Global
+								  , 0
+								  , &quality
+								  , &qualitySize));
+	ms_message("I/O unit latency [%f], quality [%u]",delay,(unsigned)quality);
+	AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+	Float32 hwoutputlatency = audioSession.outputLatency;
 
-		Float32 hwinputlatency = audioSession.inputLatency;
+	Float32 hwinputlatency = audioSession.inputLatency;
 
-		Float32 hwiobuf = audioSession.IOBufferDuration;
+	Float32 hwiobuf = audioSession.IOBufferDuration;
 
-		Float64 hwsamplerate = audioSession.sampleRate;
+	Float64 hwsamplerate = audioSession.sampleRate;
 
-		OSStatus auresult;
-		check_audiounit_call( (auresult = AudioOutputUnitStart(card->audio_unit)) );
-		if (auresult == 0){
-			card->audio_unit_state = MSAudioUnitStarted;
-		}
-		if (card->audio_unit_state != MSAudioUnitStarted) {
-			ms_message("AudioUnit could not be started, current hw output latency [%f] input [%f] iobuf[%f] hw sample rate [%f]",hwoutputlatency,hwinputlatency,hwiobuf,hwsamplerate);
-			card->last_failed_iounit_start_time=time;
-		} else {
-			ms_message("AudioUnit started, current hw output latency [%f] input [%f] iobuf[%f] hw sample rate [%f]",hwoutputlatency,hwinputlatency,hwiobuf,hwsamplerate);
-			card->last_failed_iounit_start_time=0;
-		}
-		time_end = ortp_get_cur_time_ms();
-		ms_message("start_audio_unit() took %i ms.", (int)(time_end - time_start));
+	OSStatus auresult;
+	check_audiounit_call( (auresult = AudioOutputUnitStart(card->audio_unit)) );
+	if (auresult == 0){
+		card->audio_unit_state = MSAudioUnitStarted;
 	}
+	if (card->audio_unit_state != MSAudioUnitStarted) {
+		ms_message("AudioUnit could not be started, current hw output latency [%f] input [%f] iobuf[%f] hw sample rate [%f]",hwoutputlatency,hwinputlatency,hwiobuf,hwsamplerate);
+		card->last_failed_iounit_start_time=time;
+	} else {
+		ms_message("AudioUnit started, current hw output latency [%f] input [%f] iobuf[%f] hw sample rate [%f]",hwoutputlatency,hwinputlatency,hwiobuf,hwsamplerate);
+		card->last_failed_iounit_start_time=0;
+	}
+	time_end = ortp_get_cur_time_ms();
+	ms_message("start_audio_unit() took %i ms.", (int)(time_end - time_start));
 	return card->audio_unit_state == MSAudioUnitStarted;
 }
 
@@ -439,11 +438,11 @@ static void au_init(MSSndCard *card){
 		d->is_tester=TRUE;
 	}
 	d->bits=16;
-	d->rate=AVAudioSession.sharedInstance.sampleRate; /*not set*/
+	d->rate=defaultSampleRate;
 	d->nchannels=1;
 	d->ms_snd_card=card;
 	d->will_be_used = FALSE;
-	card->preferred_sample_rate=44100;
+	card->preferred_sample_rate=defaultSampleRate;
 	card->capabilities|=MS_SND_CARD_CAP_BUILTIN_ECHO_CANCELLER|MS_SND_CARD_CAP_IS_SLOW;
 	ms_mutex_init(&d->mutex,NULL);
 	card->data=d;
@@ -480,18 +479,19 @@ static void au_usage_hint(MSSndCard *card, bool_t used){
 static void au_detect(MSSndCardManager *m);
 static MSSndCard *au_duplicate(MSSndCard *obj);
 
-static void au_audio_route_changed(MSSndCard *obj) {
-	au_card_t *d = (au_card_t*)obj->data;
+static void handle_sample_rate_change(au_card_t *d){
 	int rate = (int)[[AVAudioSession sharedInstance] sampleRate];
-	if (!d || rate >= d->rate) {
+	if (rate == (int)d->rate) {
 		return;
 	}
-
-	stop_audio_unit(d);
+	ms_message("MSAURead/MSAUWrite: AVAudioSession's sample rate has changed from %i to %i.", d->rate, rate);
 	d->rate = rate;
-	ms_message("MSAURead/MSAUWrite: AVAudioSession is configured from at sample rate %i.", d->rate);
-	configure_audio_unit(d);
-	start_audio_unit(d, 0);
+	
+	if (d->audio_unit_state == MSAudioUnitConfigured || d->audio_unit_state == MSAudioUnitStarted){
+		stop_audio_unit(d);
+		configure_audio_unit(d);
+		start_audio_unit(d, 0);
+	}
 
 	if (d->write_filter) {
 		au_filter_write_data_t *ft=(au_filter_write_data_t*)d->write_filter->data;
@@ -501,21 +501,34 @@ static void au_audio_route_changed(MSSndCard *obj) {
 	if (d->read_filter) {
 		ms_filter_notify_no_arg(d->read_filter, MS_FILTER_OUTPUT_FMT_CHANGED);
 	}
+	
+}
+
+static void au_audio_route_changed(MSSndCard *obj) {
+	au_card_t *d = (au_card_t*)obj->data;
+	if (!d) return;
+	handle_sample_rate_change(d);
 }
 
 static void configure_audio_session(au_card_t* d);
-static void au_audio_session_activated(MSSndCard *obj, bool_t actived) {
+static void au_audio_session_activated(MSSndCard *obj, bool_t activated) {
 	au_card_t *d = (au_card_t*)obj->data;
-	d->audio_session_activated = actived;
-	if(actived) {
-		configure_audio_session(d);
-	}
-	if (actived && d->audio_unit_state == MSAudioUnitConfigured){
+	d->audio_session_activated = activated;
+	ms_message("AVAudioSession activated: %i", (int)activated);
+	
+	if (activated && d->audio_unit_state == MSAudioUnitCreated){
+		/* 
+			The sample rate is known only after that the AudioSession is activated. 
+			It may have changed compared to the original value we requested while plumbing the graph.
+			*/
+		handle_sample_rate_change(d);
+		/* The next is done on a separate thread because it is considerably slow, so don't block the application calling thread here. */
 		dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH,0), ^{
-				start_audio_unit(d, 0);});
-	}else if (!actived && d->audio_unit_state == MSAudioUnitStarted) {
+				configure_audio_unit(d);
+				start_audio_unit(d, 0);
+		});
+	}else if (!activated && d->audio_unit_state == MSAudioUnitStarted) {
 		stop_audio_unit_with_param(d, TRUE);
-		configure_audio_unit(d);
 	}
 }
 
@@ -570,6 +583,11 @@ static void au_detect(MSSndCardManager *m){
 	ms_snd_card_manager_add_card(m,card);
 }
 
+static bool_t check_timestamp_discontinuity(const AudioTimeStamp *t1, const AudioTimeStamp *t2, unsigned int usualSampleCount){
+	/* The *2 on usualSampleCount is to take into account small variations that arrive on the inNumberFrames values. */
+	return labs((long)t1->mSampleTime - (long)t2->mSampleTime) >= (long)usualSampleCount * 2;
+}
+
 /********************write cb only used for write operation******************/
 static OSStatus au_read_cb (
 							  void                        *inRefCon,
@@ -588,9 +606,7 @@ static OSStatus au_read_cb (
 		return 0;
 	}
 	au_filter_read_data_t *d = card->read_filter->data;
-	if (d->readTimeStamp.mSampleTime <0) {
-		d->readTimeStamp=*inTimeStamp;
-	}
+	
 	OSStatus err=0;
 	mblk_t * rm=NULL;
 	AudioBufferList readAudioBufferList;
@@ -606,14 +622,33 @@ static OSStatus au_read_cb (
 			rm->b_wptr += readAudioBufferList.mBuffers[0].mDataByteSize;
 			ms_mutex_lock(&d->mutex);
 			putq(&d->rq,rm);
+			d->read_samples += (readAudioBufferList.mBuffers[0].mDataByteSize / 2) / d->base.card->nchannels;
 			ms_mutex_unlock(&d->mutex);
-			d->readTimeStamp.mSampleTime+=readAudioBufferList.mBuffers[0].mDataByteSize/(d->base.card->bits/2);
+			if ((readAudioBufferList.mBuffers[0].mDataByteSize / 2) / d->base.card->nchannels != inNumberFrames){
+				ms_error("au_read_cb(): buffer has only %u samples !!", (unsigned) (readAudioBufferList.mBuffers[0].mDataByteSize / 2) / d->base.card->nchannels);
+			}
 		} else {
 			check_au_unit_result(err, "AudioUnitRender");
 			freeb(rm);
 		}
-	}
+	}else ms_warning("Read NOT started");
 	ms_mutex_unlock(&card->mutex);
+	
+	if (ioData && ioData->mNumberBuffers > 1) ms_warning("ioData->mNumberBuffers=%u", (unsigned)ioData->mNumberBuffers);
+	if (d->readTimeStamp.mSampleTime < 0){
+		d->readTimeStamp = *inTimeStamp;
+	}else{
+		if (check_timestamp_discontinuity(&d->readTimeStamp, inTimeStamp, inNumberFrames)){
+			ms_warning("AudioUnit capture sample time discontinuity (current=%u, previous=%u, inNumberFrames=%u) ! This usually happens during audio route changes.",
+				(unsigned)inTimeStamp->mSampleTime, (unsigned)d->readTimeStamp.mSampleTime, (unsigned)inNumberFrames);
+			if (d->ticker_synchronizer){
+				ms_mutex_lock(&d->mutex);
+				ms_ticker_synchronizer_resync(d->ticker_synchronizer);
+				ms_mutex_unlock(&d->mutex);
+			}
+		}
+		d->readTimeStamp = *inTimeStamp;
+	}
 	return err;
 }
 
@@ -643,8 +678,15 @@ static OSStatus au_write_cb (
 
 	if (d!=NULL){
 		unsigned int size;
+		
 		ms_mutex_lock(&d->mutex);
 		size = inNumberFrames*d->base.card->bits/8;
+		//ms_message("AudioUnit playback inNumberFrames=%u timeStamp=%u", (unsigned)inNumberFrames, (unsigned)inTimeStamp->mSampleTime);
+		if (d->writeTimeStamp.mSampleTime != 0 && check_timestamp_discontinuity(&d->writeTimeStamp, inTimeStamp, inNumberFrames)){
+			ms_warning("AudioUnit playback discontinuity detected (current=%u, previous=%u, inNumberFrames=%u).",
+				(unsigned)inTimeStamp->mSampleTime, (unsigned) d->writeTimeStamp.mSampleTime, (unsigned) inNumberFrames);
+			ms_flow_controlled_bufferizer_flush(d->bufferizer);
+		}
 		if (ms_flow_controlled_bufferizer_get_avail(d->bufferizer) >= size) {
 			ms_flow_controlled_bufferizer_read(d->bufferizer, ioData->mBuffers[0].mData, size);
 		} else {
@@ -655,6 +697,7 @@ static OSStatus au_write_cb (
 					 ,(unsigned int)ioData->mBuffers[0].mDataByteSize);
 		}
 		ms_mutex_unlock(&d->mutex);
+		d->writeTimeStamp = *inTimeStamp;
 	}
 	ms_mutex_unlock(&card->mutex);
 	return 0;
@@ -719,39 +762,19 @@ static void configure_audio_session(au_card_t* d) {
 					err = nil;
 				}
 			}
-			double sampleRate = 48000; /*let's target the highest sample rate*/
+			double sampleRate = defaultSampleRate;
 			[audioSession setPreferredSampleRate:sampleRate error:&err];
 			if (err) {
 				ms_error("Unable to change preferred sample rate because : %s", [err localizedDescription].UTF8String);
 				err = nil;
 			}
-			/*
-			According to QA1631, it is not safe to request a prefered I/O buffer duration or sample rate while
-			the session is active.
-			However, until the session is active, we don't know what the actual sampleRate will be.
-			As a result the following code cannot be used. What was it for ? If put it in "if 0" in doubt.
-			*/
-#if 0
-			Float32 preferredBufferSize;
-			switch (card->rate) {
-				case 11025:
-				case 22050:
-					preferredBufferSize= .020;
-					break;
-				default:
-					preferredBufferSize= .015;
-			}
-			[audioSession setPreferredIOBufferDuration:(NSTimeInterval)preferredBufferSize
-								   error:&err];
-								   if(err) ms_error("Unable to change IO buffer duration because : %s", [err localizedDescription].UTF8String);
-								   err = nil;
-
-#endif
-			[audioSession setActive:TRUE error:&err];
-			if(err){
-				ms_error("Unable to activate audio session because : %s", [err localizedDescription].UTF8String);
-				err = nil;
-			}
+			if (!d->callkit_enabled){
+				[audioSession setActive:TRUE error:&err];
+				if(err){
+					ms_error("Unable to activate audio session because : %s", [err localizedDescription].UTF8String);
+					err = nil;
+				}
+			}else ms_message("Not activating the AVAudioSession because it is CallKit's job.");
 			time_end = ortp_get_cur_time_ms();
 			ms_message("MSAURead/MSAUWrite: configureAudioSession() took %i ms.", (int)(time_end - time_start));
 			d->audio_session_configured=TRUE;
@@ -762,9 +785,14 @@ static void configure_audio_session(au_card_t* d) {
 	} else {
 		ms_message("Fast iounit mode, audio session configuration must be done at application level.");
 	}
-	/*now that the AudioSession is configured, take the audioSession's sampleRate*/
-	d->rate = (int)[audioSession sampleRate];
-	ms_message("MSAURead/MSAUWrite: AVAudioSession is configured at sample rate %i.", d->rate);
+	/*
+		Now that the AudioSession is configured and only if activation was done, take the audioSession's sampleRate.
+		Otherwise the value is not valid.
+	*/
+	if (!d->callkit_enabled || d->audio_session_activated){
+		d->rate = (int)[audioSession sampleRate];
+		ms_message("MSAURead/MSAUWrite: AVAudioSession is configured at sample rate %i.", d->rate);
+	}
 }
 
 
@@ -773,10 +801,10 @@ static void check_audio_unit_is_up(au_card_t *card){
 	if (card->audio_unit_state == MSAudioUnitNotCreated){
 		create_audio_unit(card);
 	}
-	if (card->audio_unit_state == MSAudioUnitCreated){
+	if (card->audio_unit_state == MSAudioUnitCreated && card->audio_session_activated){
 		configure_audio_unit(card);
 	}
-	if (card->audio_session_activated && card->audio_unit_state == MSAudioUnitConfigured){
+	if (card->audio_unit_state == MSAudioUnitConfigured){
 		start_audio_unit(card, 0);
 	}
 	if (card->audio_unit_state == MSAudioUnitStarted){
@@ -799,8 +827,6 @@ static void au_read_preprocess(MSFilter *f){
 static void au_read_process(MSFilter *f){
 	au_filter_read_data_t *d=(au_filter_read_data_t*)f->data;
 	mblk_t *m;
-
-	bool_t read_something = FALSE;
 	
 	/*
 	If audio unit is not started, it means audsion session is not yet activated. Do not ms_ticker_synchronizer_update.
@@ -809,12 +835,12 @@ static void au_read_process(MSFilter *f){
 
 	ms_mutex_lock(&d->mutex);
 	while((m = getq(&d->rq)) != NULL){
-		d->read_samples += (msgdsize(m) / 2) / d->base.card->nchannels;
 		ms_queue_put(f->outputs[0],m);
 	}
+	ms_ticker_synchronizer_update(d->ticker_synchronizer, d->read_samples, d->base.card->rate);
 	ms_mutex_unlock(&d->mutex);
 
-	ms_ticker_synchronizer_update(d->ticker_synchronizer, d->read_samples, d->base.card->rate);
+	
 }
 
 static void au_read_postprocess(MSFilter *f){
