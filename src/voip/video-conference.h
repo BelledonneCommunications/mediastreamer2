@@ -22,6 +22,7 @@
 
 #include "mediastreamer2/msconference.h"
 #include "mediastreamer2/msvideoswitcher.h"
+#include "mediastreamer2/msvideorouter.h"
 #include "private.h"
 
 
@@ -36,36 +37,22 @@ class VideoConferenceGeneric {
   public:
    	//VideoConferenceGeneric()=default;
     virtual ~VideoConferenceGeneric()=default;
-    virtual MSVideoEndpoint *getEndpointAtPin(int pin) const = 0;
+    virtual MSVideoEndpoint *getEndpointAtPin(int pin) const;
     virtual void updateBitrateRequest() = 0;
     virtual void addVideoPlaceholderMember() = 0;
     virtual void addMember(MSVideoEndpoint *ep) = 0;
     virtual void removeMember(MSVideoEndpoint *ep) = 0;
     virtual void setFocus(MSVideoEndpoint *ep) = 0;
     virtual void applyNewBitrateRequest() = 0;
-    virtual int getSize() const = 0;
-    virtual const bctbx_list_t* getMembers() const = 0;
-    virtual MSVideoEndpoint *getVideoPlaceholderMember() const = 0;
-};
+    virtual int getSize() const;
+    virtual const bctbx_list_t* getMembers() const;
+    virtual MSVideoEndpoint *getVideoPlaceholderMember() const;
+    virtual MSFilter *getMixer() const;
 
-class VideoConferenceOneToAll: public VideoConferenceGeneric {
-  public:
-    VideoConferenceOneToAll(MSFactory *f, const MSVideoConferenceParams *params) ;
-    ~VideoConferenceOneToAll() ;
 
-    void addVideoPlaceholderMember() override;
-    void addMember(MSVideoEndpoint *ep) override;
-    void removeMember(MSVideoEndpoint *ep) override;
-    void setFocus(MSVideoEndpoint *ep) override;
-    void applyNewBitrateRequest() override;
-    int getSize() const override;
-    const bctbx_list_t* getMembers() const override;
-    MSVideoEndpoint *getVideoPlaceholderMember() const override;
-    MSFilter *getMixer() const;
-    void updateBitrateRequest() override;
-    MSVideoEndpoint *getEndpointAtPin(int pin) const override;
+    virtual void setLocalMember(MSVideoFilterPinControl pc) = 0;
 
-  private:
+  protected:
 
     MSVideoConferenceParams mCfparams;
     MSTicker *mTicker;
@@ -73,6 +60,38 @@ class VideoConferenceOneToAll: public VideoConferenceGeneric {
     bctbx_list_t *mMembers;
     int mBitrate;
     MSVideoEndpoint *mVideoPlaceholderMember;
+};
+
+class VideoConferenceOneToAll: public VideoConferenceGeneric {
+  public:
+    VideoConferenceOneToAll(MSFactory *f, const MSVideoConferenceParams *params);
+    ~VideoConferenceOneToAll() ;
+
+    void addVideoPlaceholderMember() override;
+    void addMember(MSVideoEndpoint *ep) override;
+    void removeMember(MSVideoEndpoint *ep) override;
+    void setFocus(MSVideoEndpoint *ep) override;
+    void applyNewBitrateRequest() override;
+    void updateBitrateRequest() override;
+
+
+
+    void setLocalMember(MSVideoFilterPinControl pc)override;
+
+
+
+};
+
+class VideoConferenceAllToAll: public VideoConferenceGeneric {
+public:
+  VideoConferenceAllToAll(MSFactory *f, const MSVideoConferenceParams *params);
+  ~VideoConferenceAllToAll() ;
+  void addMember(MSVideoEndpoint *ep) override;
+  void addVideoPlaceholderMember() override;
+  void removeMember(MSVideoEndpoint *ep) override;
+
+
+  void setLocalMember(MSVideoFilterPinControl pc)override;
 
 };
 
