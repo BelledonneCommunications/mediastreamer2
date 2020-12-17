@@ -24,15 +24,13 @@
 #define msvideoswitcher_h
 
 #include "mediastreamer2/msfilter.h"
+#include "video_util.h"
 
 /**requests the video switcher to broadcast the video from given input pin.*/
 #define MS_VIDEO_SWITCHER_SET_FOCUS MS_FILTER_METHOD(MS_VIDEO_SWITCHER_ID,0,int)
 
-typedef struct _MSVideoSwitcherPinControl{
-	int pin;
-	int enabled;
-}MSVideoSwitcherPinControl;
-#define MS_VIDEO_SWITCHER_SET_AS_LOCAL_MEMBER MS_FILTER_METHOD(MS_VIDEO_SWITCHER_ID,1,MSVideoSwitcherPinControl)
+
+#define MS_VIDEO_SWITCHER_SET_AS_LOCAL_MEMBER MS_FILTER_METHOD(MS_VIDEO_SWITCHER_ID,1,MSVideoFilterPinControl)
 
 #define MS_VIDEO_SWITCHER_NOTIFY_PLI MS_FILTER_EVENT(MS_VIDEO_SWITCHER_ID,2,int)
 #define MS_VIDEO_SWITCHER_NOTIFY_FIR MS_FILTER_EVENT(MS_VIDEO_SWITCHER_ID,3,int)
@@ -42,4 +40,3 @@ typedef struct _MSVideoSwitcherPinControl{
 #define MS_VIDEO_SWITCHER_SEND_PLI MS_FILTER_EVENT(MS_VIDEO_SWITCHER_ID,1,int)
 
 #endif
-

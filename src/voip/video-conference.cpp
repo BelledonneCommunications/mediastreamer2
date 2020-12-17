@@ -53,15 +53,15 @@ extern "C"  void ms_video_conference_set_focus(MSVideoConference *obj, MSVideoEn
 }
 
 extern "C" int ms_video_conference_get_size(MSVideoConference *obj) {
-	return ((VideoConferenceOneToAll *)obj)->getSize();
+	return ((VideoConferenceGeneric *)obj)->getSize();
 }
 
 extern "C" const bctbx_list_t* ms_video_conference_get_members(const MSVideoConference *obj) {
-	return ((VideoConferenceOneToAll *)obj)->getMembers();
+	return ((VideoConferenceGeneric *)obj)->getMembers();
 }
 
 extern "C" MSVideoEndpoint *ms_video_conference_get_video_placeholder_member(const MSVideoConference *obj) {
-	return ((VideoConferenceOneToAll *)obj)->getVideoPlaceholderMember();
+	return ((VideoConferenceGeneric *)obj)->getVideoPlaceholderMember();
 }
 
 extern "C" void ms_video_conference_destroy(MSVideoConference *obj) {
@@ -71,6 +71,9 @@ extern "C" void ms_video_conference_destroy(MSVideoConference *obj) {
 extern "C" MSVideoConference * ms_video_conference_new(MSFactory *f, const MSVideoConferenceParams *params) {
   return (MSVideoConference *)(new VideoConferenceOneToAll(f, params));
 }
+
+
+
 
 MSVideoEndpoint * ms_video_endpoint_get_from_stream(VideoStream *st, bool_t is_remote) {
 	MSVideoEndpoint *ep=ms_video_endpoint_new();
@@ -95,13 +98,14 @@ extern "C" void ms_video_endpoint_release_from_stream(MSVideoEndpoint *obj) {
 
 namespace ms2 {
 
-static void on_switcher_event(void *data, MSFilter *f, unsigned int event_id, void *event_data) {
-	VideoConferenceOneToAll *obj=(VideoConferenceOneToAll*)data;
+static void on_filter_event(void *data, MSFilter *f, unsigned int event_id, void *event_data) {
+	VideoConferenceGeneric *obj=(VideoConferenceGeneric*)data;
 	int pin=*(int*)event_data;
 	MSVideoEndpoint *ep=obj->getEndpointAtPin(pin);
 	if (ep){
 		switch(event_id){
 			case MS_VIDEO_SWITCHER_SEND_FIR:
+			case MS_VIDEO_ROUTER_SEND_FIR:
 				ms_message("Switcher needs a refresh frame (FIR) for [%s] endpoint created from VideoStream [%p]",
 					ep->is_remote ? "remote" : "local",
 					ep->st);
@@ -112,6 +116,7 @@ static void on_switcher_event(void *data, MSFilter *f, unsigned int event_id, vo
 				}
 			break;
 			case MS_VIDEO_SWITCHER_SEND_PLI:
+			case MS_VIDEO_ROUTER_SEND_PLI:
 				ms_message("Switcher needs a refresh frame (PLI) for [%s] endpoint created from VideoStream [%p]",
 					ep->is_remote ? "remote" : "local",
 					ep->st);
@@ -138,6 +143,24 @@ static void ms_video_conference_process_encoder_control(VideoStream *vs, unsigne
 		case MS_VIDEO_ENCODER_NOTIFY_SLI:
 			/* SLI and PLI are processed in the same way.*/
 			ms_filter_call_method(conf->getMixer(), MS_VIDEO_SWITCHER_NOTIFY_PLI, &ep->pin);
+		break;
+		case MS_VIDEO_ENCODER_NOTIFY_RPSI:
+			/* Ignored. We can't do anything with RPSI in a case where there are multiple receivers of a given encoder stream.*/
+		break;
+	}
+}
+
+static void ms_video_conference_process_encoder_control_for_router(VideoStream *vs, unsigned int method_id, void *arg, void *user_data) {
+	MSVideoEndpoint *ep = (MSVideoEndpoint*) user_data;
+	VideoConferenceAllToAll *conf = (VideoConferenceAllToAll *)ep->conference;
+	switch(method_id){
+		case MS_VIDEO_ENCODER_NOTIFY_FIR:
+			ms_filter_call_method(conf->getMixer(), MS_VIDEO_ROUTER_NOTIFY_FIR, &ep->pin);
+		break;
+		case MS_VIDEO_ENCODER_NOTIFY_PLI:
+		case MS_VIDEO_ENCODER_NOTIFY_SLI:
+			/* SLI and PLI are processed in the same way.*/
+			ms_filter_call_method(conf->getMixer(), MS_VIDEO_ROUTER_NOTIFY_PLI, &ep->pin);
 		break;
 		case MS_VIDEO_ENCODER_NOTIFY_RPSI:
 			/* Ignored. We can't do anything with RPSI in a case where there are multiple receivers of a given encoder stream.*/
@@ -177,8 +200,8 @@ static int find_free_pin(MSFilter *mixer) {
 }
 
 static void plumb_to_conf(MSVideoEndpoint *ep) {
-	VideoConferenceOneToAll *conf=(VideoConferenceOneToAll *)ep->conference;
-	MSVideoSwitcherPinControl pc;
+	VideoConferenceGeneric *conf=(VideoConferenceGeneric *)ep->conference;
+	MSVideoFilterPinControl pc;
 
 	if (ep != conf->getVideoPlaceholderMember()) {
 		ep->pin=find_free_pin(conf->getMixer());
@@ -193,10 +216,10 @@ static void plumb_to_conf(MSVideoEndpoint *ep) {
 
 	pc.pin = ep->pin;
 	pc.enabled = !ep->is_remote;
-	ms_filter_call_method(conf->getMixer(), MS_VIDEO_SWITCHER_SET_AS_LOCAL_MEMBER, &pc);
+	conf->setLocalMember(pc);
 }
 
-static MSVideoEndpoint *create_video_placeholder_member(VideoConferenceOneToAll *obj) {
+static MSVideoEndpoint *create_video_placeholder_member(VideoConferenceGeneric *obj) {
 	// create an endpoint for static image
 	VideoStream *stream = video_stream_new(obj->getMixer()->factory, 65004, 65005, FALSE);
 	media_stream_set_direction(&stream->ms, MediaStreamSendOnly);
@@ -224,7 +247,8 @@ static void unplumb_from_conf(MSVideoEndpoint *ep) {
 	}
 }
 
-MSVideoEndpoint *VideoConferenceOneToAll::getEndpointAtPin(int pin) const {
+//------------------------------------------------------------------------------
+MSVideoEndpoint *VideoConferenceGeneric::getEndpointAtPin(int pin) const {
   const MSList *it;
   for (it=mMembers;it!=NULL;it=it->next){
     MSVideoEndpoint *ep=(MSVideoEndpoint*)it->data;
@@ -233,6 +257,25 @@ MSVideoEndpoint *VideoConferenceOneToAll::getEndpointAtPin(int pin) const {
   if (mVideoPlaceholderMember->pin == pin) return mVideoPlaceholderMember;
   return NULL;
 }
+
+int VideoConferenceGeneric::getSize() const {
+	return bctbx_list_size(mMembers);
+}
+
+const bctbx_list_t* VideoConferenceGeneric::getMembers() const {
+	return mMembers;
+}
+
+MSVideoEndpoint *VideoConferenceGeneric::getVideoPlaceholderMember() const {
+  return mVideoPlaceholderMember;
+}
+
+MSFilter *VideoConferenceGeneric::getMixer() const {
+  return mMixer;
+}
+
+
+//------------------------------------------------------------------------------
 
 VideoConferenceOneToAll::VideoConferenceOneToAll(MSFactory *f, const MSVideoConferenceParams *params) {
 	const MSFmtDescriptor *fmt;
@@ -244,7 +287,7 @@ VideoConferenceOneToAll::VideoConferenceOneToAll(MSFactory *f, const MSVideoConf
 	mMixer = ms_factory_create_filter(f, MS_VIDEO_SWITCHER_ID);
 	fmt = ms_factory_get_video_format(f, params->codec_mime_type ? params->codec_mime_type : "VP8" ,vsize,0,NULL);
 	ms_filter_call_method(mMixer, MS_FILTER_SET_INPUT_FMT, (void*)fmt);
-	ms_filter_add_notify_callback(mMixer,on_switcher_event,this,TRUE);
+	ms_filter_add_notify_callback(mMixer,on_filter_event,this,TRUE);
 	mCfparams=*params;
 
 	mMembers = NULL;
@@ -334,23 +377,88 @@ void VideoConferenceOneToAll::updateBitrateRequest() {
 	}
 }
 
-int VideoConferenceOneToAll::getSize() const {
-	return bctbx_list_size(mMembers);
-}
-
-const bctbx_list_t* VideoConferenceOneToAll::getMembers() const {
-	return mMembers;
-}
-
-MSVideoEndpoint *VideoConferenceOneToAll::getVideoPlaceholderMember() const {
-  return mVideoPlaceholderMember;
-}
-
-MSFilter *VideoConferenceOneToAll::getMixer() const {
-  return mMixer;
+void VideoConferenceOneToAll::setLocalMember(MSVideoFilterPinControl pc) {
+	ms_filter_call_method(mMixer, MS_VIDEO_SWITCHER_SET_AS_LOCAL_MEMBER, &pc);
 }
 
 VideoConferenceOneToAll::~VideoConferenceOneToAll() {
+  ms_ticker_destroy(mTicker);
+	ms_filter_destroy(mMixer);
+}
+
+//-----------------------------------------------------------------------------
+VideoConferenceAllToAll::VideoConferenceAllToAll(MSFactory *f, const MSVideoConferenceParams *params) {
+	const MSFmtDescriptor *fmt;
+	MSVideoSize vsize = {0};
+
+	mTicker=ms_ticker_new();
+	ms_ticker_set_name(mTicker,"Video conference(all to all) MSTicker");
+	ms_ticker_set_priority(mTicker,__ms_get_default_prio(FALSE));
+	mMixer = ms_factory_create_filter(f, MS_VIDEO_ROUTER_ID);
+	fmt = ms_factory_get_video_format(f, params->codec_mime_type ? params->codec_mime_type : "VP8" ,vsize,0,NULL);
+	ms_filter_call_method(mMixer, MS_FILTER_SET_INPUT_FMT, (void*)fmt);
+
+	ms_filter_add_notify_callback(mMixer,on_filter_event,this,TRUE);
+	mCfparams=*params;
+
+	mMembers = NULL;
+	mBitrate = 0;
+	mVideoPlaceholderMember = NULL;
+}
+
+void VideoConferenceAllToAll::addMember(MSVideoEndpoint *ep) {
+	/* now connect to the mixer */
+	ep->conference = (MSVideoConference *)this;
+	if (mMembers == NULL) {
+		addVideoPlaceholderMember();
+	} else {
+		ms_ticker_detach(mTicker,mMixer);
+	}
+	plumb_to_conf(ep);
+	if (mMembers == NULL) {
+		RouterState *s=(RouterState *)mMixer->data;
+		s->inputs_num ++;
+		ms_filter_call_method(mMixer, MS_VIDEO_ROUTER_CONFIGURE_OUTPUT, &ep->pin);
+	}
+	video_stream_set_encoder_control_callback(ep->st, ms_video_conference_process_encoder_control_for_router, ep);
+	ms_ticker_attach(mTicker,mMixer);
+	mMembers=bctbx_list_append(mMembers,ep);
+}
+
+void VideoConferenceAllToAll::addVideoPlaceholderMember() {
+	mVideoPlaceholderMember = create_video_placeholder_member(this);
+
+	ms_message("add video placeholder to pin %i", mMixer->desc->ninputs-1);
+	mVideoPlaceholderMember->conference = (MSVideoConference *)this;
+	mVideoPlaceholderMember->pin = mMixer->desc->ninputs-1;
+	plumb_to_conf(mVideoPlaceholderMember);
+	video_stream_set_encoder_control_callback(mVideoPlaceholderMember->st, ms_video_conference_process_encoder_control_for_router, mVideoPlaceholderMember);
+}
+
+void VideoConferenceAllToAll::removeMember(MSVideoEndpoint *ep) {
+	video_stream_set_encoder_control_callback(ep->st, NULL, NULL);
+	ms_ticker_detach(mTicker,mMixer);
+	RouterState *s=(RouterState *)mMixer->data;
+	s->inputs_num --;
+	ms_filter_call_method(mMixer, MS_VIDEO_ROUTER_UNCONFIGURE_OUTPUT, &ep->pin);
+	unplumb_from_conf(ep);
+	ep->conference=NULL;
+	mMembers=bctbx_list_remove(mMembers,ep);
+	if (mMembers!=NULL) {
+		ms_ticker_attach(mTicker,mMixer);
+	} else {
+		ms_message("remove video placeholder member");
+		video_stream_set_encoder_control_callback(mVideoPlaceholderMember->st, NULL, NULL);
+		unplumb_from_conf(mVideoPlaceholderMember);
+		mVideoPlaceholderMember =  NULL;
+	}
+}
+
+void VideoConferenceAllToAll::setLocalMember(MSVideoFilterPinControl pc) {
+	ms_filter_call_method(mMixer, MS_VIDEO_ROUTER_SET_AS_LOCAL_MEMBER, &pc);
+}
+
+VideoConferenceAllToAll::~VideoConferenceAllToAll() {
   ms_ticker_destroy(mTicker);
 	ms_filter_destroy(mMixer);
 }

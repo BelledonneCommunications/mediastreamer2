@@ -103,6 +103,8 @@ set(VOIP_SOURCE_FILES_C
 	utils/kiss_fftr.h
 	utils/pcap_sender.c
 	utils/pcap_sender.h
+	utils/video_util.h
+	utils/video_util.c
 	utils/stream_regulator.c
 	utils/srtp_prefix.h
 	voip/audioconference.c
@@ -225,6 +227,7 @@ if(ENABLE_VIDEO)
 		videofilters/pixconv.c
 		videofilters/sizeconv.c
 		videofilters/videoswitcher.c
+		videofilters/videorouter.c
 		voip/layouts.c
 		voip/layouts.h
 		voip/msvideo_neon.c
