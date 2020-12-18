@@ -150,24 +150,36 @@ static int ogl_set_native_window_id (MSFilter *f, void *arg) {
 
 	data = f->data;
 	context_info = *((ContextInfo **)arg);
-
+#ifdef MS2_WINDOWS_UWP
 	if (context_info && (unsigned long long)context_info != (unsigned long long)MS_FILTER_VIDEO_NONE) {
-#ifdef MS2_WINDOWS_UWP    
 		ms_message(
 			"set native window id for UWP: %p \n", (void*)context_info);
+		if(data->context_info.window != context_info->window || data->context_info.functions != context_info->functions){
+			ogl_display_uninit(data->display, FALSE);
+			data->context_info = *context_info;
+			data->update_context = TRUE;
+		}
+	} else {
+		if(data->context_info.window )
+			ogl_display_uninit(data->display, FALSE);
+		ms_message("reset native window id");
+		memset(&data->context_info, 0, sizeof data->context_info);
+		data->update_context = TRUE;
+	}
 #else
+	if (context_info && (unsigned long long)context_info != (unsigned long long)MS_FILTER_VIDEO_NONE) {
 	    ms_message(
 		    "set native window id: %p (width: %d, height: %d)\n",
 		    (void*)context_info, (int)context_info->width, (int)context_info->height
 	    );
-#endif
 		data->context_info = *context_info;
+		data->update_context = TRUE;
 	} else {
 		ms_message("reset native window id");
 		memset(&data->context_info, 0, sizeof data->context_info);
+		data->update_context = TRUE;
 	}
-
-	data->update_context = TRUE;
+#endif
 
 	ms_filter_unlock(f);
 

@@ -889,6 +889,7 @@ void ogl_display_render (struct opengles_display *gldisp, int orientation) {
 #endif	
 
 	GL_OPERATION(f, glUseProgram(gldisp->program))
+	check_GL_errors(f, "ogl_display_render");
 
 	ogl_display_render_type(gldisp, REMOTE_IMAGE, TRUE, 0, 0, 1, 1, orientation);
 	// preview image already have the correct orientation
