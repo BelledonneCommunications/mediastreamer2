@@ -731,7 +731,13 @@ static void configure_audio_session(au_card_t* d) {
 
 		if (!d->audio_session_configured) {
 			uint64_t time_start, time_end;
+			bool_t reactivate_audio_session = FALSE;
 			
+			if (d->audio_session_activated && d->callkit_enabled){
+				/* AudioSession is not yet configured, but has already been activated by callkit. */
+				[audioSession setActive:FALSE error:&err];
+				reactivate_audio_session = TRUE;
+			}
 			time_start = ortp_get_cur_time_ms();
 			if (newCategory != AVAudioSessionCategoryPlayAndRecord) {
 				ms_message("Configuring audio session for playback");
@@ -768,7 +774,8 @@ static void configure_audio_session(au_card_t* d) {
 				ms_error("Unable to change preferred sample rate because : %s", [err localizedDescription].UTF8String);
 				err = nil;
 			}
-			if (!d->callkit_enabled){
+			if (!d->callkit_enabled || reactivate_audio_session){
+				if (reactivate_audio_session) ms_message("Configuring audio session now reactivated.");
 				[audioSession setActive:TRUE error:&err];
 				if(err){
 					ms_error("Unable to activate audio session because : %s", [err localizedDescription].UTF8String);
