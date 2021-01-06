@@ -290,6 +290,34 @@ typedef struct _MSVideoConference MSVideoConference;
 MS2_PUBLIC MSVideoConference * ms_video_conference_new(MSFactory *factory, const MSVideoConferenceParams *params);
 
 /**
+ * Creates a conference.
+ * @param params a MSVideoConferenceParams structure, containing conference parameters.
+ * @returns a MSVideoConference object.
+**/
+MS2_PUBLIC MSVideoConference * ms_video_conference_all_to_all_new(MSFactory *factory, const MSVideoConferenceParams *params);
+
+/**
+ * Adds a participant to the conference.
+ * @param obj the conference
+ * @param ep the participant, represented as a MSVideoEndpoint object
+**/
+MS2_PUBLIC void ms_video_conference_all_to_all_add_member(MSVideoConference *obj, MSVideoEndpoint *ep);
+
+/**
+ * Removes a participant from the conference.
+ * @param obj the conference
+ * @param ep the participant, represented as a MSVideoEndpoint object
+**/
+MS2_PUBLIC void ms_video_conference_all_to_all_remove_member(MSVideoConference *obj, MSVideoEndpoint *ep);
+
+/**
+ * Destroys a conference.
+ * @param obj the conference
+ * All participants must have been removed before destroying the conference.
+**/
+MS2_PUBLIC void ms_video_conference_all_to_all_destroy(MSVideoConference *obj);
+
+/**
  * Gets conference's current parameters.
  * @param obj the conference.
  * @returns a read-only pointer to the conference parameters.

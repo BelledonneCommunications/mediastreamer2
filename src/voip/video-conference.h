@@ -42,7 +42,7 @@ class VideoConferenceGeneric {
     virtual void addVideoPlaceholderMember() = 0;
     virtual void addMember(MSVideoEndpoint *ep) = 0;
     virtual void removeMember(MSVideoEndpoint *ep) = 0;
-    virtual void setFocus(MSVideoEndpoint *ep) = 0;
+    //virtual void setFocus(MSVideoEndpoint *ep) = 0;
     virtual void applyNewBitrateRequest() = 0;
     virtual int getSize() const;
     virtual const bctbx_list_t* getMembers() const;
@@ -70,7 +70,7 @@ class VideoConferenceOneToAll: public VideoConferenceGeneric {
     void addVideoPlaceholderMember() override;
     void addMember(MSVideoEndpoint *ep) override;
     void removeMember(MSVideoEndpoint *ep) override;
-    void setFocus(MSVideoEndpoint *ep) override;
+    void setFocus(MSVideoEndpoint *ep) ;
     void applyNewBitrateRequest() override;
     void updateBitrateRequest() override;
 

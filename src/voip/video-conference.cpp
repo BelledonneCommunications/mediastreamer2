@@ -69,10 +69,20 @@ extern "C" void ms_video_conference_destroy(MSVideoConference *obj) {
 }
 
 extern "C" MSVideoConference * ms_video_conference_new(MSFactory *f, const MSVideoConferenceParams *params) {
-  return (MSVideoConference *)(new VideoConferenceOneToAll(f, params));
+	return (MSVideoConference *)(new VideoConferenceOneToAll(f, params));
 }
 
+extern "C" MSVideoConference *ms_video_conference_all_to_all_new(MSFactory *f, const MSVideoConferenceParams *params) {
+	return (MSVideoConference *)(new VideoConferenceAllToAll(f, params));
+}
 
+extern "C" void ms_video_conference_all_to_all_add_member(MSVideoConference *obj, MSVideoEndpoint *ep) {
+  ((VideoConferenceAllToAll *)obj)->addMember(ep);
+}
+
+extern "C" void ms_video_conference_all_to_all_destroy(MSVideoConference *obj) {
+	delete ((VideoConferenceAllToAll *)obj);
+}
 
 
 MSVideoEndpoint * ms_video_endpoint_get_from_stream(VideoStream *st, bool_t is_remote) {
