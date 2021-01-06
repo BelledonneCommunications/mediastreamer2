@@ -31,6 +31,8 @@
 	#include <OpenGL/OpenGL.h>
 	#include <OpenGL/gl.h>
 #elif __ANDROID__
+	#include <EGL/egl.h>
+	#include <EGL/eglext.h>
 	#include <GLES2/gl2.h>
 	#include <GLES2/gl2ext.h>
 #elif _WIN32
