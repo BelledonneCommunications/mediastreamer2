@@ -26,21 +26,11 @@
 
 // =============================================================================
 
-#ifdef WIN32
 struct _ContextInfo {
 	EGLNativeWindowType window;
 	
 	OpenGlFunctions *functions;
 };
-#else
-struct _ContextInfo {
-	GLuint width;
-	GLuint height;
-
-	OpenGlFunctions *functions;
-};
-
-#endif
 typedef struct _ContextInfo ContextInfo;
 
 struct _FilterData {
@@ -82,21 +72,18 @@ static void ogl_uninit (MSFilter *f) {
 }
 static void ogl_process (MSFilter *f) {
 	FilterData *data;
-	ContextInfo *context_info;
+	//ContextInfo *context_info;
 	MSPicture src;
 	mblk_t *inm;
 
 	ms_filter_lock(f);
 
 	data = (FilterData *)f->data;
-	context_info = &data->context_info;
+	//context_info = &data->context_info;
 
 	// No context given or video disabled.
-#ifdef WIN32	
 	if ( !data->show_video)
-#else	
-	if (!context_info->width || !context_info->height || !data->show_video)
-#endif
+	//if (!context_info->width || !context_info->height || !data->show_video)
 		goto end;
 
 	if (
@@ -150,10 +137,9 @@ static int ogl_set_native_window_id (MSFilter *f, void *arg) {
 
 	data = (FilterData *)f->data;
 	context_info = *((ContextInfo **)arg);
-#ifdef WIN32
 	if (context_info && (unsigned long long)context_info != (unsigned long long)MS_FILTER_VIDEO_NONE) {
 		ms_message(
-			"set native window id for Win32: %p \n", (void*)context_info);
+			"set native window id : %p \n", (void*)context_info);
 		if(data->context_info.window != context_info->window || data->context_info.functions != context_info->functions){
 			ogl_display_uninit(data->display, FALSE);
 			data->context_info = *context_info;
@@ -166,7 +152,7 @@ static int ogl_set_native_window_id (MSFilter *f, void *arg) {
 		memset(&data->context_info, 0, sizeof data->context_info);
 		data->update_context = TRUE;
 	}
-#else
+	/*
 	if (context_info && (unsigned long long)context_info != (unsigned long long)MS_FILTER_VIDEO_NONE) {
 	    ms_message(
 		    "set native window id: %p (width: %d, height: %d)\n",
@@ -178,8 +164,7 @@ static int ogl_set_native_window_id (MSFilter *f, void *arg) {
 		ms_message("reset native window id");
 		memset(&data->context_info, 0, sizeof data->context_info);
 		data->update_context = TRUE;
-	}
-#endif
+	}*/
 
 	ms_filter_unlock(f);
 
@@ -230,17 +215,11 @@ static int ogl_call_render (MSFilter *f, void *arg) {
 
 	data = (FilterData *)f->data;
 	context_info = &data->context_info;
-#ifdef WIN32
 	if (data->show_video && context_info->window) {
-#else	
-	if (context_info->width && context_info->height && data->show_video) {
-#endif
+	//if (context_info->width && context_info->height && data->show_video) {
 		if (data->update_context) {
-#ifdef WIN32
 			ogl_display_auto_init(data->display, context_info->functions, context_info->window);
-#else		    
-			ogl_display_init(data->display, context_info->functions, context_info->width, context_info->height);
-#endif
+			//ogl_display_init(data->display, context_info->functions, context_info->width, context_info->height);
 			data->update_context = FALSE;
 		}
 

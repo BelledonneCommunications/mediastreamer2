@@ -43,6 +43,8 @@
 	#endif
 #elif !defined(QOPENGLFUNCTIONS_H) // glew is already included by QT.
 	#include <GL/glew.h>
+	#include <EGL/egl.h>
+	#include <EGL/eglext.h>
 #endif
 
 // =============================================================================
@@ -197,17 +199,20 @@ typedef void (*resolveGlVertexAttribPointer)(GLuint indx, GLint size, GLenum typ
 typedef void (*resolveGlViewport)(GLint x, GLint y, GLsizei width, GLsizei height);
 
 // -----------------------------------------------------------------------------
-#if _WIN32
+
 typedef void *(*resolveEGLGetProcAddress)(char const * procname);
-typedef EGLenum (*resolveEGLQueryAPI)();
+typedef EGLenum (*resolveEGLQueryAPI)(void);
 typedef EGLBoolean (*resolveEGLBindAPI)(EGLenum api);
 typedef char const *(*resolveEGLQueryString)(EGLDisplay display, EGLint name);
 typedef EGLDisplay (*resolveEGLGetPlatformDisplayEXT)(EGLenum platform, void *native_display, const EGLint *attrib_list);
+typedef EGLDisplay (*resolveEGLGetCurrentDisplay)(void);
+typedef EGLContext (*resolveEGLGetCurrentContext)(void);
+typedef EGLSurface (*resolveEGLGetCurrentSurface)(void);
 typedef EGLBoolean (*resolveEGLInitialize)(EGLDisplay dpy, EGLint *major, EGLint *minor);
 typedef EGLBoolean (*resolveEGLChooseConfig)(EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
 typedef EGLContext (*resolveEGLCreateContext)(EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list);
 typedef EGLBoolean (*resolveEGLMakeCurrent)(EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext ctx);
-typedef EGLint (*resolveEGLGetError)();
+typedef EGLint (*resolveEGLGetError)(void);
 typedef EGLBoolean (*resolveEGLSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
 typedef EGLBoolean (*resolveEGLQuerySurface)(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint *value);
 typedef EGLBoolean (*resolveEGLDestroySurface)(EGLDisplay dpy, EGLSurface surface);
@@ -217,7 +222,7 @@ typedef EGLBoolean (*resolveEGLTerminate)(EGLDisplay dpy);
 
 
 typedef EGLSurface (*resolveEGLCreateWindowSurface)(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list);
-#endif
+
 
 
 // -----------------------------------------------------------------------------
@@ -364,14 +369,16 @@ struct OpenGlFunctions {
 	// resolveGlVertexAttrib4fv glVertexAttrib4fv;
 	resolveGlVertexAttribPointer glVertexAttribPointer;
 	resolveGlViewport glViewport;
-	
-#if _WIN32
+
 	resolveEGLGetProcAddress eglGetProcAddress;
 	
 	resolveEGLQueryAPI eglQueryAPI;
 	resolveEGLBindAPI eglBindAPI;
 	resolveEGLQueryString eglQueryString;
 	resolveEGLGetPlatformDisplayEXT eglGetPlatformDisplayEXT;
+	resolveEGLGetCurrentDisplay eglGetCurrentDisplay;
+	resolveEGLGetCurrentContext eglGetCurrentContext;
+	resolveEGLGetCurrentSurface eglGetCurrentSurface;
 	resolveEGLInitialize eglInitialize;
 	resolveEGLChooseConfig eglChooseConfig;
 	resolveEGLCreateContext eglCreateContext;
@@ -383,7 +390,7 @@ struct OpenGlFunctions {
 	resolveEGLDestroySurface eglDestroySurface;
 	resolveEGLDestroyContext eglDestroyContext;
 	resolveEGLTerminate eglTerminate;
-#endif	
+	
 };
 
 typedef struct OpenGlFunctions OpenGlFunctions;
