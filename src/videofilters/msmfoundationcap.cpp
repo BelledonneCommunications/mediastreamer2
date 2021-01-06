@@ -990,7 +990,7 @@ void MSMFoundationDesktopImpl::activate() {
 	while(!found && currentDeviceIndex < devices.mDevicesCount) {
 		WCHAR *nameString = NULL;		
 		UINT32 cchName; 
-		hr = devices.mDevices[currentDeviceIndex]->GetAllocatedString(MFT_FRIENDLY_NAME_Attribute, &nameString, &cchName);
+		hr = devices.mDevices[currentDeviceIndex]->GetAllocatedString(MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, &nameString, &cchName);
 		if (SUCCEEDED(hr)) {
 			size_t inputlen = wcslen(nameString) + 1;
 			UINT currentCodePage = GetACP();
@@ -1235,7 +1235,7 @@ HRESULT MSMFoundationDesktopImpl::OnReadSample(HRESULT status, DWORD streamIndex
 					DWORD length = 0;
 					mediaBuffer->Lock(&data, NULL, &length);
 
-					processFrame(data, length, mPlaneSize);
+					processFrame(data, length, mStride);
 				}
 			}
 		}	
@@ -1263,7 +1263,7 @@ static void ms_mfoundationcap_detect(MSWebCamManager *manager) {
 	for (UINT32 i = 0; i < devices.mDevicesCount; ++i) { // Get the human-friendly name of the device
 		WCHAR *nameString = NULL;		
 		UINT32 cchName; 
-		HRESULT hr = devices.mDevices[i]->GetAllocatedString(MFT_FRIENDLY_NAME_Attribute, &nameString, &cchName);
+		HRESULT hr = devices.mDevices[i]->GetAllocatedString(MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME , &nameString, &cchName);
 		if (SUCCEEDED(hr)) {
 			size_t inputlen = wcslen(nameString) + 1;
 			UINT currentCodePage = GetACP();

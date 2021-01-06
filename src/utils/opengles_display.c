@@ -21,10 +21,6 @@
 #include "mediastreamer2/mscommon.h"
 #include "shader_util.h"
 
-#ifdef __cplusplus
-extern "C"{
-#endif
-
 enum ImageType {
 	REMOTE_IMAGE = 0,
 	PREVIEW_IMAGE,
@@ -108,7 +104,7 @@ struct opengles_display {
 
 	OpenGlFunctions *default_functions;
 	const OpenGlFunctions *functions;
-#ifdef MS2_WINDOWS_UWP	
+#ifdef WIN32	
 	EGLDisplay mEglDisplay;
 	EGLContext mEglContext;
 	EGLConfig mEglConfig;// No need to be cleaned
@@ -136,7 +132,12 @@ static void check_GL_errors (const OpenGlFunctions *f, const char* context) {
 		}
 	}
 }
-
+static void check_EGL_errors (const OpenGlFunctions *f, const char* context) {
+	GLenum error;
+	while ((error = f->eglGetError()) !=  EGL_SUCCESS) {
+		ms_error("EGL error: '%s' -> %x\n", context, error);
+	}
+}
 static unsigned int align_on_power_of_2(unsigned int value) {
 	int i;
 	/* browse all power of 2 value, and find the one just >= value */
@@ -364,7 +365,6 @@ static bool_t update_textures_with_yuv (struct opengles_display *gldisp, enum Im
 		  ? ((alig_V > alig_Y) ? alig_Y : alig_V)
 			:	((alig_U > alig_Y) ? alig_Y : alig_U);
 	}
-
 	/* upload Y plane */
 	GL_OPERATION(f, glActiveTexture(GL_TEXTURE0))
 	GL_OPERATION(f, glBindTexture(GL_TEXTURE_2D, gldisp->textures[gldisp->texture_index][type][Y]))
@@ -573,7 +573,7 @@ struct opengles_display *ogl_display_new (void) {
 	result->zoom_cx = result->zoom_cy = 0;
 	result->texture_index = 0;
 	
-#ifdef MS2_WINDOWS_UWP
+#ifdef WIN32
 	result->mEglDisplay = EGL_NO_DISPLAY;
 	result->mEglContext = EGL_NO_CONTEXT;
 	result->mRenderSurface = EGL_NO_SURFACE;
@@ -586,7 +586,7 @@ struct opengles_display *ogl_display_new (void) {
 }
 
 void ogl_display_clean(struct opengles_display *gldisp) {
-#ifdef MS2_WINDOWS_UWP
+#ifdef WIN32
 	if (gldisp->mEglDisplay != EGL_NO_DISPLAY) {
 		if (gldisp->mRenderSurface != EGL_NO_SURFACE) {
 			gldisp->functions->eglDestroySurface(gldisp->mEglDisplay, gldisp->mRenderSurface);
@@ -634,7 +634,7 @@ void ogl_display_set_size (struct opengles_display *gldisp, int width, int heigh
 	GL_OPERATION(f, glViewport(0, 0, width, height))
 	check_GL_errors(f, "ogl_display_set_size");
 }
-#ifdef MS2_WINDOWS_UWP
+#ifdef WIN32
 void ogl_create_surface(struct opengles_display *gldisp, const OpenGlFunctions *f, EGLNativeWindowType window){
 	int configAttributes[] ={
 		EGL_RED_SIZE, 8,
@@ -645,8 +645,9 @@ void ogl_create_surface(struct opengles_display *gldisp, const OpenGlFunctions *
 		EGL_STENCIL_SIZE, 8,
 		EGL_NONE
 	};
-	int contextAttributes[] = {
+	EGLint contextAttributes[] = {
 		EGL_CONTEXT_CLIENT_VERSION, 2,
+		EGL_NONE,
 		EGL_NONE
 	};
 	int defaultDisplayAttributes[] = {
@@ -694,12 +695,25 @@ void ogl_create_surface(struct opengles_display *gldisp, const OpenGlFunctions *
 	//
 	ogl_display_clean(gldisp);// Clean the display before creating surface
 	// This tries to initialize EGL to D3D11 Feature Level 10_0+. See above comment for details.
+
+	EGLenum api = f->eglQueryAPI();
+	if( api != EGL_OPENGL_API) {
+		if(f->eglBindAPI(EGL_OPENGL_API) == EGL_FALSE) {
+			ms_error("Failed to Bind EGL_OPENGL_API");
+			api = f->eglQueryAPI();
+			if( api != EGL_NONE)	
+				f->eglBindAPI( EGL_OPENGL_ES_API );
+		}
+	}
+	
+	
 	gldisp->mEglDisplay = f->eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE, EGL_DEFAULT_DISPLAY, defaultDisplayAttributes);
+	check_EGL_errors(f, "ogl_create_surface");
 	if (gldisp->mEglDisplay == EGL_NO_DISPLAY) {
 		ms_error("Failed to get EGL display (D3D11 10.0+).");
 	}
 	
-	int major, minor;
+	int major=0, minor=0;
 	if (f->eglInitialize(gldisp->mEglDisplay, &major, &minor) == EGL_FALSE)	{
 		// This tries to initialize EGL to D3D11 Feature Level 9_3, if 10_0+ is unavailable (e.g. on some mobile devices).
 		gldisp->mEglDisplay = f->eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE, EGL_DEFAULT_DISPLAY, fl9_3DisplayAttributes);
@@ -721,17 +735,32 @@ void ogl_create_surface(struct opengles_display *gldisp, const OpenGlFunctions *
 			}
 		}
 	}
+	check_EGL_errors(f, "ogl_create_surface");
+	ms_message("OpenEGL client API: %s", f->eglQueryString(gldisp->mEglDisplay, EGL_CLIENT_APIS));
+	check_EGL_errors(f, "ogl_create_surface");
+	ms_message("OpenEGL vendor: %s", f->eglQueryString(gldisp->mEglDisplay, EGL_VENDOR));
+	check_EGL_errors(f, "ogl_create_surface");
+	ms_message("OpenEGL version: %s", f->eglQueryString(gldisp->mEglDisplay, EGL_VERSION));
+	check_EGL_errors(f, "ogl_create_surface");
+	ms_message("OpenEGL extensions: %s", f->eglQueryString(gldisp->mEglDisplay, EGL_EXTENSIONS));
+	check_EGL_errors(f, "ogl_create_surface");
 	if (gldisp->mEglDisplay != EGL_NO_DISPLAY) {
 		int numConfigs = 0;
 		if (f->eglChooseConfig(gldisp->mEglDisplay, configAttributes, &gldisp->mEglConfig, 1, &numConfigs) == EGL_FALSE || numConfigs == 0) {
 			ms_error("Failed to choose first EGLConfig");
+			check_EGL_errors(f, "ogl_create_surface");
 		}else{
 			gldisp->mEglContext = f->eglCreateContext(gldisp->mEglDisplay, gldisp->mEglConfig, EGL_NO_CONTEXT, contextAttributes);
 			if (gldisp->mEglContext == EGL_NO_CONTEXT) {
 				ms_error("Failed to create EGL context");
+				check_EGL_errors(f, "ogl_create_surface");
 			}
 			
 			gldisp->mRenderSurface = f->eglCreateWindowSurface(gldisp->mEglDisplay, gldisp->mEglConfig, window, NULL);
+			if (gldisp->mRenderSurface == EGL_NO_SURFACE) {
+				ms_error("Failed to create EGL Render Surface");
+				check_EGL_errors(f, "ogl_create_surface");
+			}
 		}
 	}
 }
@@ -743,12 +772,17 @@ void ogl_display_auto_init (struct opengles_display *gldisp, const OpenGlFunctio
 	}
 	// Create default functions if necessary. (No opengl functions given.)
 	if (!gldisp->default_functions && !f) {
-		gldisp->default_functions = ms_new(OpenGlFunctions, 1);
+		gldisp->default_functions = ms_new0(OpenGlFunctions, 1);
 		opengl_functions_default_init(gldisp->default_functions);
-	}
+		gldisp->functions = gldisp->default_functions;
+	}else if(!f)
+		gldisp->functions = gldisp->default_functions;
+	else
+		gldisp->functions = f;
 	
+	if( !gldisp->functions)
+		ms_error("MSOpenGL : functions is still NULL!");
 	// Update gl functions.
-	gldisp->functions = f ? f : gldisp->default_functions;
 	if( window != NULL)
 		ogl_create_surface(gldisp, gldisp->functions, window);
 	if (gldisp->functions->eglMakeCurrent(gldisp->mEglDisplay, gldisp->mRenderSurface, gldisp->mRenderSurface, gldisp->mEglContext) == EGL_FALSE)
@@ -873,9 +907,10 @@ void ogl_display_set_preview_yuv_to_display (struct opengles_display *gldisp, mb
 void ogl_display_render (struct opengles_display *gldisp, int orientation) {
 	const OpenGlFunctions *f = gldisp->functions;
 
+	check_GL_errors(f, "ogl_display_render");
 	clean_GL_errors(f);
 	
-#ifdef MS2_WINDOWS_UWP
+#ifdef WIN32
 	int width, height;// Get current surface size
 	if (gldisp->functions->eglMakeCurrent(gldisp->mEglDisplay, gldisp->mRenderSurface, gldisp->mRenderSurface, gldisp->mEglContext) == EGL_FALSE)
 	{
@@ -896,7 +931,7 @@ void ogl_display_render (struct opengles_display *gldisp, int orientation) {
 	ogl_display_render_type(gldisp, PREVIEW_IMAGE, FALSE, 0.4f, -0.4f, 0.2f, 0.2f, 0);
 
 	gldisp->texture_index = (gldisp->texture_index + 1) % TEXTURE_BUFFER_SIZE;
-#ifdef MS2_WINDOWS_UWP
+#ifdef WIN32
 	f->eglSwapBuffers(gldisp->mEglDisplay, gldisp->mRenderSurface);
 #endif		
 }

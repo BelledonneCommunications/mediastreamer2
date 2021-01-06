@@ -26,7 +26,7 @@
 
 // =============================================================================
 
-#ifdef MS2_WINDOWS_UWP
+#ifdef WIN32
 struct _ContextInfo {
 	EGLNativeWindowType window;
 	
@@ -76,7 +76,7 @@ static void ogl_init (MSFilter *f) {
 }
 
 static void ogl_uninit (MSFilter *f) {
-	FilterData *data = f->data;
+	FilterData *data = (FilterData *)f->data;
 	ogl_display_free(data->display);
 	ms_free(data);
 }
@@ -88,11 +88,11 @@ static void ogl_process (MSFilter *f) {
 
 	ms_filter_lock(f);
 
-	data = f->data;
+	data = (FilterData *)f->data;
 	context_info = &data->context_info;
 
 	// No context given or video disabled.
-#ifdef MS2_WINDOWS_UWP	
+#ifdef WIN32	
 	if ( !data->show_video)
 #else	
 	if (!context_info->width || !context_info->height || !data->show_video)
@@ -148,12 +148,12 @@ static int ogl_set_native_window_id (MSFilter *f, void *arg) {
 
 	ms_filter_lock(f);
 
-	data = f->data;
+	data = (FilterData *)f->data;
 	context_info = *((ContextInfo **)arg);
-#ifdef MS2_WINDOWS_UWP
+#ifdef WIN32
 	if (context_info && (unsigned long long)context_info != (unsigned long long)MS_FILTER_VIDEO_NONE) {
 		ms_message(
-			"set native window id for UWP: %p \n", (void*)context_info);
+			"set native window id for Win32: %p \n", (void*)context_info);
 		if(data->context_info.window != context_info->window || data->context_info.functions != context_info->functions){
 			ogl_display_uninit(data->display, FALSE);
 			data->context_info = *context_info;
@@ -203,7 +203,7 @@ static int ogl_show_video (MSFilter *f, void *arg) {
 
 static int ogl_zoom (MSFilter *f, void *arg) {
 	ms_filter_lock(f);
-	ogl_display_zoom(((FilterData *)f->data)->display, arg);
+	ogl_display_zoom(((FilterData *)f->data)->display, (float*)arg);
 	ms_filter_unlock(f);
 
 	return 0;
@@ -228,15 +228,15 @@ static int ogl_call_render (MSFilter *f, void *arg) {
 
 	ms_filter_lock(f);
 
-	data = f->data;
+	data = (FilterData *)f->data;
 	context_info = &data->context_info;
-#ifdef MS2_WINDOWS_UWP
+#ifdef WIN32
 	if (data->show_video && context_info->window) {
 #else	
 	if (context_info->width && context_info->height && data->show_video) {
 #endif
 		if (data->update_context) {
-#ifdef MS2_WINDOWS_UWP
+#ifdef WIN32
 			ogl_display_auto_init(data->display, context_info->functions, context_info->window);
 #else		    
 			ogl_display_init(data->display, context_info->functions, context_info->width, context_info->height);

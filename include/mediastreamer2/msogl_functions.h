@@ -198,6 +198,10 @@ typedef void (*resolveGlViewport)(GLint x, GLint y, GLsizei width, GLsizei heigh
 
 // -----------------------------------------------------------------------------
 #if _WIN32
+typedef void *(*resolveEGLGetProcAddress)(char const * procname);
+typedef EGLenum (*resolveEGLQueryAPI)();
+typedef EGLBoolean (*resolveEGLBindAPI)(EGLenum api);
+typedef char const *(*resolveEGLQueryString)(EGLDisplay display, EGLint name);
 typedef EGLDisplay (*resolveEGLGetPlatformDisplayEXT)(EGLenum platform, void *native_display, const EGLint *attrib_list);
 typedef EGLBoolean (*resolveEGLInitialize)(EGLDisplay dpy, EGLint *major, EGLint *minor);
 typedef EGLBoolean (*resolveEGLChooseConfig)(EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
@@ -362,6 +366,11 @@ struct OpenGlFunctions {
 	resolveGlViewport glViewport;
 	
 #if _WIN32
+	resolveEGLGetProcAddress eglGetProcAddress;
+	
+	resolveEGLQueryAPI eglQueryAPI;
+	resolveEGLBindAPI eglBindAPI;
+	resolveEGLQueryString eglQueryString;
 	resolveEGLGetPlatformDisplayEXT eglGetPlatformDisplayEXT;
 	resolveEGLInitialize eglInitialize;
 	resolveEGLChooseConfig eglChooseConfig;
