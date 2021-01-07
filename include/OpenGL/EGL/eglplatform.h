@@ -120,7 +120,11 @@ typedef Window   EGLNativeWindowType;
 #if defined(__OBJC__)
 @class CALayer;
 #else
+#ifdef __cplusplus
 class CALayer;
+#else
+typedef void CALayer;
+#endif
 #endif
 
 typedef void *EGLNativeDisplayType;
