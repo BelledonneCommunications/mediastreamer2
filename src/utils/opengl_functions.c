@@ -27,7 +27,7 @@
 #define CAST_EGL(type, fn) (type)f->eglGetProcAddress(#fn)
 
 #if defined( __ANDROID__ )
-#  define CAST(type, fn) (type)(f->getProcAddress ? f->getProcAddress(#fn) : fn)
+#  define CAST(type, fn) (f->getProcAddress ? (type)f->getProcAddress(#fn) : (type)fn)
 #elif defined(WIN32)
 
 #  ifndef MS2_WINDOWS_UWP
@@ -53,9 +53,9 @@ void *GetAnyGLFuncAddress(HMODULE library, HMODULE firstFallback, const char *na
 #  endif
 #  include <windows.h>
 #  ifdef MS2_WINDOWS_UWP
-#    define CAST(type, fn) (type)(f->getProcAddress ? f->getProcAddress(#fn) : GetProcAddress( openglLibrary, #fn))
+#    define CAST(type, fn) (f->getProcAddress ? (type)f->getProcAddress(#fn) : (type)GetProcAddress( openglLibrary, #fn))
 #  else
-#    define CAST(type, fn) (type)(f->getProcAddress ? f->getProcAddress(#fn) : GetAnyGLFuncAddress(openglLibrary,firstFallbackLibrary, #fn))
+#    define CAST(type, fn) (f->getProcAddress ? (type)f->getProcAddress(#fn) : (type)GetAnyGLFuncAddress(openglLibrary,firstFallbackLibrary, #fn))
 #  endif
 #else
 
@@ -69,7 +69,7 @@ void *getAnyGLFuncAddress(void* library, void *firstFallback, const char *name)
 	return p;
 }
 
-#  define CAST(type, fn) (type)(f->getProcAddress ? f->getProcAddress(#fn) : getAnyGLFuncAddress(openglLibrary,firstFallbackLibrary, #fn))
+#  define CAST(type, fn) (f->getProcAddress ? (type)f->getProcAddress(#fn) : (type)getAnyGLFuncAddress(openglLibrary,firstFallbackLibrary, #fn))
 #endif
 
 #ifdef __cplusplus
