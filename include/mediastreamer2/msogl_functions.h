@@ -25,12 +25,15 @@
 #endif
 
 #if TARGET_OS_IPHONE
+	#include <EGL/egl.h>
 	#include <OpenGLES/ES2/gl.h>
 	#include <OpenGLES/ES2/glext.h>
 #elif TARGET_OS_MAC
+	#include <EGL/egl.h>
 	#include <OpenGL/OpenGL.h>
 	#include <OpenGL/gl.h>
 #elif __ANDROID__
+	#include <EGL/egl.h>
 	#include <GLES2/gl2.h>
 	#include <GLES2/gl2ext.h>
 #elif _WIN32
@@ -41,8 +44,12 @@
 		#include <GLES2/gl2.h>
 		#include <GLES2/gl2ext.h>
 	#endif
-#elif !defined(QOPENGLFUNCTIONS_H) // glew is already included by QT.
+//#elif !defined(QOPENGLFUNCTIONS_H) // glew is already included by QT.
+#else
+#ifndef QOPENGLFUNCTIONS_H
 	#include <GL/glew.h>
+#endif
+	#include <EGL/egl.h>
 #endif
 
 // =============================================================================
@@ -197,13 +204,20 @@ typedef void (*resolveGlVertexAttribPointer)(GLuint indx, GLint size, GLenum typ
 typedef void (*resolveGlViewport)(GLint x, GLint y, GLsizei width, GLsizei height);
 
 // -----------------------------------------------------------------------------
-#if _WIN32
+
+typedef void *(*resolveEGLGetProcAddress)(char const * procname);
+typedef EGLenum (*resolveEGLQueryAPI)(void);
+typedef EGLBoolean (*resolveEGLBindAPI)(EGLenum api);
+typedef char const *(*resolveEGLQueryString)(EGLDisplay display, EGLint name);
 typedef EGLDisplay (*resolveEGLGetPlatformDisplayEXT)(EGLenum platform, void *native_display, const EGLint *attrib_list);
+typedef EGLDisplay (*resolveEGLGetCurrentDisplay)(void);
+typedef EGLContext (*resolveEGLGetCurrentContext)(void);
+typedef EGLSurface (*resolveEGLGetCurrentSurface)(void);
 typedef EGLBoolean (*resolveEGLInitialize)(EGLDisplay dpy, EGLint *major, EGLint *minor);
 typedef EGLBoolean (*resolveEGLChooseConfig)(EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
 typedef EGLContext (*resolveEGLCreateContext)(EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list);
 typedef EGLBoolean (*resolveEGLMakeCurrent)(EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext ctx);
-typedef EGLint (*resolveEGLGetError)();
+typedef EGLint (*resolveEGLGetError)(void);
 typedef EGLBoolean (*resolveEGLSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
 typedef EGLBoolean (*resolveEGLQuerySurface)(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint *value);
 typedef EGLBoolean (*resolveEGLDestroySurface)(EGLDisplay dpy, EGLSurface surface);
@@ -213,7 +227,7 @@ typedef EGLBoolean (*resolveEGLTerminate)(EGLDisplay dpy);
 
 
 typedef EGLSurface (*resolveEGLCreateWindowSurface)(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list);
-#endif
+
 
 
 // -----------------------------------------------------------------------------
@@ -280,11 +294,11 @@ struct OpenGlFunctions {
 	// resolveGlGetBufferParameteriv glGetBufferParameteriv;
 	resolveGlGetError glGetError;
 	// resolveGlGetFloatv glGetFloatv;
-	// resolveGlGetFramebufferAttachmentParameteriv glGetFramebufferAttachmentParameteriv;
-	// resolveGlGetIntegerv glGetIntegerv;
+	//resolveGlGetFramebufferAttachmentParameteriv glGetFramebufferAttachmentParameteriv;
+	//resolveGlGetIntegerv glGetIntegerv;
 	resolveGlGetProgramInfoLog glGetProgramInfoLog;
 	resolveGlGetProgramiv glGetProgramiv;
-	// resolveGlGetRenderbufferParameteriv glGetRenderbufferParameteriv;
+	//resolveGlGetRenderbufferParameteriv glGetRenderbufferParameteriv;
 	resolveGlGetShaderInfoLog glGetShaderInfoLog;
 	// resolveGlGetShaderPrecisionFormat glGetShaderPrecisionFormat;
 	// resolveGlGetShaderSource glGetShaderSource;
@@ -360,9 +374,16 @@ struct OpenGlFunctions {
 	// resolveGlVertexAttrib4fv glVertexAttrib4fv;
 	resolveGlVertexAttribPointer glVertexAttribPointer;
 	resolveGlViewport glViewport;
+
+	resolveEGLGetProcAddress eglGetProcAddress;
 	
-#if _WIN32
+	resolveEGLQueryAPI eglQueryAPI;
+	resolveEGLBindAPI eglBindAPI;
+	resolveEGLQueryString eglQueryString;
 	resolveEGLGetPlatformDisplayEXT eglGetPlatformDisplayEXT;
+	resolveEGLGetCurrentDisplay eglGetCurrentDisplay;
+	resolveEGLGetCurrentContext eglGetCurrentContext;
+	resolveEGLGetCurrentSurface eglGetCurrentSurface;
 	resolveEGLInitialize eglInitialize;
 	resolveEGLChooseConfig eglChooseConfig;
 	resolveEGLCreateContext eglCreateContext;
@@ -374,7 +395,8 @@ struct OpenGlFunctions {
 	resolveEGLDestroySurface eglDestroySurface;
 	resolveEGLDestroyContext eglDestroyContext;
 	resolveEGLTerminate eglTerminate;
-#endif	
+	
+	void * (*getProcAddress)(const char * name);// Set it to let MS2 initialize all functions
 };
 
 typedef struct OpenGlFunctions OpenGlFunctions;

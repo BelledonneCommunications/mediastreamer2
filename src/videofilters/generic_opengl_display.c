@@ -26,21 +26,12 @@
 
 // =============================================================================
 
-#ifdef MS2_WINDOWS_UWP
 struct _ContextInfo {
-	EGLNativeWindowType window;
-	
-	OpenGlFunctions *functions;
-};
-#else
-struct _ContextInfo {
+	EGLNativeWindowType window;// Set it to use EGL auto managing or else, set sizes below
 	GLuint width;
 	GLuint height;
-
 	OpenGlFunctions *functions;
 };
-
-#endif
 typedef struct _ContextInfo ContextInfo;
 
 struct _FilterData {
@@ -76,7 +67,7 @@ static void ogl_init (MSFilter *f) {
 }
 
 static void ogl_uninit (MSFilter *f) {
-	FilterData *data = f->data;
+	FilterData *data = (FilterData *)f->data;
 	ogl_display_free(data->display);
 	ms_free(data);
 }
@@ -88,15 +79,12 @@ static void ogl_process (MSFilter *f) {
 
 	ms_filter_lock(f);
 
-	data = f->data;
+	data = (FilterData *)f->data;
 	context_info = &data->context_info;
 
 	// No context given or video disabled.
-#ifdef MS2_WINDOWS_UWP	
-	if ( !data->show_video)
-#else	
-	if (!context_info->width || !context_info->height || !data->show_video)
-#endif
+	if ( !data->show_video || (!context_info->window && (!context_info->width || !context_info->height)) )
+	//if (!context_info->width || !context_info->height || !data->show_video)
 		goto end;
 
 	if (
@@ -148,26 +136,27 @@ static int ogl_set_native_window_id (MSFilter *f, void *arg) {
 
 	ms_filter_lock(f);
 
-	data = f->data;
+	data = (FilterData *)f->data;
 	context_info = *((ContextInfo **)arg);
-
 	if (context_info && (unsigned long long)context_info != (unsigned long long)MS_FILTER_VIDEO_NONE) {
-#ifdef MS2_WINDOWS_UWP    
-		ms_message(
-			"set native window id for UWP: %p \n", (void*)context_info);
-#else
-	    ms_message(
-		    "set native window id: %p (width: %d, height: %d)\n",
-		    (void*)context_info, (int)context_info->width, (int)context_info->height
-	    );
-#endif
-		data->context_info = *context_info;
+		ms_message("[MSOGL] set native window id : %p \n", (void*)context_info);
+		if(  data->context_info.functions != context_info->functions
+				|| (context_info->window && data->context_info.window != context_info->window)
+				|| (!context_info->window && ( data->context_info.width != context_info->width
+					|| data->context_info.height != context_info->height) )
+			){
+			if(data->context_info.window)
+				ogl_display_uninit(data->display, FALSE);
+			data->context_info = *context_info;
+			data->update_context = TRUE;
+		}
 	} else {
-		ms_message("reset native window id");
+		if(data->context_info.window )
+			ogl_display_uninit(data->display, FALSE);
+		ms_message("[MSOGL] reset native window id");
 		memset(&data->context_info, 0, sizeof data->context_info);
+		data->update_context = TRUE;
 	}
-
-	data->update_context = TRUE;
 
 	ms_filter_unlock(f);
 
@@ -191,7 +180,7 @@ static int ogl_show_video (MSFilter *f, void *arg) {
 
 static int ogl_zoom (MSFilter *f, void *arg) {
 	ms_filter_lock(f);
-	ogl_display_zoom(((FilterData *)f->data)->display, arg);
+	ogl_display_zoom(((FilterData *)f->data)->display, (float*)arg);
 	ms_filter_unlock(f);
 
 	return 0;
@@ -216,19 +205,14 @@ static int ogl_call_render (MSFilter *f, void *arg) {
 
 	ms_filter_lock(f);
 
-	data = f->data;
+	data = (FilterData *)f->data;
 	context_info = &data->context_info;
-#ifdef MS2_WINDOWS_UWP
-	if (data->show_video && context_info->window) {
-#else	
-	if (context_info->width && context_info->height && data->show_video) {
-#endif
+	if (data->show_video && ( context_info->window || (!context_info->window && context_info->width && context_info->height)) ){
 		if (data->update_context) {
-#ifdef MS2_WINDOWS_UWP
-			ogl_display_auto_init(data->display, context_info->functions, context_info->window);
-#else		    
-			ogl_display_init(data->display, context_info->functions, context_info->width, context_info->height);
-#endif
+			if( context_info->window )// Window is set : do EGL initialization
+				ogl_display_auto_init(data->display, context_info->functions, context_info->window);
+			else// Just use input size as it is needed for viewport
+				ogl_display_init(data->display, context_info->functions, context_info->width, context_info->height);
 			data->update_context = FALSE;
 		}
 

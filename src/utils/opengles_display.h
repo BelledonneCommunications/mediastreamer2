@@ -41,7 +41,6 @@ struct opengles_display *ogl_display_new (void);
  */
 void ogl_display_free (struct opengles_display *gldisp);
 
-#ifdef MS2_WINDOWS_UWP
 /**
  * Perform initialization of opaque structure that will be auto-managed.
  *
@@ -49,7 +48,6 @@ void ogl_display_free (struct opengles_display *gldisp);
  * @param window The native window where a Surface will be created
  */
 void ogl_display_auto_init (struct opengles_display *gldisp, const OpenGlFunctions *f, EGLNativeWindowType window);
-#endif
 
 /**
  * Perform initialization of opaque structure.
