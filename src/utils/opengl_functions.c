@@ -24,7 +24,7 @@
 #endif
 
 // =============================================================================
-#define CAST_EGL(type, fn) (type)f->eglGetProcAddress(#fn)
+#define CAST_EGL(type, fn) (f->eglGetProcAddress?(type)f->eglGetProcAddress(#fn):NULL)
 
 #if defined( __ANDROID__ )
 #  define CAST(type, fn) (f->getProcAddress ? (type)f->getProcAddress(#fn) : (type)fn)
