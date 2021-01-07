@@ -27,7 +27,7 @@
 #define CAST_EGL(type, fn) (type)f->eglGetProcAddress(#fn)
 
 #if defined( __ANDROID__ )
-#  define CAST(type, fn) (type)fn
+#  define CAST(type, fn) (type)(f->getProcAddress ? f->getProcAddress(#fn) : fn)
 #elif defined(WIN32)
 
 #  ifndef MS2_WINDOWS_UWP
@@ -53,9 +53,9 @@ void *GetAnyGLFuncAddress(HMODULE library, HMODULE firstFallback, const char *na
 #  endif
 #  include <windows.h>
 #  ifdef MS2_WINDOWS_UWP
-#    define CAST(type, fn) (type)GetProcAddress( openglLibrary, #fn)
+#    define CAST(type, fn) (type)(f->getProcAddress ? f->getProcAddress(#fn) : GetProcAddress( openglLibrary, #fn))
 #  else
-#    define CAST(type, fn) (type)GetAnyGLFuncAddress(openglLibrary,firstFallbackLibrary, #fn)	
+#    define CAST(type, fn) (type)(f->getProcAddress ? f->getProcAddress(#fn) : GetAnyGLFuncAddress(openglLibrary,firstFallbackLibrary, #fn))
 #  endif
 #else
 
@@ -69,7 +69,7 @@ void *getAnyGLFuncAddress(void* library, void *firstFallback, const char *name)
 	return p;
 }
 
-#  define CAST(type, fn) (type)getAnyGLFuncAddress(openglLibrary,firstFallbackLibrary, #fn)
+#  define CAST(type, fn) (type)(f->getProcAddress ? f->getProcAddress(#fn) : getAnyGLFuncAddress(openglLibrary,firstFallbackLibrary, #fn))
 #endif
 
 #ifdef __cplusplus
@@ -77,32 +77,45 @@ extern "C"{
 #endif
 
 void opengl_functions_default_init (OpenGlFunctions *f) {
+	bool_t init = (f->getProcAddress != NULL);
+#if defined(_WIN32)
+	HMODULE openglLibrary, firstFallbackLibrary = NULL;
+#else
+	void * openglLibrary = NULL, *firstFallbackLibrary = NULL;
+#endif
 	
+	if(!init) {
 	//----------------------    GL   
 #if defined(_WIN32)// On Windows, load dynamically library as is it not deployed by the system. Clients must be sure to embedd "libGLESv2.dll" with the app
-	HMODULE openglLibrary, firstFallbackLibrary = NULL;
 #if defined(MS2_WINDOWS_DESKTOP) && !defined(MS2_WINDOWS_UWP)
 	
-#ifdef UNICODE
-	openglLibrary = LoadLibraryW(L"libGLESv2.dll");
-	firstFallbackLibrary = LoadLibraryW(L"opengl32.dll");
+#	ifdef UNICODE
+		firstFallbackLibrary = LoadLibraryW(L"opengl32.dll");
+		openglLibrary = LoadLibraryW(L"libGLESv2.dll");
+#	else
+		firstFallbackLibrary = LoadLibraryA("opengl32.dll");
+		openglLibrary = LoadLibraryA("libGLESv2.dll");
+#	endif
 #else
-	openglLibrary = LoadLibraryA("libGLESv2.dll");
-	firstFallbackLibrary = LoadLibraryA("opengl32.dll");
+		openglLibrary = LoadPackagedLibrary(L"libGLESv2.dll", 0);// UWP compatibility
 #endif
+		if( openglLibrary == NULL ){
+			ms_error("[MSOpenGL] Function : Fail to load plugin libGLESv2.dll: error %i", (int)GetLastError());
+			init = FALSE;
+		}
+	}
 #else
-	openglLibrary = LoadPackagedLibrary(L"libGLESv2.dll", 0);// UWP compatibility
-#endif
-	if( openglLibrary == NULL ){
-		ms_error("[MSOpenGL] Function : Fail to load plugin libGLESv2.dll: error %i", (int)GetLastError());
-	}else{
-#else
-	void * openglLibrary = dlopen("libGLESv2.so", RTLD_LAZY), *firstFallbackLibrary = dlopen("libGLEW.so", RTLD_LAZY);
-	if( openglLibrary == NULL ){
-		ms_error("[MSOpenGL] Function : Fail to load plugin libGLESv2.so: %s", dlerror());
-	}else{
+		openglLibrary = dlopen("libGLESv2.so", RTLD_LAZY);
+		if( openglLibrary == NULL ){
+			ms_error("[MSOpenGL] Function : Fail to load plugin libGLESv2.so: %s", dlerror());
+			init = FALSE;
+		}
+		firstFallbackLibrary = dlopen("libGLEW.so", RTLD_LAZY);
+		if( firstFallbackLibrary == NULL )
+			ms_warning("[MSOpenGL] Function : Fail to load plugin libGLEW.so: %s", dlerror());
+	}
 #endif// _WIN32
-		
+	if(init) {
 		f->glActiveTexture = CAST(resolveGlActiveTexture, glActiveTexture);
 		f->glAttachShader = CAST(resolveGlAttachShader, glAttachShader);
 		f->glBindAttribLocation = CAST(resolveGlBindAttribLocation, glBindAttribLocation);
@@ -141,28 +154,33 @@ void opengl_functions_default_init (OpenGlFunctions *f) {
 		f->glViewport = CAST(resolveGlViewport, glViewport);
 	}
 	//----------------------    EGL
-	
+	init = (f->getProcAddress != NULL);
+	if(!init) {
 #if defined(_WIN32)// On Windows, load dynamically library as is it not deployed by the system. Clients must be sure to embedd "libEGL.dll" with the app
 #if defined(MS2_WINDOWS_DESKTOP) && !defined(MS2_WINDOWS_UWP)
 	
-#ifdef UNICODE
-	openglLibrary = LoadLibraryExW(L"libEGL.dll", NULL, 0);
+#	ifdef UNICODE
+		openglLibrary = LoadLibraryExW(L"libEGL.dll", NULL, 0);
+#	else
+		openglLibrary = LoadLibraryExA("libEGL.dll", NULL, 0);
+#	endif
 #else
-	openglLibrary = LoadLibraryExA("libEGL.dll", NULL, 0);
+		openglLibrary = LoadPackagedLibrary(L"libEGL.dll", 0);// UWP compatibility
 #endif
+		if( openglLibrary == NULL ){
+			ms_error("[MSOpenGL] Function : Fail to load plugin libEGL.dll: error %i", (int)GetLastError());
+			init = FALSE;
+		}
+	}
 #else
-	openglLibrary = LoadPackagedLibrary(L"libEGL.dll", 0);// UWP compatibility
-#endif
-	if( openglLibrary == NULL ){
-		ms_error("[MSOpenGL] Function : Fail to load plugin libEGL.dll: error %i", (int)GetLastError());
-	}else{
-#else
-	openglLibrary = dlopen("libEGL.so", RTLD_LAZY);
-	if( openglLibrary == NULL ){
-		ms_error("[MSOpenGL] Function : Fail to load plugin libEGL.so: %s", dlerror());
-	}else{
+		openglLibrary = dlopen("libEGL.so", RTLD_LAZY);
+		if( openglLibrary == NULL ){
+			ms_error("[MSOpenGL] Function : Fail to load plugin libEGL.so: %s", dlerror());
+			init = FALSE;
+		}
+	}
 #endif// _WIN32
-		
+	if(init){
 		f->eglGetProcAddress = CAST(resolveEGLGetProcAddress, eglGetProcAddress);
 
 		f->eglQueryAPI = CAST_EGL(resolveEGLQueryAPI, eglQueryAPI);
@@ -184,6 +202,7 @@ void opengl_functions_default_init (OpenGlFunctions *f) {
 		f->eglDestroyContext = CAST_EGL( resolveEGLDestroyContext, eglDestroyContext);
 		f->eglTerminate = CAST_EGL( resolveEGLTerminate, eglTerminate);
 	}
+	
 }
 
 #ifdef __cplusplus

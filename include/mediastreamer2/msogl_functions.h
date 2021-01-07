@@ -43,8 +43,11 @@
 		#include <GLES2/gl2.h>
 		#include <GLES2/gl2ext.h>
 	#endif
-#elif !defined(QOPENGLFUNCTIONS_H) // glew is already included by QT.
+//#elif !defined(QOPENGLFUNCTIONS_H) // glew is already included by QT.
+#else
+#ifndef QOPENGLFUNCTIONS_H
 	#include <GL/glew.h>
+#endif
 	#include <EGL/egl.h>
 	#include <EGL/eglext.h>
 #endif
@@ -291,11 +294,11 @@ struct OpenGlFunctions {
 	// resolveGlGetBufferParameteriv glGetBufferParameteriv;
 	resolveGlGetError glGetError;
 	// resolveGlGetFloatv glGetFloatv;
-	// resolveGlGetFramebufferAttachmentParameteriv glGetFramebufferAttachmentParameteriv;
-	// resolveGlGetIntegerv glGetIntegerv;
+	//resolveGlGetFramebufferAttachmentParameteriv glGetFramebufferAttachmentParameteriv;
+	//resolveGlGetIntegerv glGetIntegerv;
 	resolveGlGetProgramInfoLog glGetProgramInfoLog;
 	resolveGlGetProgramiv glGetProgramiv;
-	// resolveGlGetRenderbufferParameteriv glGetRenderbufferParameteriv;
+	//resolveGlGetRenderbufferParameteriv glGetRenderbufferParameteriv;
 	resolveGlGetShaderInfoLog glGetShaderInfoLog;
 	// resolveGlGetShaderPrecisionFormat glGetShaderPrecisionFormat;
 	// resolveGlGetShaderSource glGetShaderSource;
@@ -393,6 +396,7 @@ struct OpenGlFunctions {
 	resolveEGLDestroyContext eglDestroyContext;
 	resolveEGLTerminate eglTerminate;
 	
+	void * (*getProcAddress)(const char * name);// Set it to let MS2 initialize all functions
 };
 
 typedef struct OpenGlFunctions OpenGlFunctions;

@@ -27,8 +27,9 @@
 // =============================================================================
 
 struct _ContextInfo {
-	EGLNativeWindowType window;
-	
+	EGLNativeWindowType window;// Set it to use EGL auto managing or else, set sizes below
+	GLuint width;
+	GLuint height;
 	OpenGlFunctions *functions;
 };
 typedef struct _ContextInfo ContextInfo;
@@ -72,17 +73,17 @@ static void ogl_uninit (MSFilter *f) {
 }
 static void ogl_process (MSFilter *f) {
 	FilterData *data;
-	//ContextInfo *context_info;
+	ContextInfo *context_info;
 	MSPicture src;
 	mblk_t *inm;
 
 	ms_filter_lock(f);
 
 	data = (FilterData *)f->data;
-	//context_info = &data->context_info;
+	context_info = &data->context_info;
 
 	// No context given or video disabled.
-	if ( !data->show_video)
+	if ( !data->show_video || (!context_info->window && (!context_info->width || !context_info->height)) )
 	//if (!context_info->width || !context_info->height || !data->show_video)
 		goto end;
 
@@ -138,33 +139,24 @@ static int ogl_set_native_window_id (MSFilter *f, void *arg) {
 	data = (FilterData *)f->data;
 	context_info = *((ContextInfo **)arg);
 	if (context_info && (unsigned long long)context_info != (unsigned long long)MS_FILTER_VIDEO_NONE) {
-		ms_message(
-			"set native window id : %p \n", (void*)context_info);
-		if(data->context_info.window != context_info->window || data->context_info.functions != context_info->functions){
-			ogl_display_uninit(data->display, FALSE);
+		ms_message("[MSOGL] set native window id : %p \n", (void*)context_info);
+		if(  data->context_info.functions != context_info->functions
+				|| (context_info->window && data->context_info.window != context_info->window)
+				|| (!context_info->window && ( data->context_info.width != context_info->width
+					|| data->context_info.height != context_info->height) )
+			){
+			if(data->context_info.window)
+				ogl_display_uninit(data->display, FALSE);
 			data->context_info = *context_info;
 			data->update_context = TRUE;
 		}
 	} else {
 		if(data->context_info.window )
 			ogl_display_uninit(data->display, FALSE);
-		ms_message("reset native window id");
+		ms_message("[MSOGL] reset native window id");
 		memset(&data->context_info, 0, sizeof data->context_info);
 		data->update_context = TRUE;
 	}
-	/*
-	if (context_info && (unsigned long long)context_info != (unsigned long long)MS_FILTER_VIDEO_NONE) {
-	    ms_message(
-		    "set native window id: %p (width: %d, height: %d)\n",
-		    (void*)context_info, (int)context_info->width, (int)context_info->height
-	    );
-		data->context_info = *context_info;
-		data->update_context = TRUE;
-	} else {
-		ms_message("reset native window id");
-		memset(&data->context_info, 0, sizeof data->context_info);
-		data->update_context = TRUE;
-	}*/
 
 	ms_filter_unlock(f);
 
@@ -215,11 +207,12 @@ static int ogl_call_render (MSFilter *f, void *arg) {
 
 	data = (FilterData *)f->data;
 	context_info = &data->context_info;
-	if (data->show_video && context_info->window) {
-	//if (context_info->width && context_info->height && data->show_video) {
+	if (data->show_video && ( context_info->window || (!context_info->window && context_info->width && context_info->height)) ){
 		if (data->update_context) {
-			ogl_display_auto_init(data->display, context_info->functions, context_info->window);
-			//ogl_display_init(data->display, context_info->functions, context_info->width, context_info->height);
+			if( context_info->window )// Window is set : do EGL initialization
+				ogl_display_auto_init(data->display, context_info->functions, context_info->window);
+			else// Just use input size as it is needed for viewport
+				ogl_display_init(data->display, context_info->functions, context_info->width, context_info->height);
 			data->update_context = FALSE;
 		}
 
