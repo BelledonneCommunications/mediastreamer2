@@ -71,8 +71,12 @@ void *getAnyGLFuncAddress(void* library, void *firstFallback, const char *name)
 #  define CAST(type, fn) (f->getProcAddress && f->getProcAddress(#fn) ? (type)f->getProcAddress(#fn) : (type)getAnyGLFuncAddress(openglLibrary,firstFallbackLibrary, #fn))
 #endif
 
+// Remove EGL from Android
+#if defined( __ANDROID__ )
+#define CAST_EGL(type, fn) NULL
+#else
 #define CAST_EGL(type, fn) (f->eglGetProcAddress && f->eglGetProcAddress(#fn) ? (type)f->eglGetProcAddress(#fn):CAST(type,fn))
-
+#endif
 #ifdef __cplusplus
 extern "C"{
 #endif
