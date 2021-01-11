@@ -539,6 +539,8 @@ static void au_callkit_enabled(MSSndCard *obj, bool_t enabled) {
 		// There is only callKit can notify audio session is activated or not.
 		// So set audio session always activated when callkit is disabled.
 		d->audio_session_activated = true;
+	}else{
+		d->audio_session_activated = false;
 	}
 }
 
