@@ -194,6 +194,7 @@ void opengl_functions_default_init (OpenGlFunctions *f) {
 	f->eglDestroyContext = CAST_EGL( resolveEGLDestroyContext, eglDestroyContext);
 	f->eglTerminate = CAST_EGL( resolveEGLTerminate, eglTerminate);
 	
+	f->initialized = TRUE;
 }
 
 #ifdef __cplusplus
