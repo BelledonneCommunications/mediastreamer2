@@ -258,6 +258,14 @@ struct _MSVideoConferenceParams{
 **/
 typedef struct _MSVideoConferenceParams MSVideoConferenceParams;
 
+
+
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * The MSVideoConference is the object representing a video conference.
  *
@@ -276,13 +284,6 @@ typedef struct _MSVideoConference MSVideoConference;
  * ms_video_endpoint_get_from_stream().
 **/
 typedef struct _MSVideoEndpoint MSVideoEndpoint;
-
-
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /**
  * Creates a conference.
@@ -354,6 +355,20 @@ MS2_PUBLIC int ms_video_conference_get_size(MSVideoConference *obj);
  * All participants must have been removed before destroying the conference.
 **/
 MS2_PUBLIC void ms_video_conference_destroy(MSVideoConference *obj);
+
+/**
+ * Creates a conference with router filter.
+ * @param params a MSVideoConferenceParams structure, containing conference parameters.
+ * @returns a MSVideoConference object.
+**/
+MS2_PUBLIC MSVideoConference * ms_video_conference_all_to_all_new(MSFactory *factory, const MSVideoConferenceParams *params);
+
+/**
+ * Destroys a conference.
+ * @param obj the conference
+ * All participants must have been removed before destroying the conference.
+**/
+MS2_PUBLIC void ms_video_conference_all_to_all_destroy(MSVideoConference *obj);
 
 /**
  * Creates an MSVideoEndpoint from an existing VideoStream.

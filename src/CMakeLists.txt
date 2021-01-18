@@ -103,6 +103,8 @@ set(VOIP_SOURCE_FILES_C
 	utils/kiss_fftr.h
 	utils/pcap_sender.c
 	utils/pcap_sender.h
+	utils/video-conference-util.cpp
+	utils/video-conference-util.h
 	utils/stream_regulator.c
 	utils/srtp_prefix.h
 	voip/audioconference.c
@@ -132,6 +134,7 @@ set(VOIP_SOURCE_FILES_CXX
 	utils/filter-wrapper/decoding-filter-wrapper.cpp
 	utils/filter-wrapper/encoding-filter-wrapper.cpp
 	voip/turn_tcp.cpp
+	voip/video-conference.cpp
 )
 set(VOIP_SOURCE_FILES_OBJC )
 set(VOIP_SOURCE_FILES_ASM )
@@ -223,7 +226,8 @@ if(ENABLE_VIDEO)
 		videofilters/nowebcam.c
 		videofilters/pixconv.c
 		videofilters/sizeconv.c
-		videofilters/videoswitcher.c
+		videofilters/video-router.cpp
+		videofilters/video-switcher.cpp
 		voip/layouts.c
 		voip/layouts.h
 		voip/msvideo_neon.c
@@ -235,7 +239,6 @@ if(ENABLE_VIDEO)
 		voip/video_preset_high_fps.c
 		voip/videostarter.c
 		voip/videostream.c
-		voip/videoconference.c
 		voip/vp8rtpfmt.c
 		voip/vp8rtpfmt.h
 	)
