@@ -779,16 +779,17 @@ void ogl_display_auto_init (struct opengles_display *gldisp, const OpenGlFunctio
 		return;
 	}
 	// Create default functions if necessary. (No opengl functions given.)
-	if (!gldisp->default_functions && (!f || f->getProcAddress) ) {
+	if (!gldisp->default_functions) {
 		gldisp->default_functions = ms_new0(OpenGlFunctions, 1);
-		if(f && f->getProcAddress)
+		if(f && f->getProcAddress){
 			gldisp->default_functions->getProcAddress = f->getProcAddress;
+		}
 		opengl_functions_default_init(gldisp->default_functions);
-		gldisp->functions = gldisp->default_functions;
-	}else if(!f || f->getProcAddress)
-		gldisp->functions = gldisp->default_functions;
-	else
+	}
+	if(f && f->initialized)
 		gldisp->functions = f;
+	else
+		gldisp->functions = gldisp->default_functions;
 	
 	if( !gldisp->functions)
 		ms_error("[ogl_display] functions is still NULL!");
@@ -801,7 +802,7 @@ void ogl_display_auto_init (struct opengles_display *gldisp, const OpenGlFunctio
 		if( gldisp->mRenderSurface != EGL_NO_SURFACE){
 			gldisp->functions->eglQuerySurface(gldisp->mEglDisplay, gldisp->mRenderSurface, EGL_WIDTH, &width);
 			gldisp->functions->eglQuerySurface(gldisp->mEglDisplay, gldisp->mRenderSurface, EGL_HEIGHT, &height);
-			ogl_display_init (gldisp, f, width, height);
+			ogl_display_init (gldisp, gldisp->functions, width, height);
 		}
 	}
 }
@@ -816,16 +817,17 @@ void ogl_display_init (struct opengles_display *gldisp, const OpenGlFunctions *f
 	}
 
 	// Create default functions if necessary. (No opengl functions given.)
-	if (!gldisp->default_functions && (!f || f->getProcAddress) ) {
+	if (!gldisp->default_functions) {
 		gldisp->default_functions = ms_new0(OpenGlFunctions, 1);
-		if(f && f->getProcAddress)
+		if(f && f->getProcAddress){
 			gldisp->default_functions->getProcAddress = f->getProcAddress;
+		}
 		opengl_functions_default_init(gldisp->default_functions);
-		gldisp->functions = gldisp->default_functions;
-	}else if(!f || f->getProcAddress)
-		gldisp->functions = gldisp->default_functions;
-	else
+	}
+	if(f && f->initialized)
 		gldisp->functions = f;
+	else
+		gldisp->functions = gldisp->default_functions;
 
 	ms_message("[ogl_display] init opengles_display (%d x %d, gl initialized:%d)", width, height, gldisp->glResourcesInitialized);
 	
@@ -936,7 +938,8 @@ void ogl_display_render (struct opengles_display *gldisp, int orientation) {
 				ogl_display_init(gldisp, f, width, height);
 		}
 	}
-
+	GL_OPERATION(f, glClearColor(0.f, 0.f, 0.f, 0.f));
+	GL_OPERATION(f, glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 	GL_OPERATION(f, glUseProgram(gldisp->program))
 	check_GL_errors(f, "ogl_display_render");
 

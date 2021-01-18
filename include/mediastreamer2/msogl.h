@@ -21,5 +21,12 @@
 #define msogl_h
 
 #define MS_OGL_RENDER MS_FILTER_METHOD_NO_ARG(MS_OGL_ID, 0)
+struct _MSOglContextInfo {
+	void *window;// Set it to use EGL auto managing or else, set sizes below
+	unsigned int width;
+	unsigned int height;
+	void *(*getProcAddress)(const char *name);
+};
+typedef struct _MSOglContextInfo MSOglContextInfo;
 
 #endif
