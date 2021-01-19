@@ -396,7 +396,7 @@ struct OpenGlFunctions {
 	resolveEGLTerminate eglTerminate;
 	
 	void * (*getProcAddress)(const char * name);// Set it to let MS2 initialize all functions
-	BOOL initialized;
+	bool_t initialized;
 };
 
 typedef struct OpenGlFunctions OpenGlFunctions;
