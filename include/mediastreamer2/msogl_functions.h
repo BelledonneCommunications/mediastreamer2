@@ -24,7 +24,7 @@
    #include "TargetConditionals.h"
 #endif
 
-#include <GLES2/gl2platform.h>
+
 
 #if TARGET_OS_IPHONE
 	#include <EGL/egl.h>
@@ -50,6 +50,7 @@
 #endif
 	#include <EGL/egl.h>
 #endif
+#include <GLES2/gl2platform.h>
 #include "bctoolbox/port.h"
 // =============================================================================
 

@@ -255,6 +255,9 @@ if(ENABLE_VIDEO)
 			utils/jpgloader-stub.c
 		)
 	endif()
+	if(ENABLE_QT_GL)
+		list(APPEND VOIP_SOURCE_FILES_CXX videofilters/msqogl.cpp )
+	endif()
 	if(WIN32)
 		list(APPEND VOIP_SOURCE_FILES_CXX
 			videofilters/msmfoundationcap.cpp	#Media-Foundation
