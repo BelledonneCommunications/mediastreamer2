@@ -209,7 +209,7 @@ static int ogl_call_render (MSFilter *f, void *arg) {
 	if (data->show_video && ( context_info->window || (!context_info->window && context_info->width && context_info->height)) ){
 		if (data->update_context) {
 			if( context_info->window )// Window is set : do EGL initialization
-				ogl_display_auto_init(data->display, &data->functions, context_info->window);
+				ogl_display_auto_init(data->display, &data->functions, (EGLNativeWindowType)context_info->window);
 			else// Just use input size as it is needed for viewport
 				ogl_display_init(data->display, &data->functions, context_info->width, context_info->height);
 			data->update_context = FALSE;
