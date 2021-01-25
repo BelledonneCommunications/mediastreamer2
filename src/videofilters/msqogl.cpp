@@ -234,7 +234,7 @@ static MSFilterMethod methods[] = {
 };
 
 MSFilterDesc ms_qogl_desc = {
-	.id = MS_OGL_ID,
+	.id = MS_FILTER_PLUGIN_ID,
 	.name = "MSQOGL",
 	.text = "A Qt opengl video display",
 	.category = MS_FILTER_OTHER,
@@ -246,4 +246,11 @@ MSFilterDesc ms_qogl_desc = {
 	.methods = methods
 };
 
-MS_FILTER_DESC_EXPORT(ms_qogl_desc)
+#ifndef VERSION
+#define VERSION "debug"
+#endif
+
+extern "C" Q_DECL_EXPORT void libmsqogl_init(MSFactory* factory) {
+	ms_factory_register_filter(factory, &ms_qogl_desc);
+	ms_message("libmsqogl " VERSION " plugin loaded");
+}

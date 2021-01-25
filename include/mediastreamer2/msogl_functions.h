@@ -210,6 +210,7 @@ typedef EGLenum (GL_APIENTRY *resolveEGLQueryAPI)(void);
 typedef EGLBoolean (GL_APIENTRY *resolveEGLBindAPI)(EGLenum api);
 typedef char const *(GL_APIENTRY *resolveEGLQueryString)(EGLDisplay display, EGLint name);
 typedef EGLDisplay (GL_APIENTRY *resolveEGLGetPlatformDisplayEXT)(EGLenum platform, void *native_display, const EGLint *attrib_list);
+typedef EGLDisplay (GL_APIENTRY *resolveEGLGetDisplay)(EGLNativeDisplayType display);
 typedef EGLDisplay (GL_APIENTRY *resolveEGLGetCurrentDisplay)(void);
 typedef EGLContext (GL_APIENTRY *resolveEGLGetCurrentContext)(void);
 typedef EGLSurface (GL_APIENTRY *resolveEGLGetCurrentSurface)(void);
@@ -381,6 +382,7 @@ struct OpenGlFunctions {
 	resolveEGLBindAPI eglBindAPI;
 	resolveEGLQueryString eglQueryString;
 	resolveEGLGetPlatformDisplayEXT eglGetPlatformDisplayEXT;
+	resolveEGLGetDisplay eglGetDisplay;
 	resolveEGLGetCurrentDisplay eglGetCurrentDisplay;
 	resolveEGLGetCurrentContext eglGetCurrentContext;
 	resolveEGLGetCurrentSurface eglGetCurrentSurface;
