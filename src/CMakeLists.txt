@@ -539,6 +539,11 @@ if(ENABLE_SHARED)
   			MACOSX_FRAMEWORK_INFO_PLIST Info.plist.in
 			PUBLIC_HEADER "${MEDIASTREAMER2_HEADER_FILES}"
 		)
+		if(ENABLE_QT_GL AND QT5_PACKAGES)
+			foreach (package ${QT5_PACKAGES})
+				add_custom_command(TARGET mediastreamer POST_BUILD COMMAND install_name_tool -change "/usr/local/opt/qt/lib/Qt${package}.framework/Versions/5/Qt${package}" "@rpath/Qt${package}.framework/Versions/5/Qt${package}" $<TARGET_FILE:mediastreamer>)
+			endforeach()
+		endif()
 	endif()
 	if(ANDROID)
 		if(ENABLE_VPX)
