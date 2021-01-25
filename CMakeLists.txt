@@ -594,12 +594,12 @@ if(ENABLE_MACAQSND)
 	set(__MAC_AQ_ENABLED__ 1)
 endif()
 
-if(ENABLE_QT_GL)
+if(ENABLE_QT_GL)#Only add headers and lib to Qt plugins
 	set(QT5_PACKAGES Core Gui Quick )
 	find_package(Qt5 COMPONENTS ${QT5_PACKAGES} REQUIRED)
 	foreach (package ${QT5_PACKAGES})
-		list(APPEND MEDIASTREAMER2_INCLUDE_DIRS "${Qt5${package}_INCLUDE_DIRS}")
-		list(APPEND LINK_LIBS ${Qt5${package}_LIBRARIES})
+		list(APPEND MEDIASTREAMER2_QT_INCLUDE_DIRS "${Qt5${package}_INCLUDE_DIRS}")
+		list(APPEND QT_LINK_LIBS ${Qt5${package}_LIBRARIES})
 	endforeach ()
 endif()
 
