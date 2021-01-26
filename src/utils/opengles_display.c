@@ -897,7 +897,9 @@ void ogl_display_auto_init (struct opengles_display *gldisp, const OpenGlFunctio
 
 	if( !gldisp->functions)
 		ms_error("[ogl_display] functions is still NULL!");
-	// Update gl functions.
+	if( gldisp->mRenderSurface != EGL_NO_SURFACE){
+		ogl_display_uninit(gldisp,FALSE);
+	}
 	ogl_create_surface(gldisp, gldisp->functions, window);
 	if (gldisp->mRenderSurface != EGL_NO_SURFACE && gldisp->functions->eglMakeCurrent(gldisp->mEglDisplay, gldisp->mRenderSurface, gldisp->mRenderSurface, gldisp->mEglContext) == EGL_FALSE)
 	{

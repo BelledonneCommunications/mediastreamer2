@@ -83,7 +83,6 @@ static void ogl_preprocess(MSFilter *f){
 	}
 }
 
-static int ogl_call_render (MSFilter *f, void *arg);
 static void ogl_process (MSFilter *f) {
 	FilterData *data = (FilterData *)f->data;
 	MSOglContextInfo *context_info;
@@ -127,10 +126,6 @@ end:
 
 	if (f->inputs[1] != NULL)
 		ms_queue_flush(f->inputs[1]);
-	ogl_call_render(f, NULL);
-#if defined(MS2_WINDOWS_UWP) || (defined(MS2_WINDOWS_DESKTOP) && defined(ENABLE_MICROSOFT_STORE_APP) )
-	ogl_call_render(f, NULL);
-#endif	
 }
 
 // =============================================================================
