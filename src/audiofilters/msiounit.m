@@ -515,7 +515,14 @@ static void au_audio_session_activated(MSSndCard *obj, bool_t activated) {
 	au_card_t *d = (au_card_t*)obj->data;
 	d->audio_session_activated = activated;
 	ms_message("AVAudioSession activated: %i", (int)activated);
-	
+	if(activated) {
+		/*
+		 For callkit (outgoing call), audio session should be configured earlier.
+		 To avoid configuring audio session in background (bad thread), which will not work for callkit.
+		 */
+		configure_audio_session(d);
+	}
+
 	if (activated && d->audio_unit_state == MSAudioUnitCreated){
 		/* 
 			The sample rate is known only after that the AudioSession is activated. 
