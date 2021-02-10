@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <array>
 #include <cwchar>
+#include <limits>
 #include <list>
 #include <memory>
 #include <vector>
