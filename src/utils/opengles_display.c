@@ -667,7 +667,6 @@ bool_t ogl_create_window(EGLNativeWindowType *window, void ** window_id){
 }
 
 void ogl_destroy_window(EGLNativeWindowType *window, void ** window_id){
-	(void **) window_id;
 	if(*window){
 		Display *dpy = XOpenDisplay(NULL);
 		XSync(dpy,FALSE);
