@@ -38,20 +38,15 @@ public:
 	MSTurboJpegDec(){
 		mFps=60.0;
 		mDciSize = 0;
-		mBufferSize = 0;
-		mBuffer = nullptr;
-		mTempBufferSize = 0;
-		mTempBuffer = nullptr;
+		mRgbBufferSize = 0;
+		mRgbBuffer = nullptr;
 		mSize.width = MS_VIDEO_SIZE_UNKNOWN_W;
 		mSize.height = MS_VIDEO_SIZE_UNKNOWN_H;
 		mAllocator = ms_yuv_buf_allocator_new();
 	}
 	~MSTurboJpegDec(){
-		if( mBufferSize > 0){
-			delete [] mBuffer;
-		}
-		if( mTempBufferSize > 0){
-			delete [] mTempBuffer;
+		if( mRgbBufferSize > 0){
+			bctbx_free(mRgbBuffer);// jpeg2yuv_details use bctbx_new
 		}
 		ms_free(mAllocator);
 	}
@@ -64,18 +59,16 @@ public:
 
 	tjhandle mTurboJpegDecompressor;
 	tjhandle mTurboJpegCompressor;
-	unsigned char * mBuffer;
-	unsigned long mBufferSize;
 	MSYuvBufAllocator * mAllocator;
-	uint8_t * mTempBuffer;
-	size_t mTempBufferSize;
+	uint8_t * mRgbBuffer;
+	size_t mRgbBufferSize;
 
 	float getFps(){return mFps;}
 
 	void decodeFrame(MSFilter *filter, mblk_t *inm){
 		if (inm->b_cont!=NULL) inm=inm->b_cont; /*skip potential video header */
 		if( mTurboJpegDecompressor){
-			mblk_t *m = jpeg2yuv_details(inm->b_rptr, inm->b_wptr-inm->b_rptr, &mSize,mTurboJpegDecompressor,mTurboJpegCompressor,mAllocator,&mTempBuffer,&mTempBufferSize );
+			mblk_t *m = jpeg2yuv_details(inm->b_rptr, inm->b_wptr-inm->b_rptr, &mSize,mTurboJpegDecompressor,mTurboJpegCompressor,mAllocator,&mRgbBuffer,&mRgbBufferSize );
 			if(m){
 				uint32_t timestamp;
 				timestamp = (uint32_t)(filter->ticker->time * 90);// rtp uses a 90000 Hz clockrate for video
