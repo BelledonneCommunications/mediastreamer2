@@ -125,6 +125,7 @@ typedef enum _MSAudioUnitState{
 @property bool_t audio_session_activated;
 @property bool_t callkit_enabled;
 @property bool_t mic_enabled;
+@property bool_t configure_forced; /* for callkit, audio session sometimes need to be configured early */
 
 +(AudioUnitHolder *)sharedInstance;
 - (id)init;
@@ -221,14 +222,15 @@ ms_mutex_t mutex;
 
 - (id)init {
 	if (self = [super init]) {
-	 ms_debug("au_init");
-	 _bits=16;
-	 _rate=defaultSampleRate;
-	 _nchannels=1;
-	 _ms_snd_card=NULL;
-	 _will_be_used = FALSE;
-	 ms_mutex_init(&mutex,NULL);
-	 _mic_enabled = TRUE;
+		ms_debug("au_init");
+		_bits=16;
+		_rate=defaultSampleRate;
+		_nchannels=1;
+		_ms_snd_card=NULL;
+		_will_be_used = FALSE;
+		ms_mutex_init(&mutex,NULL);
+		_mic_enabled = TRUE;
+		_configure_forced = FALSE;
 	}
 	return self;
 }
@@ -473,20 +475,22 @@ ms_mutex_t mutex;
 	//UInt32 audioCategorySize=sizeof(audioCategory);
 	AVAudioSession *audioSession = [AVAudioSession sharedInstance];
 
-		if (_audio_unit_state == MSAudioUnitStarted){
+	if (_audio_unit_state == MSAudioUnitStarted){
 		ms_message("configure_audio_session(): AudioUnit is already started, skipping this process.");
 		return;
 	}
 
-	if ( !bctbx_param_string_get_bool_value(_ms_snd_card->sndcardmanager->paramString, SCM_PARAM_FAST) ) {
+	if (_configure_forced || !bctbx_param_string_get_bool_value(_ms_snd_card->sndcardmanager->paramString, SCM_PARAM_FAST) ) {
 		/*check that category wasn't changed*/
 		NSString *currentCategory = audioSession.category;
 		NSString *newCategory = AVAudioSessionCategoryPlayAndRecord;
-		
-		if (_ms_snd_card->streamType == MS_SND_CARD_STREAM_MEDIA){
-			newCategory = AVAudioSessionCategoryPlayback;
-		}else if (bctbx_param_string_get_bool_value(_ms_snd_card->sndcardmanager->paramString, SCM_PARAM_RINGER) ){
-			newCategory = AVAudioSessionCategoryAmbient;
+
+		if (!_configure_forced) {
+			if (_ms_snd_card->streamType == MS_SND_CARD_STREAM_MEDIA){
+				newCategory = AVAudioSessionCategoryPlayback;
+			}else if (bctbx_param_string_get_bool_value(_ms_snd_card->sndcardmanager->paramString, SCM_PARAM_RINGER) ){
+				newCategory = AVAudioSessionCategoryAmbient;
+			}
 		}
 
 		if (currentCategory != newCategory){
@@ -658,6 +662,15 @@ static void au_audio_session_activated(MSSndCard *obj, bool_t activated) {
 	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
 	[au_holder setAudio_session_activated:activated];
 	ms_message("AVAudioSession activated: %i", (int)activated);
+	if(activated) {
+		[au_holder setConfigure_forced:TRUE];
+		/*
+		 For callkit (outgoing call), audio session should be configured earlier.
+		 To avoid configuring audio session in background (bad thread), which will not work for callkit.
+		 */
+		[au_holder configure_audio_session];
+		[au_holder setConfigure_forced:FALSE];
+	}
 	
 	if (activated && [au_holder audio_unit_state] == MSAudioUnitCreated){
 		/* 
