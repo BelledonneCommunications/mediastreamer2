@@ -325,7 +325,7 @@ static int set_high_prio(MSTicker *obj){
 
 	if (prio>MS_TICKER_PRIO_NORMAL){
 #ifdef _WIN32
-#ifdef MS2_WINDOWS_DESKTOP
+#if defined(MS2_WINDOWS_DESKTOP) && !defined(MS2_WINDOWS_UWP)
 		MMRESULT mm;
 		TIMECAPS ptc;
 		mm=timeGetDevCaps(&ptc,sizeof(ptc));
@@ -346,6 +346,8 @@ static int set_high_prio(MSTicker *obj){
 		if(!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST)){
 			ms_warning("SetThreadPriority() failed (%d)\n", (int)GetLastError());
 		}
+#else
+		ms_warning("SetThreadPriority() is not implemented. %s priority left to normal.",obj->name);
 #endif
 #else
 		struct sched_param param;
@@ -393,7 +395,7 @@ static int set_high_prio(MSTicker *obj){
 
 static void unset_high_prio(int precision){
 #ifdef _WIN32
-#ifdef MS2_WINDOWS_DESKTOP
+#if defined(MS2_WINDOWS_DESKTOP) && !defined(MS2_WINDOWS_UWP)
 	if(!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL)){
 		ms_warning("SetThreadPriority() failed (%d)\n", (int)GetLastError());
 	}
@@ -432,6 +434,7 @@ void * ms_ticker_run(void *arg)
 	int lastlate=0;
 	int precision=2;
 	int late;
+	unsigned int lateMessageCount = 0;// Avoid spamming late messages
 
 	ms_mutex_lock(&s->lock);
 
@@ -467,9 +470,11 @@ void * ms_ticker_run(void *arg)
 		s->time+=s->interval;
 		late=s->wait_next_tick(s->wait_next_tick_data,s->time);
 		if (late>s->interval*5 && late>lastlate){
-			ms_warning("%s: We are late of %d miliseconds.",s->name,late);
+			if((++lateMessageCount)%10 == 1)
+				ms_warning("%s: We are late of %d miliseconds.",s->name,late);
 			late_tick_time=ms_get_cur_time_ms();
-		}
+		}else if(late == 0)// Reset spam count
+			lateMessageCount = 0;
 		lastlate=late;
 		ms_mutex_lock(&s->lock);
 		if (late_tick_time){
@@ -651,7 +656,7 @@ uint64_t ms_ticker_round(uint64_t ms) {
 
 uint64_t ms_ticker_synchronizer_get_corrected_time(MSTickerSynchronizer* ts) {
 	/* round skew to timer resolution in order to avoid adapt the ticker just with statistical "noise" */
-	int64_t rounded_skew=( ((int64_t)ts->av_skew)/(int64_t)TICKER_INTERVAL) * (int64_t)TICKER_INTERVAL;
+	uint64_t rounded_skew=( ((uint64_t)ts->av_skew)/(uint64_t)TICKER_INTERVAL) * (uint64_t)TICKER_INTERVAL;
 	return get_wallclock_ms() - rounded_skew;
 }
 
