@@ -105,11 +105,13 @@ struct OpenSLESContext {
 		samplerate = DeviceFavoriteSampleRate;
 		nchannels = 1;
 		builtin_aec = false;
+		use_mic_recognition = false;
 	}
 
 	int samplerate;
 	int nchannels;
 	bool builtin_aec;
+	bool use_mic_recognition;
 
 	SLObjectItf engineObject;
 	SLEngineItf engineEngine;
@@ -163,7 +165,7 @@ struct OpenSLESOutputContext {
 	SLPlayItf playerPlay;
 	SLAndroidSimpleBufferQueueItf playerBufferQueue;
 	SLAndroidConfigurationItf playerConfig;
-	SLint32 streamType;
+	SLuint32 streamType;
 
 	MSSndCard *soundCard;
 	MSFilter *filter;
@@ -178,7 +180,7 @@ struct OpenSLESOutputContext {
 
 struct OpenSLESInputContext {
 	OpenSLESInputContext() {
-		streamType = SL_ANDROID_RECORDING_PRESET_VOICE_COMMUNICATION;
+		streamType = SL_ANDROID_RECORDING_PRESET_VOICE_COMMUNICATION; // SL_ANDROID_RECORDING_PRESET_VOICE_RECOGNITION
 		inBufSize = DeviceFavoriteBufferSize;
 		qinit(&q);
 		ms_mutex_init(&mutex,NULL);
@@ -212,7 +214,7 @@ struct OpenSLESInputContext {
 	SLRecordItf recorderRecord;
 	SLAndroidSimpleBufferQueueItf recorderBufferQueue;
 	SLAndroidConfigurationItf recorderConfig;
-	SLint32 streamType;
+	SLuint32 streamType;
 
 	queue_t q;
 	ms_mutex_t mutex;
@@ -372,7 +374,10 @@ static SLresult opensles_recorder_init(OpenSLESInputContext *ictx) {
 		return result;
 	}
 
-	result = (*ictx->recorderConfig)->SetConfiguration(ictx->recorderConfig, SL_ANDROID_KEY_RECORDING_PRESET, &ictx->streamType, sizeof(SLint32));
+	if (ictx->opensles_context->use_mic_recognition) {
+		ictx->streamType = SL_ANDROID_RECORDING_PRESET_VOICE_RECOGNITION;
+	}
+	result = (*ictx->recorderConfig)->SetConfiguration(ictx->recorderConfig, SL_ANDROID_KEY_RECORDING_PRESET, &ictx->streamType, sizeof(SLuint32));
 	if (SL_RESULT_SUCCESS != result) {
 		ms_error("[OpenSLES] Error %u while setting the audio recorder configuration", result);
 		return result;
@@ -729,7 +734,7 @@ static SLresult opensles_sink_init(OpenSLESOutputContext *octx) {
 	}
 
 	octx->updateStreamTypeFromMsSndCard();
-	result = (*octx->playerConfig)->SetConfiguration(octx->playerConfig, SL_ANDROID_KEY_STREAM_TYPE, &octx->streamType, sizeof(SLint32));
+	result = (*octx->playerConfig)->SetConfiguration(octx->playerConfig, SL_ANDROID_KEY_STREAM_TYPE, &octx->streamType, sizeof(SLuint32));
 	if (result != SL_RESULT_SUCCESS) {
 		ms_error("[OpenSLES] Error %u while setting stream type configuration", result);
 		return result;
@@ -1032,6 +1037,13 @@ static MSSndCard* android_snd_card_new(MSSndCardManager *m) {
 		ms_warning("[OpenSLES] Removing MS_SND_CARD_CAP_CAPTURE flag from soundcard to use HAEC Java capture soundcard");
 		card->capabilities = MS_SND_CARD_CAP_PLAYBACK;
 	}
+
+	if (d->flags & DEVICE_OPENSLES_MIC_SWITCH_WHEN_IN_SPEAKER) {
+		ms_warning("[OpenSLES] Using SL_ANDROID_RECORDING_PRESET_VOICE_RECOGNITION to prevent mic switch when enabling speaker, side effect is disabled hardware AEC");
+		context->use_mic_recognition = true;
+		context->builtin_aec = false;
+	}
+
 	card->latency = d->delay;
 	card->data = context;
 	if (d->recommended_rate){
