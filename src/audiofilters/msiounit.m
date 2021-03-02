@@ -677,9 +677,9 @@ static void au_callkit_enabled(MSSndCard *obj, bool_t enabled) {
 	}
 }
 
-static void configure_audio_session(au_card_t* d);
 static void au_configure(MSSndCard *obj) {
-	configure_audio_session((au_card_t*)obj->data);
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
+	[au_holder configure_audio_session];
 }
 
 MSSndCardDesc au_card_desc={
