@@ -4179,6 +4179,7 @@ static bool_t ice_check_gathering_timeout(IceCheckList *cl, RtpSession *rtp_sess
 
 static void ice_send_stun_server_requests(IceStunServerRequest *request, IceCheckList *cl)
 {
+	
 	IceStunServerRequestTransaction *transaction = NULL;
 	MSTimeSpec curtime = ice_current_time();
 
