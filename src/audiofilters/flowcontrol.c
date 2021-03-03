@@ -22,6 +22,7 @@
 #include "mediastreamer2/msticker.h"
 #include "mediastreamer2/flowcontrol.h"
 
+#include <math.h>
 
 void ms_audio_flow_controller_init(MSAudioFlowController *ctl)
 {
@@ -79,6 +80,19 @@ static bool_t ms_audio_flow_controller_running(MSAudioFlowController *ctl) {
 	return (ctl->total_samples > 0) && (ctl->target_samples > 0);
 }
 
+static const float max_e = (32768* 0.7f);   /* 0.7 - is RMS factor */
+static const float almost_silent_threshold= 0.02;
+
+static float compute_frame_power(int16_t *samples, uint32_t nsamples){
+	float acc = 0;
+	uint32_t i;
+	for (i = 0; i < nsamples; ++i){
+		int sample = samples[i];
+		acc += (float) (sample*sample);
+	}
+	return sqrt(acc / (float)nsamples) / max_e;
+}
+
 mblk_t *ms_audio_flow_controller_process(MSAudioFlowController *ctl, mblk_t *m){
 	if (ms_audio_flow_controller_running(ctl)) {
 		uint32_t nsamples = (uint32_t)((m->b_wptr - m->b_rptr) / 2);
@@ -89,7 +103,14 @@ mblk_t *ms_audio_flow_controller_process(MSAudioFlowController *ctl, mblk_t *m){
 		th_dropped = (uint32_t)(((uint64_t)ctl->target_samples * (uint64_t)ctl->current_pos) / (uint64_t)ctl->total_samples);
 		todrop = (th_dropped > ctl->current_dropped) ? (th_dropped - ctl->current_dropped) : 0;
 		if (todrop > 0) {
-			if ((todrop * 8) < nsamples) {
+			if (nsamples <= ctl->target_samples && compute_frame_power((int16_t*)m->b_rptr, nsamples) < almost_silent_threshold){
+				/* This frame is almost silent, let's drop it entirely, it won't be noticeable.*/
+				ms_message("ms_audio_flow_controller_process(): dropping silent frame.");
+				freemsg(m);
+				m = NULL;
+				todrop = nsamples;
+			}else if ((todrop * 8) < nsamples) {
+				/* eliminate samples at zero-crossing */
 				discard_well_choosed_samples(m, nsamples, todrop);
 			} else {
 				ms_warning("Too many samples to drop, dropping entire frame.");
