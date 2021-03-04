@@ -142,6 +142,11 @@ MS2_PUBLIC int ms_media_stream_sessions_set_srtp_send_key_b64(MSMediaStreamSessi
  */
 MS2_PUBLIC int ms_media_stream_sessions_set_srtp_send_key(MSMediaStreamSessions *sessions, MSCryptoSuite suite, const char* key, size_t key_length, MSSrtpStreamType stream_type);
 
+/**
+ * Free ressources used by SRTP context
+ * @param[in/out]	context		the DTLS-SRTP context
+ */
+MS2_PUBLIC void ms_srtp_context_delete(MSSrtpCtx *session);
 
 #ifdef __cplusplus
 }
