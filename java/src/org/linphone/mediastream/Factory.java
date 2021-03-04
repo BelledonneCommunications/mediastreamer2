@@ -32,6 +32,7 @@ public class Factory{
 	public static final int DEVICE_MCH264ENC_NO_PIX_FMT_CONV = 1024; // avoid pixel format convervion before MediaCodec H264 encoder input
 	public static final int DEVICE_MCH265_LIMIT_DEQUEUE_OF_OUTPUT_BUFFERS = 2048; // avoid calling dequeueOutputBuffers() too often.
 	public static final int DEVICE_HAS_CRAPPY_AAUDIO = 4096; // set to prevent aaudio plugin to create a soundcard
+	public static final int DEVICE_OPENSLES_MIC_SWITCH_WHEN_IN_SPEAKER = 8192; // set to prevent changing mic input when enabling speaker
 
 	private long mNativePtr;
 	private Factory(long nativePtr){
