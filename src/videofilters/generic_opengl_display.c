@@ -66,7 +66,7 @@ struct _FilterData {
 #else
 	void * window_id;// Used for window managment. On UWP, it is a CoreWindow that can be closed.
 #endif
-	OpenGlFunctions functions;
+	OpenGlFunctions functions = {0};
 	unsigned long video_mode;
 
 	struct opengles_display *display;
@@ -85,7 +85,8 @@ struct _FilterData {
 };
 
 typedef struct _FilterData FilterData;
-static ms_mutex_t gLock = 0;	// Protect OpenGL call from threads
+static ms_mutex_t gLock;	// Protect OpenGL call from threads
+static bool_t gMutexInitialized = FALSE;
 
 // =============================================================================
 // Process.
@@ -120,7 +121,6 @@ static void ogl_init (MSFilter *f) {
 	data->mirroring = TRUE;
 	data->update_mirroring = FALSE;
 	data->prev_inm = NULL;
-	data->functions = {};
 	data->functions.glInitialized = FALSE;
 	data->functions.eglInitialized = FALSE;
 	data->video_mode = MS_FILTER_VIDEO_AUTO;
@@ -130,8 +130,10 @@ static void ogl_init (MSFilter *f) {
 	ms_mutex_init(&data->lock, NULL);
 	data->rendering = FALSE;
 	f->data = data;
-	if(gLock == 0)
+	if(!gMutexInitialized){
+		gMutexInitialized = TRUE;
 		ms_mutex_init(&gLock, NULL);
+	}
 	ms_thread_create(&data->renderThread, NULL, threadRendering, f->data);// Create a rendering thread for the current filter
 }
 
