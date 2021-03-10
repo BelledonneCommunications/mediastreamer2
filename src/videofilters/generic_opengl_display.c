@@ -85,7 +85,8 @@ struct _FilterData {
 };
 
 typedef struct _FilterData FilterData;
-static ms_mutex_t gLock = 0;	// Protect OpenGL call from threads
+static ms_mutex_t gLock;	// Protect OpenGL call from threads
+static bool_t gMutexInitialized = FALSE;
 
 // =============================================================================
 // Process.
@@ -120,7 +121,7 @@ static void ogl_init (MSFilter *f) {
 	data->mirroring = TRUE;
 	data->update_mirroring = FALSE;
 	data->prev_inm = NULL;
-	data->functions = {};
+	memset(&data->functions, 0, sizeof(data->functions));
 	data->functions.glInitialized = FALSE;
 	data->functions.eglInitialized = FALSE;
 	data->video_mode = MS_FILTER_VIDEO_AUTO;
@@ -130,8 +131,10 @@ static void ogl_init (MSFilter *f) {
 	ms_mutex_init(&data->lock, NULL);
 	data->rendering = FALSE;
 	f->data = data;
-	if(gLock == 0)
+	if(!gMutexInitialized){
+		gMutexInitialized = TRUE;
 		ms_mutex_init(&gLock, NULL);
+	}
 	ms_thread_create(&data->renderThread, NULL, threadRendering, f->data);// Create a rendering thread for the current filter
 }
 
@@ -172,7 +175,6 @@ static void ogl_preprocess(MSFilter *f){
 }
 
 
-static void ogl_reset(MSFilter *f);
 static void ogl_process (MSFilter *f) {
 	//ms_mutex_lock(&gLock);
 	FilterData *data = (FilterData *)f->data;
@@ -355,6 +357,7 @@ static int ogl_call_render (MSFilter *f, void *arg) {
 }
 
 // Only used for testing reset process
+/*
 static void ogl_reset(MSFilter *f) {
 	FilterData *data = (FilterData *)f->data;
 	MSOglContextInfo d = data->context_info;
@@ -363,6 +366,7 @@ static void ogl_reset(MSFilter *f) {
 	ogl_init(f);
 	ogl_set_native_window_id(f, &dd);
 }
+*/
 // =============================================================================
 // Register filter.
 // =============================================================================
