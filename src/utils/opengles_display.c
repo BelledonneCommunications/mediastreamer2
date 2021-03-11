@@ -689,10 +689,8 @@ bool_t ogl_create_window(EGLNativeWindowType *window, void ** window_id){
 	if(window_id != NULL)
 		*window_id = NULL;
 	XStoreName( dpy, *window, "Video" );
-	int error = XMapWindow(dpy, *window);
+	XMapWindow(dpy, *window);
 	XSync( dpy, False );
-	if(error>0)
-		ms_error("[ogl_display] Cannot show Window : %d", error);
 	return (*window) != (EGLNativeWindowType)0;
 }
 
