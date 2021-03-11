@@ -17,9 +17,11 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+
 #include <algorithm>
 #include <memory>
 
+#include <stdint.h>
 #define bool_t matroska_bool_t
 extern "C" {
 #include <matroska/matroska.h>
@@ -1643,7 +1645,7 @@ static matroska_block *matroska_write_block(Matroska *obj, const matroska_frame 
 			codecPrivateElt = (ebml_binary *)EBML_MasterAddElt(blockGroup, &MATROSKA_ContextCodecState, FALSE);
 			EBML_BinarySetData(codecPrivateElt, codecPrivateData, codecPrivateDataSize);
 		}
-		block->TrackNumber = trackNum;
+		MATROSKA_BlockSetTrackNum(block, trackNum);
 		MATROSKA_LinkBlockWithReadTracks(block, obj->tracks, TRUE);
 		MATROSKA_LinkBlockWriteSegmentInfo(block, obj->info);
 		MATROSKA_BlockSetKeyframe(block, isKeyFrame);
