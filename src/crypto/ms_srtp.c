@@ -283,7 +283,9 @@ static int ms_set_srtp_crypto_policy(MSCryptoSuite suite, crypto_policy_t *polic
 			// srtp doc says: not adapted to rtcp...
 			crypto_policy_set_aes_cm_128_null_auth(policy);
 			break;
-		case MS_NO_CIPHER_SHA1_80:
+		case MS_NO_CIPHER_SRTP_SHA1_80:
+		case MS_NO_CIPHER_SRTCP_SHA1_80:
+		case MS_NO_CIPHER_SRTP_SRTCP_SHA1_80:
 			crypto_policy_set_null_cipher_hmac_sha1_80(policy);
 			break;
 		case MS_AES_128_SHA1_80: /*default mode*/
