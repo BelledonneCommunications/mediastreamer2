@@ -554,7 +554,9 @@ RtpSession * media_stream_get_rtp_session(const MediaStream *stream) {
 MSCryptoSuite ms_crypto_suite_build_from_name_params(const MSCryptoSuiteNameParams *descrption){
 	const char *name=descrption->name, *parameters=descrption->params;
 	if (keywordcmp ( "AES_CM_128_HMAC_SHA1_80",name ) == 0 ){
-		if (parameters && strstr(parameters,"UNENCRYPTED_SRTP")) return MS_NO_CIPHER_SHA1_80;
+		if (parameters && strstr(parameters,"UNENCRYPTED_SRTP") && strstr(parameters,"UNENCRYPTED_SRTCP")) return MS_NO_CIPHER_SRTP_SRTCP_SHA1_80;
+		if (parameters && strstr(parameters,"UNENCRYPTED_SRTP")) return MS_NO_CIPHER_SRTP_SHA1_80;
+		else if (parameters && strstr(parameters,"UNENCRYPTED_SRTCP")) return MS_NO_CIPHER_SRTCP_SHA1_80;
 		else if (parameters && strstr(parameters,"UNAUTHENTICATED_SRTP")) return MS_AES_128_NO_AUTH;
 		else return MS_AES_128_SHA1_80;
 	}else if ( keywordcmp ( "AES_CM_128_HMAC_SHA1_32",name ) == 0 ){
@@ -595,7 +597,15 @@ int ms_crypto_suite_to_name_params(MSCryptoSuite cs, MSCryptoSuiteNameParams *pa
      		params->name="AES_CM_128_HMAC_SHA1_80";
      		params->params="UNAUTHENTICATED_SRTP";
      		break;
-     	case MS_NO_CIPHER_SHA1_80:
+     	case MS_NO_CIPHER_SRTP_SHA1_80:
+     		params->name="AES_CM_128_HMAC_SHA1_80";
+     		params->params="UNENCRYPTED_SRTP";
+     		break;
+     	case MS_NO_CIPHER_SRTCP_SHA1_80:
+     		params->name="AES_CM_128_HMAC_SHA1_80";
+     		params->params="UNENCRYPTED_SRTCP";
+     		break;
+     	case MS_NO_CIPHER_SRTP_SRTCP_SHA1_80:
      		params->name="AES_CM_128_HMAC_SHA1_80";
      		params->params="UNENCRYPTED_SRTP UNENCRYPTED_SRTCP";
      		break;
