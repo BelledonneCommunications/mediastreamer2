@@ -39,7 +39,9 @@ typedef enum _MSCryptoSuite{
         MS_AES_128_SHA1_80,
         MS_AES_128_SHA1_32,
         MS_AES_128_NO_AUTH,
-        MS_NO_CIPHER_SHA1_80,
+        MS_NO_CIPHER_SRTP_SHA1_80,
+        MS_NO_CIPHER_SRTCP_SHA1_80,
+        MS_NO_CIPHER_SRTP_SRTCP_SHA1_80,
         MS_AES_256_SHA1_80,
         MS_AES_CM_256_SHA1_80,
         MS_AES_256_SHA1_32
