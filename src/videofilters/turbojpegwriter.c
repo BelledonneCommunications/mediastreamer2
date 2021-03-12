@@ -40,7 +40,7 @@ typedef struct _MSJpegWriteEventData {
 } MSJpegWriteEventData;
 
 static void close_file(JpegWriter *obj, bool_t doRenaming) {
-	MSJpegWriteEventData eventData = {0};
+	MSJpegWriteEventData eventData = {{0}};
 	if (obj->file) {
 		fclose(obj->file);
 		obj->file = NULL;
