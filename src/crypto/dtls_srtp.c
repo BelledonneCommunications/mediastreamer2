@@ -188,7 +188,7 @@ static MSCryptoSuite ms_dtls_srtp_bctbx_protection_profile_to_ms_crypto_suite(bc
 		case BCTBX_SRTP_AES128_CM_HMAC_SHA1_32:
 			return MS_AES_128_SHA1_32;
 		case BCTBX_SRTP_NULL_HMAC_SHA1_80:
-			return MS_NO_CIPHER_SHA1_80;
+			return MS_NO_CIPHER_SRTP_SRTCP_SHA1_80;
 		case BCTBX_SRTP_NULL_HMAC_SHA1_32: /* this profile is defined in DTLS-SRTP rfc but not implemented by libsrtp */
 			return MS_CRYPTO_SUITE_INVALID;
 		default:
