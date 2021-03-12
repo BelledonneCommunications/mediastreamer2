@@ -36,7 +36,7 @@ typedef struct {
 }JpegWriter;
 
 typedef struct _MSJpegWriteEventData {
-	char fileName[MAX_PATH]
+	char fileName[MAX_PATH];
 } MSJpegWriteEventData;
 
 static void close_file(JpegWriter *obj, bool_t doRenaming) {
