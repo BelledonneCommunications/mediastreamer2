@@ -25,7 +25,7 @@
 #include "mediastreamer2/msvideo.h"
 #include "turbojpeg.h"
 
-#define MAX_PATH 300;
+#define MAX_PATH 300
 
 typedef struct {
 	FILE *file;
