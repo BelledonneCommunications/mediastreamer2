@@ -22,7 +22,12 @@
 
 #include <mediastreamer2/msfilter.h>
 
+#define MAX_FILE_NAME 300
+typedef struct _MSJpegWriteEventData {
+	char filePath[MAX_FILE_NAME];
+} MSJpegWriteEventData;
+
 #define MS_JPEG_WRITER_TAKE_SNAPSHOT	MS_FILTER_METHOD(MS_JPEG_WRITER_ID, 0, const char)
-#define MS_JPEG_WRITER_SNAPSHOT_TAKEN 	MS_FILTER_EVENT(MS_JPEG_WRITER_ID, 0, const char)
+#define MS_JPEG_WRITER_SNAPSHOT_TAKEN 	MS_FILTER_EVENT(MS_JPEG_WRITER_ID, 0, MSJpegWriteEventData)
 
 #endif
