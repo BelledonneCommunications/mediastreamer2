@@ -25,7 +25,7 @@
 #include "mediastreamer2/msvideo.h"
 #include "turbojpeg.h"
 
-#define MAX_PATH 300
+#define MAX_FILE_NAME 300
 
 typedef struct {
 	FILE *file;
@@ -36,7 +36,7 @@ typedef struct {
 }JpegWriter;
 
 typedef struct _MSJpegWriteEventData {
-	char fileName[MAX_PATH];
+	char fileName[MAX_FILE_NAME];
 } MSJpegWriteEventData;
 
 static void close_file(JpegWriter *obj, bool_t doRenaming) {
