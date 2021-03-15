@@ -22,7 +22,21 @@
 
 #include <mediastreamer2/msfilter.h>
 
+#if defined(__APPLE__)
+#include <sys/syslimits.h>
+#define MAX_PATH PATH_MAX
+#elif defined(__unix__)
+#include <limits.h>
+#define MAX_PATH PATH_MAX
+#else
+#include <limits.h>
+#endif
+
+typedef struct _MSJpegWriteEventData {
+	char filePath[MAX_PATH];
+} MSJpegWriteEventData;
+
 #define MS_JPEG_WRITER_TAKE_SNAPSHOT	MS_FILTER_METHOD(MS_JPEG_WRITER_ID, 0, const char)
-#define MS_JPEG_WRITER_SNAPSHOT_TAKEN 	MS_FILTER_EVENT(MS_JPEG_WRITER_ID, 0, const char)
+#define MS_JPEG_WRITER_SNAPSHOT_TAKEN 	MS_FILTER_EVENT(MS_JPEG_WRITER_ID, 0, MSJpegWriteEventData)
 
 #endif
