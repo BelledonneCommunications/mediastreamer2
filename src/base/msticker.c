@@ -325,7 +325,7 @@ static int set_high_prio(MSTicker *obj){
 
 	if (prio>MS_TICKER_PRIO_NORMAL){
 #ifdef _WIN32
-#ifdef MS2_WINDOWS_DESKTOP
+#if defined(MS2_WINDOWS_DESKTOP) && !defined(MS2_WINDOWS_UWP)
 		MMRESULT mm;
 		TIMECAPS ptc;
 		mm=timeGetDevCaps(&ptc,sizeof(ptc));
@@ -346,6 +346,8 @@ static int set_high_prio(MSTicker *obj){
 		if(!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST)){
 			ms_warning("SetThreadPriority() failed (%d)\n", (int)GetLastError());
 		}
+#else
+		ms_warning("SetThreadPriority() is not implemented. %s priority left to normal.",obj->name);
 #endif
 #else
 		struct sched_param param;
@@ -393,7 +395,7 @@ static int set_high_prio(MSTicker *obj){
 
 static void unset_high_prio(int precision){
 #ifdef _WIN32
-#ifdef MS2_WINDOWS_DESKTOP
+#if defined(MS2_WINDOWS_DESKTOP) && !defined(MS2_WINDOWS_UWP)
 	if(!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL)){
 		ms_warning("SetThreadPriority() failed (%d)\n", (int)GetLastError());
 	}
@@ -429,9 +431,11 @@ static int wait_next_tick(void *data, uint64_t virt_ticker_time){
 void * ms_ticker_run(void *arg)
 {
 	MSTicker *s=(MSTicker*)arg;
-	int lastlate=0;
+	int last_late=0;
 	int precision=2;
 	int late;
+	int max_late=0;
+	uint64_t late_time_checkpoint=0;
 
 	ms_mutex_lock(&s->lock);
 
@@ -443,7 +447,7 @@ void * ms_ticker_run(void *arg)
 	ms_mutex_unlock(&s->cur_time_lock);
 
 	while(s->run){
-		uint64_t late_tick_time=0;
+		uint64_t late_tick_time=0, current_time;
 
 		s->ticks++;
 		/*Step 1: run the graphs*/
@@ -466,11 +470,19 @@ void * ms_ticker_run(void *arg)
 		/*Step 2: wait for next tick*/
 		s->time+=s->interval;
 		late=s->wait_next_tick(s->wait_next_tick_data,s->time);
-		if (late>s->interval*5 && late>lastlate){
-			ms_warning("%s: We are late of %d miliseconds.",s->name,late);
-			late_tick_time=ms_get_cur_time_ms();
+		current_time = ms_get_cur_time_ms();
+		if(current_time > late_time_checkpoint + 1000) {// We print max late each 1s
+			if( max_late > 0){// We have a counted late
+				ms_warning("%s: We are late of %d miliseconds.",s->name,max_late);
+				max_late = 0;// Reset max
+			}
+			late_time_checkpoint = current_time;// Reset time
 		}
-		lastlate=late;
+		if (late>s->interval*5 && late>last_late){
+			max_late = (late > max_late? late : max_late);// Get the max
+			late_tick_time=current_time;
+		}
+		last_late=late;
 		ms_mutex_lock(&s->lock);
 		if (late_tick_time){
 			s->late_event.lateMs=late;
@@ -651,7 +663,7 @@ uint64_t ms_ticker_round(uint64_t ms) {
 
 uint64_t ms_ticker_synchronizer_get_corrected_time(MSTickerSynchronizer* ts) {
 	/* round skew to timer resolution in order to avoid adapt the ticker just with statistical "noise" */
-	int64_t rounded_skew=( ((int64_t)ts->av_skew)/(int64_t)TICKER_INTERVAL) * (int64_t)TICKER_INTERVAL;
+	uint64_t rounded_skew=( ((uint64_t)ts->av_skew)/(uint64_t)TICKER_INTERVAL) * (uint64_t)TICKER_INTERVAL;
 	return get_wallclock_ms() - rounded_skew;
 }
 

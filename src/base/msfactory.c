@@ -76,7 +76,11 @@ MS2_DEPRECATED static MSFactory *fallback_factory=NULL;
 
 static void ms_fmt_descriptor_destroy(MSFmtDescriptor *obj);
 
+#ifdef _WIN32
+#define DEFAULT_MAX_PAYLOAD_SIZE 1400
+#else
 #define DEFAULT_MAX_PAYLOAD_SIZE 1440
+#endif
 
 int ms_factory_get_payload_max_size(const MSFactory *factory) {
 	return factory->max_payload_size;
@@ -86,8 +90,11 @@ void ms_factory_set_payload_max_size(MSFactory *obj, int size){
 	if (size<=0) size=DEFAULT_MAX_PAYLOAD_SIZE;
 	obj->max_payload_size=size;
 }
-
+#ifdef _WIN32
+#define MS_MTU_DEFAULT 1460	// Limited by WSock2
+#else
 #define MS_MTU_DEFAULT 1500
+#endif
 
 void ms_factory_set_mtu(MSFactory *obj, int mtu){
 	/*60= IPv6+UDP+RTP overhead */
@@ -574,8 +581,8 @@ static bool_t ms_factory_dlopen_plugin(MSFactory *factory, const char *plugin_pa
 }
 
 int ms_factory_load_plugins_from_list(MSFactory *factory, const bctbx_list_t *plugins_list, const char *optionnal_plugins_path) {
-	int num = 0;
-	int plugins_list_size = 0;
+	size_t num = 0;
+	size_t plugins_list_size = 0;
 	const bctbx_list_t *it = NULL;
 
 	if (plugins_list == NULL || bctbx_list_size(plugins_list) == 0) {
@@ -600,7 +607,7 @@ int ms_factory_load_plugins_from_list(MSFactory *factory, const bctbx_list_t *pl
 		ms_message("All plugins in list correctly loaded");
 	}
 
-	return num;
+	return (int)num;
 }
 
 int ms_factory_load_plugins(MSFactory *factory, const char *dir){
@@ -654,7 +661,7 @@ int ms_factory_load_plugins(MSFactory *factory, const char *dir){
 #else
 		snprintf(szPluginFile, sizeof(szPluginFile), "%s\\%s", szDirPath, FileData.cFileName);
 #endif
-#ifdef MS2_WINDOWS_DESKTOP
+#if defined(MS2_WINDOWS_DESKTOP) && !defined(MS2_WINDOWS_UWP)
 		if (!debug) em = SetErrorMode (SEM_FAILCRITICALERRORS);
 
 #ifdef UNICODE
@@ -997,13 +1004,8 @@ int ms_factory_get_expected_bandwidth(MSFactory *f) {
 const char * ms_factory_get_default_video_renderer(MSFactory *f) {
 #if defined(MS2_WINDOWS_PHONE)
 	return "MSWP8Dis";
-#elif defined(MS2_WINDOWS_DESKTOP)
-	// Check if UWP filter is created
-	if (ms_factory_lookup_filter_by_name(f, "MSWinRTBackgroundDis")) {
-		return "MSWinRTBackgroundDis";
-	} else {
-		return "MSDrawDibDisplay";
-	}
+#elif defined(MS2_WINDOWS_DESKTOP) || defined (MS2_WINDOWS_UWP)
+	return "MSOGL";
 #elif defined(__ANDROID__)
 	return "MSAndroidTextureDisplay";
 #elif __APPLE__ && !TARGET_OS_IPHONE
