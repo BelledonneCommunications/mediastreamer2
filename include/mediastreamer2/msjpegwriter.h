@@ -22,12 +22,14 @@
 
 #include <mediastreamer2/msfilter.h>
 
-#if defined(__linux__)
-	#include <linux/limits.h>
-#elif defined(__APPLE__)
-	#define MAX_PATH 1024
+#if defined(__APPLE__)
+#include <sys/syslimits.h>
+#define MAX_PATH PATH_MAX
+#elif defined(__unix__)
+#include <limits.h>
+#define MAX_PATH PATH_MAX
 #else
-	#include <limits.h>
+#include <limits.h>
 #endif
 
 typedef struct _MSJpegWriteEventData {
