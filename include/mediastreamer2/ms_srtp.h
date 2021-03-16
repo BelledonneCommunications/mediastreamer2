@@ -37,13 +37,14 @@ typedef struct _MSMediaStreamSessions MSMediaStreamSessions;
 typedef enum _MSCryptoSuite{
         MS_CRYPTO_SUITE_INVALID=0,
         MS_AES_128_SHA1_80,
-        MS_AES_128_SHA1_32,
-        MS_AES_128_NO_AUTH,
-        MS_NO_CIPHER_SRTP_SHA1_80,
-        MS_NO_CIPHER_SRTCP_SHA1_80,
-        MS_NO_CIPHER_SRTP_SRTCP_SHA1_80,
+        MS_AES_128_SHA1_80_NO_AUTH,
+        MS_NO_CIPHER_SRTP_AES_128_SHA1_80,
+        MS_NO_CIPHER_SRTCP_AES_128_SHA1_80,
+        MS_NO_CIPHER_SRTP_SRTCP_AES_128_SHA1_80,
         MS_AES_256_SHA1_80,
         MS_AES_CM_256_SHA1_80,
+        MS_AES_128_SHA1_32,
+        MS_AES_128_SHA1_32_NO_AUTH,
         MS_AES_256_SHA1_32
 } MSCryptoSuite;
 
