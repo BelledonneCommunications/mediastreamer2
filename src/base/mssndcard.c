@@ -497,6 +497,11 @@ void ms_snd_card_app_notifies_activation(MSSndCard *obj, bool_t yesno) {
 		obj->desc->callkit_enabled(obj, yesno);
 }
 
+void ms_snd_card_configure(MSSndCard *obj) {
+	if (obj->desc->configure != NULL)
+		obj->desc->configure(obj);
+}
+
 void ms_snd_card_destroy(MSSndCard *obj){
 	ms_snd_card_unref(obj);
 }
