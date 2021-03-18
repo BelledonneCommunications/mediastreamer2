@@ -21,6 +21,7 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #endif
+
 #include "msqogl.h"
 #include <QOpenGLFramebufferObjectFormat>
 #include <QThread>
@@ -162,7 +163,7 @@ static int qogl_set_native_window_id (MSFilter *f, void *arg) {
 	ms_filter_lock(f);
 	
 	data = (FilterData *)f->data;
-	if( !arg || arg && !(*(QQuickFramebufferObject::Renderer**)arg) ){
+	if( !arg || (arg && !(*(QQuickFramebufferObject::Renderer**)arg) )){
 		data->renderer = NULL;
 	}
 	ms_filter_unlock(f);
@@ -239,7 +240,7 @@ static MSFilterMethod methods[] = {
 	//{ MS_OGL_RENDER, qogl_call_render }, // qogl_call_render is autocalled by Qt, there is no need to put it in interface
 	{ 0, NULL }
 };
-#ifdef _WIN32
+
 MSFilterDesc ms_qogl_desc = {
 	MS_FILTER_PLUGIN_ID,
 	"MSQOGL",
@@ -256,20 +257,6 @@ MSFilterDesc ms_qogl_desc = {
 	methods
 };
 
-#else
-MSFilterDesc ms_qogl_desc = {
-	.id = MS_FILTER_PLUGIN_ID,
-	.name = "MSQOGL",
-	.text = "A Qt opengl video display",
-	.category = MS_FILTER_OTHER,
-	.ninputs = 2,
-	.noutputs = 0,
-	.init = qogl_init,
-	.process = qogl_process,
-	.uninit = qogl_uninit,
-	.methods = methods
-};
-#endif
 #ifndef VERSION
 #define VERSION "debug"
 #endif
