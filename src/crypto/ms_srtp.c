@@ -427,34 +427,30 @@ static int ms_media_stream_sessions_set_srtp_key_base(MSMediaStreamSessions *ses
 static int ms_media_stream_sessions_set_srtp_key(MSMediaStreamSessions *sessions, MSCryptoSuite suite, const char* key, size_t key_length, bool_t is_send, MSSrtpStreamType stream_type){
 	int error = 0;
 
+	// RTP stream
 	if (stream_type == MSSRTP_ALL_STREAMS || stream_type == MSSRTP_RTP_STREAM) {
-		const char * master_key = NULL;
-		size_t master_key_length = 0;
+		size_t cipher_key_length = 0;
 		if ((suite == MS_NO_CIPHER_SRTP_SRTCP_AES_128_SHA1_80) || (suite == MS_NO_CIPHER_SRTP_AES_128_SHA1_80)) {
-			// SRTP is unencrypted therefore key is NULL
-			master_key = NULL;
-			master_key_length = 0;
+			// SRTP is unencrypted therefore cipher key length is 0
+			cipher_key_length = 0;
 		} else {
-			// SRTP is encrypted therefore key is NULL
-			master_key = key;
-			master_key_length = key_length;
+			// SRTP is unencrypted therefore cipher key length is the value provided as argument
+			cipher_key_length = key_length;
 		}
-		error=ms_media_stream_sessions_set_srtp_key_base(sessions,suite,master_key,master_key_length,is_send,TRUE);
+		error=ms_media_stream_sessions_set_srtp_key_base(sessions,suite,key,cipher_key_length,is_send,TRUE);
 	}
 
+	// RTCP stream
 	if (error == 0 && ((suite != MS_AES_128_SHA1_32) && (suite != MS_AES_128_SHA1_80_NO_AUTH) && (suite != MS_AES_128_SHA1_32_NO_AUTH)) && (stream_type == MSSRTP_ALL_STREAMS || stream_type == MSSRTP_RTCP_STREAM)) {
-		const char * master_key = NULL;
-		size_t master_key_length = 0;
+		size_t cipher_key_length = 0;
 		if ((suite == MS_NO_CIPHER_SRTP_SRTCP_AES_128_SHA1_80) || (suite == MS_NO_CIPHER_SRTCP_AES_128_SHA1_80)) {
-			// SRTCP is unencrypted therefore key is NULL
-			master_key = NULL;
-			master_key_length = 0;
+			// SRTCP is unencrypted therefore cipher key length is 0
+			cipher_key_length = 0;
 		} else {
-			// SRTCP is encrypted therefore key is NULL
-			master_key = key;
-			master_key_length = key_length;
+			// SRTCP is unencrypted therefore cipher key length is the value provided as argument
+			cipher_key_length = key_length;
 		}
-		error=ms_media_stream_sessions_set_srtp_key_base(sessions,suite,master_key,master_key_length,is_send,FALSE);
+		error=ms_media_stream_sessions_set_srtp_key_base(sessions,suite,key,cipher_key_length,is_send,FALSE);
 	}
 	return error;
 }
