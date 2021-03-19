@@ -273,7 +273,7 @@ int ms_media_stream_sessions_fill_srtp_context_all_stream(struct _MSMediaStreamS
 }
 
 
-static int ms_set_srtp_crypto_policy(MSCryptoSuite suite, crypto_policy_t *policy) {
+static int ms_set_srtp_crypto_policy(MSCryptoSuite suite, crypto_policy_t *policy, bool_t is_rtp) {
 	switch(suite){
 		case MS_AES_128_SHA1_32:
 			// srtp doc says: not adapted to rtcp...
@@ -285,8 +285,18 @@ static int ms_set_srtp_crypto_policy(MSCryptoSuite suite, crypto_policy_t *polic
 			crypto_policy_set_aes_cm_128_null_auth(policy);
 			break;
 		case MS_NO_CIPHER_SRTP_AES_128_SHA1_80:
+			// SRTP is not encrypted
+			// SRTCP is encrypted
+			(is_rtp) ? crypto_policy_set_null_cipher_hmac_sha1_80(policy) : crypto_policy_set_aes_cm_128_hmac_sha1_80(policy);
+			break;
 		case MS_NO_CIPHER_SRTCP_AES_128_SHA1_80:
+			// SRTP is encrypted
+			// SRTCP is not encrypted
+			(is_rtp) ? crypto_policy_set_aes_cm_128_hmac_sha1_80(policy) : crypto_policy_set_null_cipher_hmac_sha1_80(policy);
+			break;
 		case MS_NO_CIPHER_SRTP_SRTCP_AES_128_SHA1_80:
+			// SRTP is not encrypted
+			// SRTCP is not encrypted
 			crypto_policy_set_null_cipher_hmac_sha1_80(policy);
 			break;
 		case MS_AES_128_SHA1_80: /*default mode*/
@@ -316,7 +326,7 @@ static int ms_add_srtp_stream(srtp_t srtp, MSCryptoSuite suite, uint32_t ssrc, c
 	/* Init both RTP and RTCP policies, even if this srtp_t is used for one of them.
 	 * Indeed the key derivation algorithm that computes the SRTCP auth key depends on parameters 
 	 * of the SRTP stream.*/
-	if (ms_set_srtp_crypto_policy(suite, &policy.rtp) != 0) {
+	if (ms_set_srtp_crypto_policy(suite, &policy.rtp, is_rtp) != 0) {
 		return -1;
 	}
 	if ((int)key_length != policy.rtp.cipher_key_len) {
@@ -325,7 +335,7 @@ static int ms_add_srtp_stream(srtp_t srtp, MSCryptoSuite suite, uint32_t ssrc, c
 		return -1;
 	}
 	// and RTCP stream
-	if (ms_set_srtp_crypto_policy(suite, &policy.rtcp) != 0) {
+	if (ms_set_srtp_crypto_policy(suite, &policy.rtcp, is_rtp) != 0) {
 		return -1;
 	}
 	if ((int)key_length != policy.rtcp.cipher_key_len) {
@@ -392,7 +402,11 @@ static int ms_media_stream_sessions_set_srtp_key_base(MSMediaStreamSessions *ses
 	int error = -1;
 
 	check_and_create_srtp_context(sessions);
-	ms_message("media_stream_set_%s_%s_key(): key %02x..%02x stream sessions is [%p]",(is_rtp?"srtp":"srtcp"),(is_send?"send":"recv"), (uint8_t)key[0], (uint8_t)key[key_length-1], sessions);
+	if (key) {
+		ms_message("media_stream_set_%s_%s_key(): key %02x..%02x stream sessions is [%p]",(is_rtp?"srtp":"srtcp"),(is_send?"send":"recv"), (uint8_t)key[0], (uint8_t)key[key_length-1], sessions);
+	} else {
+		ms_message("media_stream_set_%s_%s_key(): key none stream sessions is [%p]",(is_rtp?"srtp":"srtcp"),(is_send?"send":"recv"), sessions);
+	}
 	stream_ctx = get_stream_context(sessions,is_send,is_rtp);
 	ssrc = is_send? rtp_session_get_send_ssrc(sessions->rtp_session):0/*only relevant for send*/;
 
@@ -414,11 +428,33 @@ static int ms_media_stream_sessions_set_srtp_key(MSMediaStreamSessions *sessions
 	int error = 0;
 
 	if (stream_type == MSSRTP_ALL_STREAMS || stream_type == MSSRTP_RTP_STREAM) {
-		error=ms_media_stream_sessions_set_srtp_key_base(sessions,suite,key,key_length,is_send,TRUE);
+		const char * master_key = NULL;
+		size_t master_key_length = 0;
+		if ((suite == MS_NO_CIPHER_SRTP_SRTCP_AES_128_SHA1_80) || (suite == MS_NO_CIPHER_SRTP_AES_128_SHA1_80)) {
+			// SRTP is unencrypted therefore key is NULL
+			master_key = NULL;
+			master_key_length = 0;
+		} else {
+			// SRTP is encrypted therefore key is NULL
+			master_key = key;
+			master_key_length = key_length;
+		}
+		error=ms_media_stream_sessions_set_srtp_key_base(sessions,suite,master_key,master_key_length,is_send,TRUE);
 	}
 
-	if (error == 0 && (stream_type == MSSRTP_ALL_STREAMS || stream_type == MSSRTP_RTCP_STREAM)) {
-		error=ms_media_stream_sessions_set_srtp_key_base(sessions,suite,key,key_length,is_send,FALSE);
+	if (error == 0 && ((suite != MS_AES_128_SHA1_32) && (suite != MS_AES_128_SHA1_80_NO_AUTH) && (suite != MS_AES_128_SHA1_32_NO_AUTH)) && (stream_type == MSSRTP_ALL_STREAMS || stream_type == MSSRTP_RTCP_STREAM)) {
+		const char * master_key = NULL;
+		size_t master_key_length = 0;
+		if ((suite == MS_NO_CIPHER_SRTP_SRTCP_AES_128_SHA1_80) || (suite == MS_NO_CIPHER_SRTCP_AES_128_SHA1_80)) {
+			// SRTCP is unencrypted therefore key is NULL
+			master_key = NULL;
+			master_key_length = 0;
+		} else {
+			// SRTCP is encrypted therefore key is NULL
+			master_key = key;
+			master_key_length = key_length;
+		}
+		error=ms_media_stream_sessions_set_srtp_key_base(sessions,suite,master_key,master_key_length,is_send,FALSE);
 	}
 	return error;
 }
