@@ -36,6 +36,7 @@
 #define DEVICE_MCH264ENC_NO_PIX_FMT_CONV     (1<<10) /* set in order to avoid pixel format convervion before MediaCodec H264 encoder input */
 #define DEVICE_MCH265_LIMIT_DEQUEUE_OF_OUTPUT_BUFFERS     (1<<11) /* set in order to avoid calling dequeueOutputBuffers() too often. */
 #define DEVICE_HAS_CRAPPY_AAUDIO			 (1<<12) /* set to prevent aaudio plugin to create a soundcard */
+#define DEVICE_OPENSLES_MIC_SWITCH_WHEN_IN_SPEAKER (1<<13) /* set to use SL_ANDROID_RECORDING_PRESET_VOICE_RECOGNITION to prevent changing mic input when enabling speaker */
 
 struct SoundDeviceAudioHacks {
 	const char *mic_equalizer;
