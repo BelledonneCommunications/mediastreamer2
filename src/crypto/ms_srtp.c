@@ -403,7 +403,7 @@ static int ms_media_stream_sessions_set_srtp_key_base(MSMediaStreamSessions *ses
 
 	check_and_create_srtp_context(sessions);
 	if (key) {
-		ms_message("media_stream_set_%s_%s_key(): key %02x..%02x stream sessions is [%p]",(is_rtp?"srtp":"srtcp"),(is_send?"send":"recv"), (uint8_t)key[0], (uint8_t)key[key_length-1], sessions);
+		ms_message("media_stream_set_%s_%s_key(): key %02x..%02x stream sessions is [%p]",(is_rtp?"srtp":"srtcp"),(is_send?"send":"recv"), (uint8_t)key[0], (uint8_t)key[strlen(key)-1], sessions);
 	} else {
 		ms_message("media_stream_set_%s_%s_key(): key none stream sessions is [%p]",(is_rtp?"srtp":"srtcp"),(is_send?"send":"recv"), sessions);
 	}
