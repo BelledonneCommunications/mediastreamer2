@@ -590,6 +590,10 @@ error:
 	return MS_CRYPTO_SUITE_INVALID;
 }
 
+bool_t ms_crypto_suite_is_unencrypted(MSCryptoSuite cs){
+	return (cs == MS_NO_CIPHER_SRTP_AES_128_SHA1_80) || (cs == MS_NO_CIPHER_SRTCP_AES_128_SHA1_80) || (cs == MS_NO_CIPHER_SRTP_SRTCP_AES_128_SHA1_80) || (cs == MS_AES_128_SHA1_80_NO_AUTH) || (cs == MS_AES_128_SHA1_32_NO_AUTH);
+}
+
 int ms_crypto_suite_to_name_params(MSCryptoSuite cs, MSCryptoSuiteNameParams *params ){
      params->name=NULL;
      params->params=NULL;
