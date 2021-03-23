@@ -396,14 +396,14 @@ void ms_srtp_shutdown(void){
 	}
 }
 
-static int ms_media_stream_sessions_set_srtp_key_base(MSMediaStreamSessions *sessions, MSCryptoSuite suite, const char* key, size_t key_length, bool_t is_send, bool_t is_rtp){
+static int ms_media_stream_sessions_set_srtp_key_base(MSMediaStreamSessions *sessions, MSCryptoSuite suite, const char* key, size_t key_length, size_t cipher_key_length, bool_t is_send, bool_t is_rtp){
 	MSSrtpStreamContext* stream_ctx;
 	uint32_t ssrc;
 	int error = -1;
 
 	check_and_create_srtp_context(sessions);
 	if (key) {
-		ms_message("media_stream_set_%s_%s_key(): key %02x..%02x stream sessions is [%p]",(is_rtp?"srtp":"srtcp"),(is_send?"send":"recv"), (uint8_t)key[0], (uint8_t)key[strlen(key)-1], sessions);
+		ms_message("media_stream_set_%s_%s_key(): key %02x..%02x stream sessions is [%p]",(is_rtp?"srtp":"srtcp"),(is_send?"send":"recv"), (uint8_t)key[0], (uint8_t)key[key_length-1], sessions);
 	} else {
 		ms_message("media_stream_set_%s_%s_key(): key none stream sessions is [%p]",(is_rtp?"srtp":"srtcp"),(is_send?"send":"recv"), sessions);
 	}
@@ -415,7 +415,7 @@ static int ms_media_stream_sessions_set_srtp_key_base(MSMediaStreamSessions *ses
 		return error;
 	}
 
-	if ((error = ms_add_srtp_stream(stream_ctx->srtp, suite, ssrc, key, key_length, is_send, is_rtp))) {
+	if ((error = ms_add_srtp_stream(stream_ctx->srtp, suite, ssrc, key, cipher_key_length, is_send, is_rtp))) {
 		stream_ctx->secured=FALSE;
 		return error;
 	}
@@ -437,7 +437,7 @@ static int ms_media_stream_sessions_set_srtp_key(MSMediaStreamSessions *sessions
 			// SRTP is unencrypted therefore cipher key length is the value provided as argument
 			cipher_key_length = key_length;
 		}
-		error=ms_media_stream_sessions_set_srtp_key_base(sessions,suite,key,cipher_key_length,is_send,TRUE);
+		error=ms_media_stream_sessions_set_srtp_key_base(sessions,suite,key,key_length,cipher_key_length,is_send,TRUE);
 	}
 
 	// RTCP stream
@@ -450,7 +450,7 @@ static int ms_media_stream_sessions_set_srtp_key(MSMediaStreamSessions *sessions
 			// SRTCP is unencrypted therefore cipher key length is the value provided as argument
 			cipher_key_length = key_length;
 		}
-		error=ms_media_stream_sessions_set_srtp_key_base(sessions,suite,key,cipher_key_length,is_send,FALSE);
+		error=ms_media_stream_sessions_set_srtp_key_base(sessions,suite,key,key_length,cipher_key_length,is_send,FALSE);
 	}
 	return error;
 }
