@@ -1071,7 +1071,6 @@ static void android_snd_write_postprocess(MSFilter *obj) {
 	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
 
 	if (octx->playerPlay){
-ms_message("%s - context %p  playerPlay %p\n", __func__, octx, octx->playerPlay);
 		result = (*octx->playerPlay)->SetPlayState(octx->playerPlay, SL_PLAYSTATE_STOPPED);
 		if (result != SL_RESULT_SUCCESS) {
 			ms_error("[OpenSLES] Error %u while stopping player", result);
@@ -1097,9 +1096,6 @@ ms_message("%s - context %p  playerPlay %p\n", __func__, octx, octx->playerPlay)
 		octx->outputMixObject = NULL;
 	}
 
-	// At the end of a call, postprocess is called therefore here the output device can be changed to earpiece in the audio manager
-	JNIEnv *env = ms_get_jni_env();
-	ms_android_change_device(env, MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_EARPIECE);
 	free(octx->playBuffer[0]);
 	octx->playBuffer[0]=NULL;
 	free(octx->playBuffer[1]);

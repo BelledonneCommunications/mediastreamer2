@@ -919,6 +919,7 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 			stream->captcard = NULL;
 		}
 		stream->captcard = ms_snd_card_ref(card);
+		ms_filter_call_method(stream->soundread, MS_AUDIO_CAPTURE_SET_INTERNAL_ID, stream->captcard);
 	} else if (io->input.type == MSResourceRtp) {
 		stream->rtp_io_session = io->input.session;
 		pt = rtp_profile_get_payload(rtp_session_get_profile(stream->rtp_io_session),
@@ -938,6 +939,7 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 			stream->playcard = NULL;
 		}
 		stream->playcard = ms_snd_card_ref(card);
+		ms_filter_call_method(stream->soundwrite, MS_AUDIO_PLAYBACK_SET_INTERNAL_ID, stream->playcard);
 	} else if (io->output.type == MSResourceRtp) {
 		stream->rtp_io_session = io->output.session;
 		pt = rtp_profile_get_payload(rtp_session_get_profile(stream->rtp_io_session),
