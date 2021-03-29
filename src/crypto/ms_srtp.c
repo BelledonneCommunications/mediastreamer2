@@ -466,15 +466,19 @@ bool_t ms_srtp_supported(void){
 int ms_media_stream_sessions_set_srtp_recv_key_b64(MSMediaStreamSessions *sessions, MSCryptoSuite suite, const char* b64_key){
 	int retval;
 
-	/* decode b64 key */
-	size_t b64_key_length = strlen(b64_key);
-	size_t max_key_length = b64_decode(b64_key, b64_key_length, 0, 0);
-	size_t key_length;
-	char *key = (char *) ms_malloc0(max_key_length+1);
-	if ((key_length = b64_decode(b64_key, b64_key_length, key, max_key_length)) == 0) {
-		ms_error("Error decoding b64 srtp recv key");
-		ms_free(key);
-		return -1;
+	size_t key_length = 0;
+	char *key = NULL;
+
+	if (b64_key != NULL) {
+		/* decode b64 key */
+		size_t b64_key_length = strlen(b64_key);
+		size_t max_key_length = b64_decode(b64_key, b64_key_length, 0, 0);
+		key = (char *) ms_malloc0(max_key_length+1);
+		if ((key_length = b64_decode(b64_key, b64_key_length, key, max_key_length)) == 0) {
+			ms_error("Error decoding b64 srtp recv key");
+			ms_free(key);
+			return -1;
+		}
 	}
 
 	/* pass decoded key to set_recv_key function */
@@ -507,15 +511,19 @@ int ms_media_stream_sessions_set_srtp_recv_key(MSMediaStreamSessions *sessions, 
 int ms_media_stream_sessions_set_srtp_send_key_b64(MSMediaStreamSessions *sessions, MSCryptoSuite suite, const char* b64_key){
 	int retval;
 
-	/* decode b64 key */
-	size_t b64_key_length = strlen(b64_key);
-	size_t max_key_length = b64_decode(b64_key, b64_key_length, 0, 0);
-	size_t key_length;
-	char *key = (char *) ms_malloc0(max_key_length+1);
-	if ((key_length = b64_decode(b64_key, b64_key_length, key, max_key_length)) == 0) {
-		ms_error("Error decoding b64 srtp recv key");
-		ms_free(key);
-		return -1;
+	size_t key_length = 0;
+	char *key = NULL;
+
+	if (b64_key != NULL) {
+		/* decode b64 key */
+		size_t b64_key_length = strlen(b64_key);
+		size_t max_key_length = b64_decode(b64_key, b64_key_length, 0, 0);
+		key = (char *) ms_malloc0(max_key_length+1);
+		if ((key_length = b64_decode(b64_key, b64_key_length, key, max_key_length)) == 0) {
+			ms_error("Error decoding b64 srtp recv key");
+			ms_free(key);
+			return -1;
+		}
 	}
 
 	/* pass decoded key to set_send_key function */
