@@ -117,9 +117,8 @@ static int _process_on_send(RtpSession* session,MSSrtpStreamContext *ctx, mblk_t
 	if (rtp_header && (slen>RTP_FIXED_HEADER_SIZE && rtp_header->version==2)) {
 		ms_mutex_lock(&ctx->mutex);
 		if (!ctx->secured) {
-			/*does not make sense to protect, because we don't have any key*/
+			// No need to protect RTP packets
 			err=err_status_ok;
-			slen = 0; /*droping packets*/
 		} else {
 			/* defragment incoming message and enlarge the buffer for srtp to write its data */
 			msgpullup(m,slen+SRTP_MAX_TRAILER_LEN+4 /*for 32 bits alignment*/);
@@ -129,9 +128,8 @@ static int _process_on_send(RtpSession* session,MSSrtpStreamContext *ctx, mblk_t
 	} else if (rtcp_header && (slen>RTP_FIXED_HEADER_SIZE && rtcp_header->version==2)) {
 		ms_mutex_lock(&ctx->mutex);
 		if (!ctx->secured) {
+			// No need to protect RTCP packets
 			err=err_status_ok;
-			/*does not make sense to protect, because we don't have any key*/
-			slen = 0; /*droping packets*/
 		} else {
 		/* defragment incoming message and enlarge the buffer for srtp to write its data */
 			msgpullup(m,slen+SRTP_MAX_TRAILER_LEN+4 /*for 32 bits alignment*/ + 4 /*required by srtp_protect_rtcp*/);
@@ -160,7 +158,7 @@ static int ms_srtp_process_dummy(RtpTransportModifier *t, mblk_t *m) {
 }
 static int _process_on_receive(RtpSession* session,MSSrtpStreamContext *ctx, mblk_t *m, int err){
 	int slen;
-	err_status_t srtp_err;
+	err_status_t srtp_err=err_status_ok;
 	bool_t is_rtp=ctx->is_rtp;
 
 	/* fixed: when rtcp-mux is on and we receive RTCP packet, we need to use same srtp context as used for RTP stream */
@@ -172,21 +170,27 @@ static int _process_on_receive(RtpSession* session,MSSrtpStreamContext *ctx, mbl
 	/* keep NON-RTP data unencrypted */
 	if (is_rtp){
 		rtp_header_t *rtp=(rtp_header_t*)m->b_rptr;
-		if (err<RTP_FIXED_HEADER_SIZE || rtp->version!=2 )
+		if (err<RTP_FIXED_HEADER_SIZE || rtp->version!=2 ) {
 			return err;
+		}
 	}else{
 		rtcp_common_header_t *rtcp=(rtcp_common_header_t*)m->b_rptr;
-		if (err<(int)(sizeof(rtcp_common_header_t)+4) || rtcp->version!=2 )
+		if (err<(int)(sizeof(rtcp_common_header_t)+4) || rtcp->version!=2 ) {
 			return err;
+		}
 	}
 
 	slen=err;
-	srtp_err = is_rtp?srtp_unprotect(ctx->srtp,m->b_rptr,&slen):srtp_unprotect_rtcp(ctx->srtp,m->b_rptr,&slen);
-	if (srtp_err==err_status_ok) {
+	if (ctx->secured) {
+		srtp_err = is_rtp?srtp_unprotect(ctx->srtp,m->b_rptr,&slen):srtp_unprotect_rtcp(ctx->srtp,m->b_rptr,&slen);
+		if (srtp_err==err_status_ok) {
+			return slen;
+		} else {
+			ms_error("srtp_unprotect%s() failed (%d) on stream ctx [%p]", is_rtp?"":"_rtcp", srtp_err,ctx);
+			return -1;
+		}
+	}else{
 		return slen;
-	} else {
-		ms_error("srtp_unprotect%s() failed (%d) on stream ctx [%p]", is_rtp?"":"_rtcp", srtp_err,ctx);
-		return -1;
 	}
 }
 static int ms_srtp_process_on_receive(RtpTransportModifier *t, mblk_t *m){
