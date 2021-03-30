@@ -858,11 +858,17 @@ void ms_dtls_srtp_reset_context(MSDtlsSrtpContext *context) {
 
 		ms_message("Reseting DTLS context [%p] and SSL connections", context);
 
+		if (context->rtp_channel_status == DTLS_STATUS_HANDSHAKE_ONGOING ) {
+			bctbx_ssl_session_reset( context->rtp_dtls_context->ssl );
+		}
+
 		context->rtp_channel_status = DTLS_STATUS_CONTEXT_READY;
-		bctbx_ssl_session_reset( context->rtp_dtls_context->ssl );
+
+		if (context->rtcp_channel_status == DTLS_STATUS_HANDSHAKE_ONGOING ) {
+			bctbx_ssl_session_reset( context->rtcp_dtls_context->ssl );
+		}
 
 		context->rtcp_channel_status = DTLS_STATUS_CONTEXT_READY;
-		bctbx_ssl_session_reset( context->rtcp_dtls_context->ssl );
 
 		context->role = MSDtlsSrtpRoleUnset;
 
