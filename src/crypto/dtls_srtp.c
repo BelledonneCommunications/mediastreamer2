@@ -586,7 +586,6 @@ static int ms_dtls_srtp_rtp_process_on_receive(struct _RtpTransportModifier *t, 
 
 	/* check if it is a DTLS packet and process it */
 	if (ms_dtls_srtp_process_dtls_packet(msg, ctx, &ret, TRUE) == TRUE){
-		
 		if ((ret==0) && (ctx->rtp_channel_status == DTLS_STATUS_HANDSHAKE_ONGOING)) { /* handshake is over, give the keys to srtp : 128 bits client write - 128 bits server write - 112 bits client salt - 112 server salt */
 			MSCryptoSuite agreed_srtp_protection_profile = MS_CRYPTO_SUITE_INVALID;
 			uint8_t old_status = ctx->rtp_channel_status;
@@ -849,6 +848,27 @@ void ms_dtls_srtp_set_peer_fingerprint(MSDtlsSrtpContext *context, const char *p
 		} else {
 			memcpy(context->peer_fingerprint, peer_fingerprint, peer_fingerprint_length);
 		}
+	}
+}
+
+void ms_dtls_srtp_reset_context(MSDtlsSrtpContext *context) {
+	if (context) {
+		ms_mutex_lock(&context->rtp_dtls_context->ssl_context_mutex);
+		ms_mutex_lock(&context->rtcp_dtls_context->ssl_context_mutex);
+
+		ms_message("Reseting DTLS context [%p] and SSL connections", context);
+
+		context->rtp_channel_status = DTLS_STATUS_CONTEXT_READY;
+		bctbx_ssl_session_reset( context->rtp_dtls_context->ssl );
+
+		context->rtcp_channel_status = DTLS_STATUS_CONTEXT_READY;
+		bctbx_ssl_session_reset( context->rtcp_dtls_context->ssl );
+
+		context->role = MSDtlsSrtpRoleUnset;
+
+		ms_mutex_unlock(&context->rtp_dtls_context->ssl_context_mutex);
+		ms_mutex_unlock(&context->rtcp_dtls_context->ssl_context_mutex);
+
 	}
 }
 
