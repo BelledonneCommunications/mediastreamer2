@@ -588,9 +588,11 @@ if(ENABLE_MACAQSND)
 endif()
 
 if(ENABLE_QT_GL)#Only add headers and lib to Qt plugins
-	set(QT5_PACKAGES Core Gui Quick )
+	set(QT5_PACKAGES Core Gui Quick QmlModels Qml Network)
 	find_package(Qt5 COMPONENTS ${QT5_PACKAGES} REQUIRED)
 	foreach (package ${QT5_PACKAGES})
+		get_target_property(Qt${package}_location Qt5::${package} LOCATION)
+		string(REPLACE "Qt${package}.framework/Qt${package}" "" Qt${package}_ROOT_LOCATION ${Qt${package}_location})
 		list(APPEND MEDIASTREAMER2_QT_INCLUDE_DIRS "${Qt5${package}_INCLUDE_DIRS}")
 		list(APPEND QT_LINK_LIBS ${Qt5${package}_LIBRARIES})
 	endforeach ()
