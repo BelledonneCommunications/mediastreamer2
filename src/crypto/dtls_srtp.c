@@ -858,13 +858,13 @@ void ms_dtls_srtp_reset_context(MSDtlsSrtpContext *context) {
 
 		ms_message("Reseting DTLS context [%p] and SSL connections", context);
 
-		if (context->rtp_channel_status == DTLS_STATUS_HANDSHAKE_ONGOING ) {
+		if ((context->rtp_channel_status == DTLS_STATUS_HANDSHAKE_ONGOING ) || (context->rtp_channel_status == DTLS_STATUS_HANDSHAKE_OVER )) {
 			bctbx_ssl_session_reset( context->rtp_dtls_context->ssl );
 		}
 
 		context->rtp_channel_status = DTLS_STATUS_CONTEXT_READY;
 
-		if (context->rtcp_channel_status == DTLS_STATUS_HANDSHAKE_ONGOING ) {
+		if ((context->rtcp_channel_status == DTLS_STATUS_HANDSHAKE_ONGOING ) || (context->rtcp_channel_status == DTLS_STATUS_HANDSHAKE_OVER )) {
 			bctbx_ssl_session_reset( context->rtcp_dtls_context->ssl );
 		}
 
@@ -884,11 +884,13 @@ void ms_dtls_srtp_set_role(MSDtlsSrtpContext *context, MSDtlsSrtpRole role) {
 		ms_mutex_lock(&context->rtcp_dtls_context->ssl_context_mutex);
 
 		/* if role has changed and handshake already setup and going, reset the session */
-		if (context->role != role && context->rtp_channel_status == DTLS_STATUS_HANDSHAKE_ONGOING ) {
-			bctbx_ssl_session_reset( context->rtp_dtls_context->ssl );
-		}
-		if (context->role != role && context->rtcp_channel_status == DTLS_STATUS_HANDSHAKE_ONGOING ) {
-			bctbx_ssl_session_reset( context->rtcp_dtls_context->ssl );
+		if (context->role != role) {
+			if ((context->rtp_channel_status == DTLS_STATUS_HANDSHAKE_ONGOING ) || (context->rtp_channel_status == DTLS_STATUS_HANDSHAKE_OVER )) {
+				bctbx_ssl_session_reset( context->rtp_dtls_context->ssl );
+			}
+			if ((context->rtcp_channel_status == DTLS_STATUS_HANDSHAKE_ONGOING ) || (context->rtcp_channel_status == DTLS_STATUS_HANDSHAKE_OVER )) {
+				bctbx_ssl_session_reset( context->rtcp_dtls_context->ssl );
+			}
 		}
 
 		/* if role is isServer and was Unset, we must complete the server setup */
