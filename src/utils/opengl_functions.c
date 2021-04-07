@@ -56,6 +56,8 @@ void *GetAnyGLFuncAddress(HMODULE library, HMODULE firstFallback, const char *na
 #  else
 #    define CAST(type, fn) (f->getProcAddress && f->getProcAddress(#fn) ? (type)f->getProcAddress(#fn) : (type)GetAnyGLFuncAddress(openglLibrary,firstFallbackLibrary, #fn))
 #  endif
+#elif TARGET_OS_IPHONE
+#define CAST(type, fn) (type)fn
 #else
 
 void *getAnyGLFuncAddress(void* library, void *firstFallback, const char *name)
@@ -72,7 +74,7 @@ void *getAnyGLFuncAddress(void* library, void *firstFallback, const char *name)
 #endif
 
 // Remove EGL from Android
-#if defined( __ANDROID__ )
+#if defined( __ANDROID__ ) || TARGET_OS_IPHONE
 #define CAST_EGL(type, fn) NULL
 #else
 #define CAST_EGL(type, fn) (f->eglGetProcAddress && f->eglGetProcAddress(#fn) ? (type)f->eglGetProcAddress(#fn):CAST(type,fn))
@@ -176,13 +178,18 @@ void opengl_functions_default_init (OpenGlFunctions *f) {
 			ms_warning("[ogl_functions] Function : Fail to load plugin libEGL.so: %s", dlerror());
 		}
 #endif// _WIN32
+#if TARGET_OS_IPHONE
+	f->eglGetProcAddress = CAST_EGL(resolveEGLGetProcAddress, eglGetProcAddress);
+#else
 	f->eglGetProcAddress = CAST(resolveEGLGetProcAddress, eglGetProcAddress);
-
+#endif
 	f->eglInitialized = TRUE;
 	f->eglInitialized &= ((f->eglQueryAPI = CAST_EGL(resolveEGLQueryAPI, eglQueryAPI)) != NULL);
 	f->eglInitialized &= ((f->eglBindAPI = CAST_EGL(resolveEGLBindAPI, eglBindAPI)) != NULL);
 	f->eglInitialized &= ((f->eglQueryString = CAST_EGL(resolveEGLQueryString, eglQueryString)) != NULL);
+#if defined(_WIN32)
 	f->eglInitialized &= ((f->eglGetPlatformDisplayEXT = CAST_EGL(resolveEGLGetPlatformDisplayEXT, eglGetPlatformDisplayEXT)) != NULL);
+#endif
 	f->eglInitialized &= ((f->eglGetDisplay = CAST_EGL(resolveEGLGetDisplay, eglGetDisplay)) != NULL);
 	f->eglInitialized &= ((f->eglGetCurrentDisplay = CAST_EGL(resolveEGLGetCurrentDisplay, eglGetCurrentDisplay)) != NULL);
 	f->eglInitialized &= ((f->eglGetCurrentContext= CAST_EGL(resolveEGLGetCurrentContext, eglGetCurrentContext)) != NULL);
