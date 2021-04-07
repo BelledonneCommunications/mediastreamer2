@@ -258,6 +258,7 @@ MS2_PUBLIC void ms_audio_endpoint_destroy(MSAudioEndpoint *ep);
  * Structure that holds audio conference parameters
 **/
 struct _MSVideoConferenceParams{
+	int all_to_all;
 	int min_switch_interval;
 	const char *codec_mime_type;
 };
@@ -266,6 +267,12 @@ struct _MSVideoConferenceParams{
  * Typedef to structure that holds conference parameters
 **/
 typedef struct _MSVideoConferenceParams MSVideoConferenceParams;
+
+#ifdef __cplusplus
+
+extern "C" {
+
+#endif
 
 /**
  * The MSVideoConference is the object representing a video conference.
@@ -286,12 +293,6 @@ typedef struct _MSVideoConference MSVideoConference;
 **/
 typedef struct _MSVideoEndpoint MSVideoEndpoint;
 
-
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /**
  * Creates a conference.
@@ -321,6 +322,19 @@ MS2_PUBLIC void ms_video_conference_add_member(MSVideoConference *obj, MSVideoEn
 **/
 MS2_PUBLIC void ms_video_conference_remove_member(MSVideoConference *obj, MSVideoEndpoint *ep);
 
+/**
+ * Adds an endpoint to the conference.
+ * @param obj the conference
+ * @param ep the endpoint, represented as a MSVideoEndpoint object
+**/
+MS2_PUBLIC void ms_video_conference_add_endpoint(MSVideoConference *obj, MSVideoEndpoint *ep);
+
+/**
+ * Removes an endpoint from the conference.
+ * @param obj the conference
+ * @param ep the endpoint, represented as a MSVideoEndpoint object
+**/
+MS2_PUBLIC void ms_video_conference_remove_endpoint(MSVideoConference *obj, MSVideoEndpoint *ep);
 
 /**
  * Switch the focus of the video conf on a given member.
@@ -342,6 +356,13 @@ MS2_PUBLIC MSVideoEndpoint *ms_video_conference_get_video_placeholder_member(con
  * @return a list of MSVideoEndpoint objects.
  */
 MS2_PUBLIC const bctbx_list_t* ms_video_conference_get_members(const MSVideoConference *obj);
+
+/**
+ * Get the list of endpoints, as MSVideoEndpoints.
+ * @param obj the conference
+ * @return a list of MSVideoEndpoint objects.
+ */
+MS2_PUBLIC const bctbx_list_t* ms_video_conference_get_endpoints(const MSVideoConference *obj);
 
 /**
  * Put an audio conference and a video conference in relationship.

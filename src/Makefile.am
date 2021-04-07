@@ -111,7 +111,10 @@ libmediastreamer_voip_la_SOURCES+=	voip/private.h \
 					otherfilters/msudp.c \
 					voip/qualityindicator.c \
 					voip/audioconference.c \
-					voip/videoconference.c \
+					voip/video-conference.cpp \
+					voip/video-conference-one-to-all.cpp \
+					voip/video-conference-all-to-all.cpp \
+					voip/video-endpoint.cpp \
 					voip/bitratedriver.c \
 					voip/qosanalyzer.c voip/qosanalyzer.h \
 					voip/bitratecontrol.c \
