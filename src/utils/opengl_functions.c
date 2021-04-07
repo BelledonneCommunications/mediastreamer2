@@ -178,8 +178,11 @@ void opengl_functions_default_init (OpenGlFunctions *f) {
 			ms_warning("[ogl_functions] Function : Fail to load plugin libEGL.so: %s", dlerror());
 		}
 #endif// _WIN32
+#if TARGET_OS_IPHONE
 	f->eglGetProcAddress = CAST_EGL(resolveEGLGetProcAddress, eglGetProcAddress);
-
+#else
+	f->eglGetProcAddress = CAST(resolveEGLGetProcAddress, eglGetProcAddress);
+#endif
 	f->eglInitialized = TRUE;
 	f->eglInitialized &= ((f->eglQueryAPI = CAST_EGL(resolveEGLQueryAPI, eglQueryAPI)) != NULL);
 	f->eglInitialized &= ((f->eglBindAPI = CAST_EGL(resolveEGLBindAPI, eglBindAPI)) != NULL);
