@@ -132,6 +132,10 @@ set(VOIP_SOURCE_FILES_CXX
 	utils/filter-wrapper/decoding-filter-wrapper.cpp
 	utils/filter-wrapper/encoding-filter-wrapper.cpp
 	voip/turn_tcp.cpp
+	voip/video-conference.cpp
+	voip/video-conference-one-to-all.cpp
+	voip/video-conference-all-to-all.cpp
+	voip/video-endpoint.cpp
 )
 set(VOIP_SOURCE_FILES_OBJC )
 set(VOIP_SOURCE_FILES_ASM )
@@ -224,6 +228,7 @@ if(ENABLE_VIDEO)
 		videofilters/pixconv.c
 		videofilters/sizeconv.c
 		videofilters/videoswitcher.c
+		videofilters/videorouter.c
 		voip/layouts.c
 		voip/layouts.h
 		voip/msvideo_neon.c
@@ -235,7 +240,6 @@ if(ENABLE_VIDEO)
 		voip/video_preset_high_fps.c
 		voip/videostarter.c
 		voip/videostream.c
-		voip/videoconference.c
 		voip/vp8rtpfmt.c
 		voip/vp8rtpfmt.h
 	)
