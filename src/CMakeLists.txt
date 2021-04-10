@@ -23,8 +23,8 @@
 find_library(LIBM NAMES m)
 
 if(MSVC AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsPhone" AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
-	find_library(LIBGCC NAMES gcc)
-	find_library(LIBMINGWEX NAMES mingwex)
+	#find_library(LIBGCC NAMES gcc)
+	#find_library(LIBMINGWEX NAMES mingwex)
 endif()
 
 find_program(AWK_PROGRAM awk CMAKE_FIND_ROOT_PATH_BOTH)
