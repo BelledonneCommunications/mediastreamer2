@@ -669,6 +669,7 @@ void ogl_display_set_size (struct opengles_display *gldisp, int width, int heigh
 }
 
 #ifdef HAVE_GLX
+
 bool_t ogl_create_window(EGLNativeWindowType *window, void ** window_id){
 	Display                 *dpy;
 	Window                  root;
@@ -676,7 +677,18 @@ bool_t ogl_create_window(EGLNativeWindowType *window, void ** window_id){
 	XVisualInfo             *vi;
 	Colormap                cmap;
 	XSetWindowAttributes    swa;
+
 	dpy = XOpenDisplay(NULL);
+	if(dpy == NULL){
+		const char* display = getenv("DISPLAY");
+		if(display==NULL)
+			display=":0";
+		dpy = XOpenDisplay(display);
+		if(dpy == NULL){
+			ms_error("Could not open display %s",display);
+			return FALSE;
+		}
+	}
 	XSync(dpy, False);
 	root = DefaultRootWindow(dpy);
 	vi = glXChooseVisual(dpy, 0, att);
