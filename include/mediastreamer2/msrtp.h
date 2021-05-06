@@ -29,8 +29,23 @@
 
 #define MS_RTP_RECV_RESET_JITTER_BUFFER		MS_FILTER_METHOD_NO_ARG(MS_RTP_RECV_ID,1)
 
+#define MS_RTP_RECV_SET_MIXER_TO_CLIENT_EXTENSION_ID	MS_FILTER_METHOD(MS_RTP_RECV_ID, 2, int)
+
 #define MS_RTP_RECV_GENERIC_CN_RECEIVED		MS_FILTER_EVENT(MS_RTP_RECV_ID,0, MSCngData)
 
+#define MS_RTP_RECV_MIXER_TO_CLIENT_AUDIO_LEVEL_RECEIVED		MS_FILTER_EVENT(MS_RTP_RECV_ID,1, rtp_audio_level_t*)
+
+#define MS_RTP_RECV_CLIENT_TO_MIXER_AUDIO_LEVEL_RECEIVED		MS_FILTER_EVENT(MS_RTP_RECV_ID,2, rtp_audio_level_t)
+
+
+typedef int (*MSRtpSendRequestMixerToClientDataCb)(MSFilter *filter, rtp_audio_level_t *audio_levels, void *user_data);
+
+struct _MSFilterRequestAudioDataCb {
+	MSRtpSendRequestMixerToClientDataCb cb;
+	void *user_data;
+};
+
+typedef struct _MSFilterRequestAudioDataCb MSFilterRequestAudioDataCb;
 
 #define MS_RTP_SEND_SET_SESSION			MS_FILTER_METHOD(MS_RTP_SEND_ID,0,RtpSession*)
 
@@ -50,7 +65,11 @@
 
 #define MS_RTP_SEND_ENABLE_TS_ADJUSTMENT	MS_FILTER_METHOD(MS_RTP_SEND_ID, 8, bool_t)
 
+#define MS_RTP_SEND_SET_MIXER_TO_CLIENT_SEND_INTERVAL	MS_FILTER_METHOD(MS_RTP_SEND_ID, 9, int)
 
+#define MS_RTP_SEND_SET_MIXER_TO_CLIENT_EXTENSION_ID	MS_FILTER_METHOD(MS_RTP_SEND_ID, 10, int)
+
+#define MS_RTP_SEND_SET_MIXER_TO_CLIENT_DATA_REQUEST_CB	MS_FILTER_METHOD(MS_RTP_SEND_ID, 11, MSFilterRequestAudioDataCb)
 
 
 extern MSFilterDesc ms_rtp_send_desc;
