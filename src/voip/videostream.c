@@ -1660,6 +1660,7 @@ static MSFilter* _video_stream_stop(VideoStream * stream, bool_t keep_source)
 				if ((stream->source_performs_encoding == FALSE) && !rtp_source) {
 					ms_connection_helper_unlink(&ch, stream->ms.encoder, 0, 0);
 				}
+
 				ms_connection_helper_unlink(&ch, stream->ms.rtpsend, 0, -1);
 				if (stream->output2){
 					ms_filter_unlink(stream->tee,1,stream->output2,0);
