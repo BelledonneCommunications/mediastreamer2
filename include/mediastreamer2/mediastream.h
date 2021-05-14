@@ -1112,6 +1112,7 @@ MS2_PUBLIC void video_stream_send_fir(VideoStream *stream);
 MS2_PUBLIC void video_stream_send_vfu(VideoStream *stream);
 
 MS2_PUBLIC void video_stream_stop(VideoStream * stream);
+MS2_PUBLIC void video_stream_free(VideoStream * stream);
 
 /**
  * Stop the video stream, but does not destroy the source of the video. This function
