@@ -22,6 +22,7 @@
 #include "private.h"
 
 static void ms_video_conference_update_bitrate_request(MSVideoConference *obj);
+void ms_video_endpoint_destroy(MSVideoEndpoint *ep);
 
 struct _MSVideoConference{
 	MSVideoConferenceParams params;
@@ -265,6 +266,7 @@ static void ms_video_conference_add_video_placeholder_member(MSVideoConference *
 	pt->clock_rate = 90000;
 	rtp_profile_set_payload(prof, 95, pt);
 	video_stream_start_from_io(stream, prof, "127.0.0.1",65004, "127.0.0.1", 65005, 95, &io);
+	rtp_profile_destroy(prof);
 	obj->video_placeholder_member = ms_video_endpoint_get_from_stream(stream, FALSE);
 
 	ms_message("add video placeholder to pin %i", obj->mixer->desc->ninputs-1);
@@ -308,9 +310,13 @@ void ms_video_conference_remove_member(MSVideoConference *obj, MSVideoEndpoint *
 	if (obj->members!=NULL) {
 		ms_ticker_attach(obj->ticker,obj->mixer);
 	} else {
-		ms_message("remove video placeholder member");
+		ms_message("remove video placeholder member %p", obj->video_placeholder_member);
 		video_stream_set_encoder_control_callback(obj->video_placeholder_member->st, NULL, NULL);
 		unplumb_from_conf(obj->video_placeholder_member);
+		if (obj->video_placeholder_member) {
+			video_stream_free(obj->video_placeholder_member->st);
+			ms_video_endpoint_destroy(obj->video_placeholder_member);
+		}
 		obj->video_placeholder_member =  NULL;
 	}
 }
