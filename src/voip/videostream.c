@@ -1367,10 +1367,12 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 	stream->ms.is_beginning=TRUE;
 
 	/* attach the graphs */
-	if (stream->source)
+	if (stream->source) {
 		ms_ticker_attach (stream->ms.sessions.ticker, stream->source);
-	if (stream->void_source)
+	}
+	if (stream->void_source) {
 		ms_ticker_attach (stream->ms.sessions.ticker, stream->void_source);
+	}
 	if (stream->ms.rtprecv)
 		ms_ticker_attach (stream->ms.sessions.ticker, stream->ms.rtprecv);
 
