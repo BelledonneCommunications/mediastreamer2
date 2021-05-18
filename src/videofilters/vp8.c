@@ -677,12 +677,8 @@ static int enc_set_configuration(MSFilter *f, void *data) {
 			s->vconf.vsize = vsize;
 		}
 		else if (fps_changed){
-			ms_filter_lock(f);
 			enc_postprocess(f);
-			ms_filter_unlock(f);
-			ms_filter_lock(f);
 			enc_preprocess(f);
-			ms_filter_unlock(f);
 		}else{
 			ms_mutex_lock(&s->vp8_mutex);
 			if (vpx_codec_enc_config_set(&s->codec, &s->cfg) != 0){
