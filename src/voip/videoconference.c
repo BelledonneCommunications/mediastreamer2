@@ -266,7 +266,6 @@ static void ms_video_conference_add_video_placeholder_member(MSVideoConference *
 	pt->clock_rate = 90000;
 	rtp_profile_set_payload(prof, 95, pt);
 	video_stream_start_from_io(stream, prof, "127.0.0.1",65004, "127.0.0.1", 65005, 95, &io);
-	rtp_profile_destroy(prof);
 	obj->video_placeholder_member = ms_video_endpoint_get_from_stream(stream, FALSE);
 
 	ms_message("add video placeholder to pin %i", obj->mixer->desc->ninputs-1);
