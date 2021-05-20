@@ -143,7 +143,9 @@ static void event_cb(void *ud, MSFilter* f, unsigned int event, void *eventdata)
 	}
 	switch (event) {// Allow a filter to reinitialize all tree formats
 		case MS_FILTER_OUTPUT_FMT_CHANGED:
-			video_stream_update_video_params(st);
+// video_stream_update_video_params call video_stream_change_camera so the feature belongs to a capture filter
+			if(f->desc->ninputs == 0 && f->desc->noutputs > 0)
+				video_stream_update_video_params(st);
 			break;
 		default:{}
 	}
