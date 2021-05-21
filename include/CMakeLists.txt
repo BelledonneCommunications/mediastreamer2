@@ -82,6 +82,7 @@ set(HEADER_FILES
 	msudp.h
 	mspcapfileplayer.h
 	msvideoswitcher.h
+	msvideorouter.h
 )
 
 set(MEDIASTREAMER2_HEADER_FILES )
