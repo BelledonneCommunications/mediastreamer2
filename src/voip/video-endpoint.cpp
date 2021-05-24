@@ -87,7 +87,9 @@ static void ms_video_endpoint_tmmbr_received(const OrtpEventData *evd, void *use
 
 void VideoEndpoint::cutVideoStreamGraph(bool isRemote, VideoStream *st) {
 	mSt = st;
-	mName = st->display_name;
+	if (st->label) {
+		mName = st->label;
+	}
 	/*stop the video graph*/
 	if (mSt->source) ms_ticker_detach(mSt->ms.sessions.ticker, mSt->source);
 	if (mSt->ms.rtprecv) ms_ticker_detach(mSt->ms.sessions.ticker, mSt->ms.rtprecv);
