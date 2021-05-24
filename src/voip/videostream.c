@@ -132,6 +132,8 @@ void video_stream_free(VideoStream *stream) {
 		ms_free(stream->display_name);
 	if (stream->preset)
 		ms_free(stream->preset);
+	if (stream->label)
+		ms_free(stream->label);
 
 	ms_free(stream);
 }
@@ -563,6 +565,15 @@ void video_stream_set_display_filter_name(VideoStream *s, const char *fname){
 	}
 	if (fname!=NULL)
 		s->display_name=ms_strdup(fname);
+}
+
+void video_stream_set_label(VideoStream *s, const char *flabel){
+	if (s->label!=NULL){
+		ms_free(s->label);
+		s->label=NULL;
+	}
+	if (flabel!=NULL)
+		s->label=ms_strdup(flabel);
 }
 
 static void ext_display_cb(void *ud, MSFilter* f, unsigned int event, void *eventdata){
