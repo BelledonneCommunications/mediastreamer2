@@ -60,11 +60,8 @@ public:
 
 	virtual int getSize() const;
 	virtual const bctbx_list_t* getMembers() const;
-	virtual void removeMember(VideoEndpoint *ep);
-	virtual void addMember(VideoEndpoint *ep);
-	virtual const bctbx_list_t* getEndpoints() const;
-	virtual void addEndpoint(VideoEndpoint *ep) {};
-	virtual void removeEndpoint(VideoEndpoint *ep) {};
+	virtual void removeMember(VideoEndpoint *ep) = 0;
+	virtual void addMember(VideoEndpoint *ep) = 0;
 	virtual VideoEndpoint *getVideoPlaceholderMember() const;
 	virtual void setFocus(VideoEndpoint *ep) {};
 
@@ -101,6 +98,8 @@ public:
 	void setLocalMember(MSVideoConferenceFilterPinControl pc) override;
 	void notifyFir(int pin) override;
 	void notifySli(int pin) override;
+	void removeMember(VideoEndpoint *ep) override;
+	void addMember(VideoEndpoint *ep) override;
 
 protected:
 	void addVideoPlaceholderMember() override;
@@ -114,14 +113,13 @@ public:
 	VideoConferenceAllToAll(MSFactory *f, const MSVideoConferenceParams *params);
 	~VideoConferenceAllToAll();
 	
-	void addEndpoint(VideoEndpoint *ep) override;
-	void removeEndpoint(VideoEndpoint *ep) override;
+	void removeMember(VideoEndpoint *ep) override;
+	void addMember(VideoEndpoint *ep) override;
 	void setLocalMember(MSVideoConferenceFilterPinControl pc) override;
 	void notifyFir(int pin) override;
 	void notifySli(int pin) override;
 
 protected:
-	void setPin(VideoEndpoint *ep) override;
 	int findInputPin(std::string participant);
 	void configureOutput(VideoEndpoint *ep) override;
 	void unconfigureOutput(int pin) override;
