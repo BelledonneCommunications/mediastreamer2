@@ -79,6 +79,43 @@ VideoConferenceOneToAll::VideoConferenceOneToAll(MSFactory *f, const MSVideoConf
 	mCfparams=*params;
 }
 
+void VideoConferenceOneToAll::addMember(VideoEndpoint *ep) {
+	/* now connect to the filter */
+	ep->mConference = (MSVideoConference *)this;
+	if (mMembers == NULL) {
+		addVideoPlaceholderMember();
+	} else {
+		ms_ticker_detach(mTicker,mMixer);
+	}
+	setPin(ep);
+	plumb_to_conf(ep);
+	video_stream_set_encoder_control_callback(ep->mSt, ms_video_conference_process_encoder_control, ep);
+	ms_ticker_attach(mTicker,mMixer);
+	mMembers=bctbx_list_append(mMembers,ep);
+	
+	configureOutput(ep);
+}
+
+void VideoConferenceOneToAll::removeMember(VideoEndpoint *ep) {
+	video_stream_set_encoder_control_callback(ep->mSt, NULL, NULL);
+	ms_ticker_detach(mTicker,mMixer);
+	unplumb_from_conf(ep);
+	ep->mConference=NULL;
+	mMembers=bctbx_list_remove(mMembers,ep);
+	if (mMembers!=NULL) {
+		ms_ticker_attach(mTicker,mMixer);
+	} else {
+		ms_message("remove video placeholder member %p", mVideoPlaceholderMember);
+		video_stream_set_encoder_control_callback(mVideoPlaceholderMember->mSt, NULL, NULL);
+		unplumb_from_conf(mVideoPlaceholderMember);
+		if (mVideoPlaceholderMember) {
+			video_stream_free(mVideoPlaceholderMember->mSt);
+			delete mVideoPlaceholderMember;
+		}
+		mVideoPlaceholderMember =  NULL;
+	}
+}
+
 void VideoConferenceOneToAll::setPin(VideoEndpoint *ep) {
 	ep->mPin = find_free_pin(getMixer());
 	ep->mOutPin = ep->mPin;
