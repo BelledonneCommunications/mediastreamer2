@@ -32,10 +32,6 @@ extern "C" const bctbx_list_t* ms_video_conference_get_members(const MSVideoConf
 	return ((VideoConferenceGeneric *)obj)->getMembers();
 }
 
-extern "C" const bctbx_list_t* ms_video_conference_get_endpoints(const MSVideoConference *obj) {
-	return ((VideoConferenceGeneric *)obj)->getEndpoints();
-}
-
 extern "C" MSVideoEndpoint *ms_video_conference_get_video_placeholder_member(const MSVideoConference *obj) {
 	return (MSVideoEndpoint *)(((VideoConferenceGeneric *)obj)->getVideoPlaceholderMember());
 }
@@ -46,14 +42,6 @@ extern "C" void ms_video_conference_add_member(MSVideoConference *obj, MSVideoEn
 
 extern "C" void ms_video_conference_remove_member(MSVideoConference *obj, MSVideoEndpoint *ep) {
 	((VideoConferenceGeneric *)obj)->removeMember((VideoEndpoint *)ep);
-}
-
-extern "C" void ms_video_conference_add_endpoint(MSVideoConference *obj, MSVideoEndpoint *ep) {
-	((VideoConferenceGeneric *)obj)->addEndpoint((VideoEndpoint *)ep);
-}
-
-extern "C" void ms_video_conference_remove_endpoint(MSVideoConference *obj, MSVideoEndpoint *ep) {
-	((VideoConferenceGeneric *)obj)->removeEndpoint((VideoEndpoint *)ep);
 }
 
 extern "C"  void ms_video_conference_set_focus(MSVideoConference *obj, MSVideoEndpoint *ep) {
@@ -84,47 +72,6 @@ const bctbx_list_t* VideoConferenceGeneric::getMembers() const {
 
 VideoEndpoint *VideoConferenceGeneric::getVideoPlaceholderMember() const {
 	return mVideoPlaceholderMember;
-}
-
-const bctbx_list_t* VideoConferenceGeneric::getEndpoints() const {
-	return mEndpoints;
-}
-
-void VideoConferenceGeneric::addMember(VideoEndpoint *ep) {
-	/* now connect to the filter */
-	ep->mConference = (MSVideoConference *)this;
-	if (mMembers == NULL) {
-		addVideoPlaceholderMember();
-	} else {
-		ms_ticker_detach(mTicker,mMixer);
-	}
-	setPin(ep);
-	plumb_to_conf(ep);
-	video_stream_set_encoder_control_callback(ep->mSt, ms_video_conference_process_encoder_control, ep);
-	ms_ticker_attach(mTicker,mMixer);
-	mMembers=bctbx_list_append(mMembers,ep);
-	
-	configureOutput(ep);
-}
-
-void VideoConferenceGeneric::removeMember(VideoEndpoint *ep) {
-	video_stream_set_encoder_control_callback(ep->mSt, NULL, NULL);
-	ms_ticker_detach(mTicker,mMixer);
-	unplumb_from_conf(ep);
-	ep->mConference=NULL;
-	mMembers=bctbx_list_remove(mMembers,ep);
-	if (mMembers!=NULL) {
-		ms_ticker_attach(mTicker,mMixer);
-	} else {
-		ms_message("remove video placeholder member %p", mVideoPlaceholderMember);
-		video_stream_set_encoder_control_callback(mVideoPlaceholderMember->mSt, NULL, NULL);
-		unplumb_from_conf(mVideoPlaceholderMember);
-		if (mVideoPlaceholderMember) {
-			video_stream_free(mVideoPlaceholderMember->mSt);
-			delete mVideoPlaceholderMember;
-		}
-		mVideoPlaceholderMember =  NULL;
-	}
 }
 
 VideoEndpoint *VideoConferenceGeneric::getMemberAtPin(int pin) const {
