@@ -372,4 +372,9 @@ typedef enum _MSAudioRoute MSAudioRoute;
 #define MS_VOID_SOURCE_SEND_SILENCE \
 	MS_FILTER_METHOD(MSFilterVoidInterface, 0, bool_t)
 
+#define MS_VIDEO_DISPLAY_COMPARE_COLOR \
+	MS_FILTER_METHOD(MS_ANALYSE_DISPLAY_ID,0,int)
+
 #endif
+
+

@@ -1502,6 +1502,11 @@ static MSFilter* _video_stream_change_camera(VideoStream *stream, MSWebCam *cam,
 				stream->source = new_source ? new_source : ms_web_cam_create_reader(cam);
 				stream->cam = cam;
 				stream->player_active = FALSE;
+				/*ms_message("[mire] lll");
+				if (stream->source && (ms_filter_get_id(stream->source) == MS_MIRE_ID)) {
+					int temp = 200;
+					ms_filter_call_method(stream->source,MS_FILTER_SET_COLOR,&temp);
+				}*/
 			}
 		}
 		if (stream->source_performs_encoding == TRUE) {
