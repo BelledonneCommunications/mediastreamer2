@@ -57,6 +57,11 @@ struct SenderData {
 	bool_t use_task;
 	bool_t stun_enabled;
 	bool_t enable_ts_adjustment;
+	int mixer_to_client_send_interval;
+	uint64_t last_mtc_sent_time;
+	int mixer_to_client_extension_id;
+	MSRtpSendRequestMixerToClientDataCb mtc_request_data_cb;
+	void *mtc_request_data_user_data;
 };
 
 typedef struct SenderData SenderData;
@@ -126,6 +131,11 @@ static void sender_init(MSFilter * f)
 	if (d->use_task) ms_message("MSRtpSend will use tasks to send out packet at the beginning of ticks.");
 	d->stun_enabled = TRUE;
 	d->enable_ts_adjustment = TRUE;
+	d->mixer_to_client_send_interval = 250;
+	d->last_mtc_sent_time = 0;
+	d->mixer_to_client_extension_id = 0;
+	d->mtc_request_data_cb = NULL;
+	d->mtc_request_data_user_data = NULL;
 	f->data = d;
 }
 
@@ -203,6 +213,28 @@ static int sender_set_relay_session_id(MSFilter *f, void*arg){
 	SenderData *d = (SenderData *) f->data;
 	const char *tmp=(const char *)arg;
 	d->relay_session_id_size=(int)b64_decode(tmp, strlen(tmp), (void*)d->relay_session_id, (unsigned int)sizeof(d->relay_session_id));
+	return 0;
+}
+
+static int sender_set_mixer_to_client_send_interval(MSFilter *f, void *arg) {
+	SenderData *d = (SenderData *) f->data;
+	int *interval = (int *)arg;
+	d->mixer_to_client_send_interval = *interval;
+	return 0;
+}
+
+static int sender_set_mixer_to_client_extension_id(MSFilter *f, void *arg) {
+	SenderData *d = (SenderData *) f->data;
+	int *id = (int *)arg;
+	d->mixer_to_client_extension_id = *id;
+	return 0;
+}
+
+static int sender_set_mixer_to_client_data_request_cb(MSFilter *f, void *arg) {
+	SenderData *d = (SenderData *) f->data;
+	MSFilterRequestAudioDataCb *cb = (MSFilterRequestAudioDataCb *)arg;
+	d->mtc_request_data_cb = cb->cb;
+	d->mtc_request_data_user_data = cb->user_data;
 	return 0;
 }
 
@@ -440,7 +472,7 @@ static void _sender_process(MSFilter * f)
 	RtpSession *s = d->session;
 	mblk_t *im;
 	uint32_t timestamp;
-
+	rtp_audio_level_t audio_levels[RTP_MAX_MIXER_TO_CLIENT_AUDIO_LEVEL] = {0};
 
 	if (d->relay_session_id_size>0 && 
 		( (f->ticker->time-d->last_rsi_time)>5000 || d->last_rsi_time==0) ) {
@@ -472,7 +504,15 @@ static void _sender_process(MSFilter * f)
 		if (im){
 			compute_processing_delay_stats(f, im);
 			if (d->skip == FALSE && d->mute==FALSE){
-				header = rtp_session_create_packet(s, 12, NULL, 0);
+				if (d->mixer_to_client_extension_id > 0
+					&& (f->ticker->time - d->last_mtc_sent_time > (uint64_t)d->mixer_to_client_send_interval)
+					&& d->mtc_request_data_cb) {
+					int size = d->mtc_request_data_cb(f, audio_levels, d->mtc_request_data_user_data);
+					header = rtp_session_create_packet_with_mixer_to_client_audio_level(s, 12, d->mixer_to_client_extension_id, size, audio_levels);
+					d->last_mtc_sent_time = f->ticker->time;
+				} else {
+					header = rtp_session_create_packet(s, 12, NULL, 0);
+				}
 				rtp_set_markbit(header, mblk_get_marker_info(im));
 				header->b_cont = im;
 				mblk_meta_copy(im, header);
@@ -551,6 +591,9 @@ static MSFilterMethod sender_methods[] = {
 	{MS_RTP_SEND_SET_SESSION, sender_set_session},
 	{MS_RTP_SEND_SEND_DTMF, sender_send_dtmf},
 	{MS_RTP_SEND_SET_RELAY_SESSION_ID, sender_set_relay_session_id},
+	{MS_RTP_SEND_SET_MIXER_TO_CLIENT_SEND_INTERVAL, sender_set_mixer_to_client_send_interval},
+	{MS_RTP_SEND_SET_MIXER_TO_CLIENT_EXTENSION_ID, sender_set_mixer_to_client_extension_id},
+	{MS_RTP_SEND_SET_MIXER_TO_CLIENT_DATA_REQUEST_CB, sender_set_mixer_to_client_data_request_cb},
 	{MS_FILTER_GET_SAMPLE_RATE, sender_get_sr },
 	{MS_FILTER_GET_NCHANNELS, sender_get_ch },
 	{MS_RTP_SEND_SET_DTMF_DURATION, sender_set_dtmf_duration },
@@ -604,6 +647,7 @@ struct ReceiverData {
 	int rate;
 	bool_t starting;
 	bool_t reset_jb;
+	int mixer_to_client_extension_id;
 };
 
 typedef struct ReceiverData ReceiverData;
@@ -613,6 +657,7 @@ static void receiver_init(MSFilter * f)
 	ReceiverData *d = (ReceiverData *)ms_new0(ReceiverData, 1);
 	d->session = NULL;
 	d->rate = 8000;
+	d->mixer_to_client_extension_id = 0;
 	f->data = d;
 }
 
@@ -641,6 +686,13 @@ static int receiver_set_session(MSFilter * f, void *arg)
 	}
 	d->session = s;
 
+	return 0;
+}
+
+static int receiver_set_mixer_to_client_extension_id(MSFilter * f, void *arg) {
+	ReceiverData *d = (ReceiverData *) f->data;
+	int *id = (int *) arg;
+	d->mixer_to_client_extension_id = *id;
 	return 0;
 }
 
@@ -721,6 +773,28 @@ static bool_t receiver_check_payload_type(MSFilter *f, ReceiverData *d, mblk_t *
 	return TRUE;
 }
 
+static void receiver_check_for_extensions(MSFilter *f, mblk_t *m) {
+	ReceiverData *d = (ReceiverData *) f->data;
+	rtp_audio_level_t mtc_levels[RTP_MAX_MIXER_TO_CLIENT_AUDIO_LEVEL] = {0};
+	//rtp_audio_level_t ctm_level;
+	//bool_t voice_activity;
+	int ret;
+
+	// Check the packet if it contains audio level extensions
+	if (d->mixer_to_client_extension_id > 0) {
+		if ((ret = rtp_get_mixer_to_client_audio_level(m, d->mixer_to_client_extension_id, mtc_levels)) != -1) {
+			ms_filter_notify(f, MS_RTP_RECV_MIXER_TO_CLIENT_AUDIO_LEVEL_RECEIVED, mtc_levels);
+		}
+	}
+
+	// TODO: uncomment this when audiostream have a client_to_mixer extension id configured
+	// if ((ret = rtp_get_client_to_mixer_audio_level(m, RTP_EXTENSION_CLIENT_TO_MIXER_AUDIO_LEVEL, &voice_activity)) != -1) {
+	// 	ctm_level.csrc = rtp_get_ssrc(m);
+	// 	ctm_level.dbov = ret;
+	// 	ms_filter_notify(f, MS_RTP_RECV_CLIENT_TO_MIXER_AUDIO_LEVEL_RECEIVED, &ctm_level);
+	// }
+}
+
 static void receiver_process(MSFilter * f)
 {
 	ReceiverData *d = (ReceiverData *) f->data;
@@ -751,6 +825,7 @@ static void receiver_process(MSFilter * f)
 			mblk_set_timestamp_info(m, rtp_get_timestamp(m));
 			mblk_set_marker_info(m, rtp_get_markbit(m));
 			mblk_set_cseq(m, rtp_get_seqnumber(m));
+			receiver_check_for_extensions(f, m);
 			rtp_get_payload(m,&m->b_rptr);
 			ms_queue_put(f->outputs[0], m);
 		}else{
@@ -773,6 +848,7 @@ static int get_receiver_output_fmt(MSFilter *f, void *arg) {
 static MSFilterMethod receiver_methods[] = {
 	{	MS_RTP_RECV_SET_SESSION	, receiver_set_session	},
 	{	MS_RTP_RECV_RESET_JITTER_BUFFER, receiver_reset_jitter_buffer },
+	{	MS_RTP_RECV_SET_MIXER_TO_CLIENT_EXTENSION_ID, receiver_set_mixer_to_client_extension_id },
 	{	MS_FILTER_GET_SAMPLE_RATE	, receiver_get_sr		},
 	{	MS_FILTER_GET_NCHANNELS	,	receiver_get_ch	},
 	{ 	MS_FILTER_GET_OUTPUT_FMT, get_receiver_output_fmt },
