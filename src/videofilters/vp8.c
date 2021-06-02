@@ -196,7 +196,6 @@ static void enc_preprocess(MSFilter *f) {
 	s->cfg.g_error_resilient = VPX_ERROR_RESILIENT_DEFAULT|VPX_ERROR_RESILIENT_PARTITIONS;
 	s->cfg.g_lag_in_frames = 0;
 
-
 #if defined(__ANDROID__) || (TARGET_OS_IPHONE == 1) || defined(__arm__) || defined(_M_ARM)
 	cpuused = 10 - s->cfg.g_threads; /*cpu/quality tradeoff: positive values decrease CPU usage at the expense of quality*/
 	if (cpuused < 7) cpuused = 7; /*values beneath 7 consume too much CPU*/
@@ -636,7 +635,9 @@ static void enc_process(MSFilter *f) {
 	if ((entry_f = ms_queue_peek_last(f->inputs[0])) != NULL) {
 		ms_queue_remove(f->inputs[0], entry_f);
 		putq(&s->entry_q, entry_f);
+		ms_mutex_lock(&s->vp8_mutex);
 		ms_worker_thread_add_task(s->process_thread, enc_process_frame_task, (void*)f);
+		ms_mutex_unlock(&s->vp8_mutex);
 	}
 
 	/* Put each frame we have in exit_q in f->output[0] */
@@ -651,6 +652,7 @@ static void enc_process(MSFilter *f) {
 static void enc_postprocess(MSFilter *f) {
 	EncState *s = (EncState *)f->data;
 	ms_worker_thread_destroy(s->process_thread, FALSE);
+	s->process_thread = NULL;
 	if (s->ready) vpx_codec_destroy(&s->codec);
 	vp8rtpfmt_packer_uninit(&s->packer);
 	flushq(&s->entry_q,0);
@@ -677,8 +679,10 @@ static int enc_set_configuration(MSFilter *f, void *data) {
 			s->vconf.vsize = vsize;
 		}
 		else if (fps_changed){
+			ms_mutex_lock(&s->vp8_mutex);
 			enc_postprocess(f);
 			enc_preprocess(f);
+			ms_mutex_unlock(&s->vp8_mutex);
 		}else{
 			ms_mutex_lock(&s->vp8_mutex);
 			if (vpx_codec_enc_config_set(&s->codec, &s->cfg) != 0){
