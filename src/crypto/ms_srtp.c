@@ -119,6 +119,7 @@ static int _process_on_send(RtpSession* session,MSSrtpStreamContext *ctx, mblk_t
 		if (!ctx->secured) {
 			// No need to protect RTP packets
 			err=err_status_ok;
+			slen = 0; /*droping packets*/
 		} else {
 			/* defragment incoming message and enlarge the buffer for srtp to write its data */
 			msgpullup(m,slen+SRTP_MAX_TRAILER_LEN+4 /*for 32 bits alignment*/);
@@ -130,6 +131,8 @@ static int _process_on_send(RtpSession* session,MSSrtpStreamContext *ctx, mblk_t
 		if (!ctx->secured) {
 			// No need to protect RTCP packets
 			err=err_status_ok;
+			/*does not make sense to protect, because we don't have any key*/
+			slen = 0; /*droping packets*/
 		} else {
 		/* defragment incoming message and enlarge the buffer for srtp to write its data */
 			msgpullup(m,slen+SRTP_MAX_TRAILER_LEN+4 /*for 32 bits alignment*/ + 4 /*required by srtp_protect_rtcp*/);
@@ -190,7 +193,7 @@ static int _process_on_receive(RtpSession* session,MSSrtpStreamContext *ctx, mbl
 			return -1;
 		}
 	}else{
-		return slen;
+		return 0;
 	}
 }
 static int ms_srtp_process_on_receive(RtpTransportModifier *t, mblk_t *m){
