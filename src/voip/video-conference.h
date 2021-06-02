@@ -75,7 +75,7 @@ public:
 protected:
 	virtual void addVideoPlaceholderMember() {};
 	virtual void setPin(VideoEndpoint *ep) {};
-	virtual void configureOutput(VideoEndpoint *ep) {};
+	virtual void configureOutput(VideoEndpoint *ep, int source) {};
 	virtual void unconfigureOutput(int pin) {};
 	virtual void applyNewBitrateRequest();
 
@@ -118,10 +118,11 @@ public:
 	void setLocalMember(MSVideoConferenceFilterPinControl pc) override;
 	void notifyFir(int pin) override;
 	void notifySli(int pin) override;
+	void addEndpoint(VideoEndpoint *ep);
 
 protected:
 	int findInputPin(std::string participant);
-	void configureOutput(VideoEndpoint *ep) override;
+	void configureOutput(VideoEndpoint *ep, int source) override;
 	void unconfigureOutput(int pin) override;
 };
 

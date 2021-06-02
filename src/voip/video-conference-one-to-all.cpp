@@ -93,7 +93,7 @@ void VideoConferenceOneToAll::addMember(VideoEndpoint *ep) {
 	ms_ticker_attach(mTicker,mMixer);
 	mMembers=bctbx_list_append(mMembers,ep);
 	
-	configureOutput(ep);
+	configureOutput(ep,ep->mPin);
 }
 
 void VideoConferenceOneToAll::removeMember(VideoEndpoint *ep) {

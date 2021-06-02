@@ -62,8 +62,10 @@ VideoConferenceAllToAll::VideoConferenceAllToAll(MSFactory *f, const MSVideoConf
 }
 
 int VideoConferenceAllToAll::findInputPin(std::string participant) {
+	ms_message("[all to all] ep send only %s", participant.c_str());
 	for (const bctbx_list_t *elem = getMembers(); elem != nullptr; elem = elem->next){
 		VideoEndpoint *ep_it = (VideoEndpoint *)elem->data;
+		ms_message("[all to all] member %s", ep_it->mName.c_str());
 		if (ep_it->mName.compare(participant) == 0){
 			return ep_it->mPin;
 		}
@@ -72,35 +74,73 @@ int VideoConferenceAllToAll::findInputPin(std::string participant) {
 	return -1;
 }
 
+static void configureEndpoint(VideoEndpoint *ep){
+	VideoConferenceAllToAll *conf = (VideoConferenceAllToAll *)ep->mConference;
+	conf->addEndpoint(ep);
+}
+
+
+void VideoConferenceAllToAll::addEndpoint(VideoEndpoint *ep) {
+	
+	
+	int source = findInputPin(ep->mName);
+	if (source > 0) {
+		configureOutput(ep, source);
+	}
+}
+
 void VideoConferenceAllToAll::addMember(VideoEndpoint *ep) {
 	/* now connect to the filter */
 	ep->mConference = (MSVideoConference *)this;
 	if (mMembers != NULL || mEndpoints != NULL) {
 		ms_ticker_detach(mTicker,mMixer);
 	}
-	if (ep->mSt->dir != MediaStreamSendOnly) {
+	if (media_stream_get_direction(&ep->mSt->ms) == MediaStreamSendRecv) {
 		ep->mPin = find_free_input_pin(getMixer());
-	} else {
-		ep->mPin = findInputPin(ep->mName);
-	}
-	if (ep->mSt->dir != MediaStreamRecvOnly) {
-		ep->mOutPin = find_free_output_pin(getMixer());
-	}
-	plumb_to_conf(ep);
-	video_stream_set_encoder_control_callback(ep->mSt, ms_video_conference_process_encoder_control, ep);
-	ms_ticker_attach(mTicker,mMixer);
-	if (ep->mSt->dir != MediaStreamSendOnly) {
+		ep->mOutPin = ep->mPin;
+		//ep->mOutPin = find_free_output_pin(getMixer());
+		ms_message("[all to all] add member sendrecv  input %d, output %d", ep->mPin, ep->mOutPin);
+		plumb_to_conf(ep);
+		video_stream_set_encoder_control_callback(ep->mSt, ms_video_conference_process_encoder_control, ep);
+		ms_ticker_attach(mTicker,mMixer);
 		mMembers=bctbx_list_append(mMembers,ep);
-	} else {
+		configureOutput(ep, ep->mPin);
+	} else if (media_stream_get_direction(&ep->mSt->ms) == MediaStreamSendOnly) {
+		ms_message("[all to all] sendonly");
+		ep->mPin = find_free_input_pin(getMixer());
+		ep->mOutPin = ep->mPin;
+		ms_message("[all to all] add endpoint input %d output %d", ep->mPin, ep->mOutPin);
+			plumb_to_conf(ep);
+		//	video_stream_set_encoder_control_callback(ep->mSt, ms_video_conference_process_encoder_control, ep);
+
+		ms_ticker_attach(mTicker,mMixer);
 		mEndpoints = bctbx_list_append(mEndpoints, ep);
+		addEndpoint(ep);
+	} else {
+		ep->mPin = find_free_input_pin(getMixer());
+		ep->mOutPin = ep->mPin;
+		ms_message("[all to all] add member recvonly  input %d", ep->mPin);
+		//ep->mOutPin = getMixer()->desc->noutputs-1;
+		plumb_to_conf(ep);
+		
+		video_stream_set_encoder_control_callback(ep->mSt, ms_video_conference_process_encoder_control, ep);
+		ms_ticker_attach(mTicker,mMixer);
+		
+		mMembers=bctbx_list_append(mMembers,ep);
+		
+		configureOutput(ep, ep->mPin);
+		
+		bctbx_list_for_each(mEndpoints, (void (*)(void*))configureEndpoint);
 	}
-	configureOutput(ep);
+
 }
 
 void VideoConferenceAllToAll::removeMember(VideoEndpoint *ep) {
-	if (ep->mSt->dir != MediaStreamSendOnly) {
+	if (media_stream_get_direction(&ep->mSt->ms) != MediaStreamSendOnly) {
+		ms_message("[all to all] remove member at pin", ep->mPin);
 		mMembers=bctbx_list_remove(mMembers,ep);
 	} else {
+		ms_message("[all to all] remove endpoint at pin", ep->mPin);
 		mEndpoints=bctbx_list_remove(mEndpoints,ep);
 	}
 	video_stream_set_encoder_control_callback(ep->mSt, NULL, NULL);
@@ -113,9 +153,9 @@ void VideoConferenceAllToAll::removeMember(VideoEndpoint *ep) {
 	}
 }
 
-void VideoConferenceAllToAll::configureOutput(VideoEndpoint *ep) {
+void VideoConferenceAllToAll::configureOutput(VideoEndpoint *ep, int source) {
 	MSVideoRouterPinData pd;
-	pd.input = ep->mPin;
+	pd.input = source;
 	pd.output = ep->mOutPin;
 	ms_filter_call_method(mMixer, MS_VIDEO_ROUTER_CONFIGURE_OUTPUT, &pd);
 }

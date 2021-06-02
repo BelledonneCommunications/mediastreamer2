@@ -23,6 +23,7 @@
 
 #include "mediastreamer2/msfilter.h"
 #include "mediastreamer2/msvideoswitcher.h"
+#define ROUTER_MAX_CHANNELS 20
 
 typedef struct _MSVideoRouterPinData{
 	int input;

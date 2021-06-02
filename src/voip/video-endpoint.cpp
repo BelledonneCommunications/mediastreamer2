@@ -89,6 +89,7 @@ void VideoEndpoint::cutVideoStreamGraph(bool isRemote, VideoStream *st) {
 	mSt = st;
 	if (st->label) {
 		mName = st->label;
+		ms_message("[all to all] label %s", mName.c_str());
 	}
 	/*stop the video graph*/
 	if (mSt->source) ms_ticker_detach(mSt->ms.sessions.ticker, mSt->source);

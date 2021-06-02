@@ -134,7 +134,10 @@ void plumb_to_conf(VideoEndpoint *ep) {
 
 	if (ep != conf->getVideoPlaceholderMember()) {
 		if (ep->mMixerOut.filter){
-			ms_filter_link(conf->getMixer(),ep->mOutPin,ep->mMixerOut.filter,ep->mMixerOut.pin);
+			//if (ep->mOutPin != -1) {
+				
+				ms_filter_link(conf->getMixer(),ep->mOutPin,ep->mMixerOut.filter,ep->mMixerOut.pin);
+			//}
 		}
 	}
 
@@ -142,9 +145,11 @@ void plumb_to_conf(VideoEndpoint *ep) {
 		ms_filter_link(ep->mMixerIn.filter,ep->mMixerIn.pin,conf->getMixer(),ep->mPin);
 	}
 
-	pc.pin = ep->mPin;
-	pc.enabled = !ep->mIsRemote;
-	conf->setLocalMember(pc);
+	//if (ep->mPin > -1) {
+		pc.pin = ep->mPin;
+		pc.enabled = !ep->mIsRemote;
+		conf->setLocalMember(pc);
+	//}
 }
 
 void unplumb_from_conf(VideoEndpoint *ep) {
