@@ -22,6 +22,7 @@
 #include "private.h"
 
 static void ms_video_conference_update_bitrate_request(MSVideoConference *obj);
+void ms_video_endpoint_destroy(MSVideoEndpoint *ep);
 
 struct _MSVideoConference{
 	MSVideoConferenceParams params;
@@ -308,9 +309,13 @@ void ms_video_conference_remove_member(MSVideoConference *obj, MSVideoEndpoint *
 	if (obj->members!=NULL) {
 		ms_ticker_attach(obj->ticker,obj->mixer);
 	} else {
-		ms_message("remove video placeholder member");
+		ms_message("remove video placeholder member %p", obj->video_placeholder_member);
 		video_stream_set_encoder_control_callback(obj->video_placeholder_member->st, NULL, NULL);
 		unplumb_from_conf(obj->video_placeholder_member);
+		if (obj->video_placeholder_member) {
+			video_stream_free(obj->video_placeholder_member->st);
+			ms_video_endpoint_destroy(obj->video_placeholder_member);
+		}
 		obj->video_placeholder_member =  NULL;
 	}
 }

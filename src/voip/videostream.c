@@ -1372,10 +1372,12 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 	stream->ms.is_beginning=TRUE;
 
 	/* attach the graphs */
-	if (stream->source)
+	if (stream->source) {
 		ms_ticker_attach (stream->ms.sessions.ticker, stream->source);
-	if (stream->void_source)
+	}
+	if (stream->void_source) {
 		ms_ticker_attach (stream->ms.sessions.ticker, stream->void_source);
+	}
 	if (stream->ms.rtprecv)
 		ms_ticker_attach (stream->ms.sessions.ticker, stream->ms.rtprecv);
 
@@ -1660,6 +1662,7 @@ static MSFilter* _video_stream_stop(VideoStream * stream, bool_t keep_source)
 				if ((stream->source_performs_encoding == FALSE) && !rtp_source) {
 					ms_connection_helper_unlink(&ch, stream->ms.encoder, 0, 0);
 				}
+
 				ms_connection_helper_unlink(&ch, stream->ms.rtpsend, 0, -1);
 				if (stream->output2){
 					ms_filter_unlink(stream->tee,1,stream->output2,0);
