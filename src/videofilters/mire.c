@@ -39,6 +39,7 @@ typedef struct _MireData{
 	float fps;
 	mblk_t *pic;
 	bool_t keep_fps;
+	int colors[6];
 }MireData;
 
 void mire_init(MSFilter *f){
@@ -51,6 +52,8 @@ void mire_init(MSFilter *f){
 	d->pic=NULL;
 	d->keep_fps=FALSE;
 	f->data=d;
+	int tempColors[6] = {150,12,100,60,200,100};
+	memcpy(d->colors, tempColors, 6 * sizeof(int));
 }
 
 void mire_uninit(MSFilter *f){
@@ -78,9 +81,9 @@ static void plane_draw(uint8_t *p, int w, int h, int lsz, int index, int color1,
 }
 
 static void mire_draw(MireData *d){
-	plane_draw(d->pict.planes[0],d->pict.w,d->pict.h,d->pict.strides[0],d->index*2,150,12);
-	plane_draw(d->pict.planes[1],d->pict.w/2,d->pict.h/2,d->pict.strides[1],d->index,100,60);
-	plane_draw(d->pict.planes[2],d->pict.w/2,d->pict.h/2,d->pict.strides[2],d->index,200,100);
+	plane_draw(d->pict.planes[0],d->pict.w,d->pict.h,d->pict.strides[0],d->index*2,d->colors[0],d->colors[1]);
+	plane_draw(d->pict.planes[1],d->pict.w/2,d->pict.h/2,d->pict.strides[1],d->index,d->colors[2],d->colors[3]);
+	plane_draw(d->pict.planes[2],d->pict.w/2,d->pict.h/2,d->pict.strides[2],d->index,d->colors[4],d->colors[5]);
 }
 
 static void mire_process(MSFilter *f){
@@ -139,6 +142,16 @@ static int mire_get_vsize(MSFilter *f, void* data){
 	return 0;
 }
 
+static int mire_set_color(MSFilter *f, void* data){
+	MireData *d=(MireData*)f->data;
+	int color = *(int *)data;
+	if (color < 0) return -1;
+	for (int i=0; i<6; i++) {
+		d->colors[i] = color;
+	}
+	return 0;
+}
+
 static int mire_get_fps(MSFilter *f, void* data) {
 	MireData *d = (MireData*) f->data;
 	*(float*) data = d->fps;
@@ -151,6 +164,7 @@ MSFilterMethod mire_methods[]={
 	{	MS_FILTER_GET_PIX_FMT	, mire_get_fmt	},
 	{	MS_FILTER_GET_VIDEO_SIZE, mire_get_vsize },
 	{	MS_FILTER_GET_FPS		, mire_get_fps	},
+	{	MS_FILTER_SET_COLOR	, mire_set_color},
 	{	0,0 }
 };
 
