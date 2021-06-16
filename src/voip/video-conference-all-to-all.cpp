@@ -24,28 +24,6 @@
 using namespace ms2;
 namespace ms2 {
 
-static int find_free_input_pin(MSFilter *mixer) {
-	int i;
-	for(i=0;i<mixer->desc->ninputs;++i){
-		if (mixer->inputs[i]==NULL){
-			return i;
-		}
-	}
-	ms_fatal("No more free input pin in video router filter");
-	return -1;
-}
-
-static int find_free_output_pin(MSFilter *mixer) {
-	int i;
-	for(i=0;i<mixer->desc->noutputs;++i){
-		if (mixer->outputs[i]==NULL){
-			return i;
-		}
-	}
-	ms_fatal("No more free output pin in video router filter");
-	return -1;
-}
-
 VideoConferenceAllToAll::VideoConferenceAllToAll(MSFactory *f, const MSVideoConferenceParams *params) {
 	const MSFmtDescriptor *fmt;
 	MSVideoSize vsize = {0};
@@ -59,63 +37,138 @@ VideoConferenceAllToAll::VideoConferenceAllToAll(MSFactory *f, const MSVideoConf
 
 	ms_filter_add_notify_callback(mMixer,on_filter_event,this,TRUE);
 	mCfparams=*params;
+
+	std::fill_n(mOutputs, ROUTER_MAX_OUTPUT_CHANNELS, -1);
+	std::fill_n(mInputs, ROUTER_MAX_INPUT_CHANNELS, -1);
 }
 
-int VideoConferenceAllToAll::findInputPin(std::string participant) {
+int VideoConferenceAllToAll::findFreeOutputPin() {
+	int i;
+	for(i=0;i<mMixer->desc->noutputs;++i){
+		if (mOutputs[i] == -1) {
+			mOutputs[i] = 0;
+			return i;
+		}
+	}
+	ms_fatal("No more free output pin in video router filter");
+	return -1;
+}
+
+int VideoConferenceAllToAll::findFreeInputPin() {
+	int i;
+	for(i=0;i<mMixer->desc->ninputs;++i){
+		if (mInputs[i] == -1) {
+			mInputs[i] =0;
+			return i;
+		}
+	}
+	ms_fatal("No more free input pin in video router filter");
+	return -1;
+}
+
+int VideoConferenceAllToAll::findSourcePin(std::string participant) {
 	for (const bctbx_list_t *elem = getMembers(); elem != nullptr; elem = elem->next){
 		VideoEndpoint *ep_it = (VideoEndpoint *)elem->data;
-		if (ep_it->mName.compare(participant) == 0){
+		if (ep_it->mName.compare(participant) == 0) {
+			ms_message("Find source pin %d for %s", ep_it->mPin, participant.c_str());
 			return ep_it->mPin;
 		}
 	}
-	ms_error("input not found");
+	ms_message("Can not find source pin for %s",participant.c_str());
 	return -1;
+}
+
+static void configureEndpoint(VideoEndpoint *ep){
+	VideoConferenceAllToAll *conf = (VideoConferenceAllToAll *)ep->mConference;
+	conf->connectEndpoint(ep);
+}
+
+static void unlinkEndpoint(VideoEndpoint *ep){
+	unplumb_from_conf(ep);
+	ep->connected = false;
+	ep->mSource = -1;
+	ms_message("[all to all] unlink endpoint %s with output pin %d input pin %d", ep->mName.c_str(), ep->mOutPin, ep->mPin);
 }
 
 void VideoConferenceAllToAll::addMember(VideoEndpoint *ep) {
 	/* now connect to the filter */
 	ep->mConference = (MSVideoConference *)this;
-	if (mMembers != NULL || mEndpoints != NULL) {
-		ms_ticker_detach(mTicker,mMixer);
-	}
-	if (ep->mSt->dir != MediaStreamSendOnly) {
-		ep->mPin = find_free_input_pin(getMixer());
-	} else {
-		ep->mPin = findInputPin(ep->mName);
-	}
-	if (ep->mSt->dir != MediaStreamRecvOnly) {
-		ep->mOutPin = find_free_output_pin(getMixer());
-	}
-	plumb_to_conf(ep);
-	video_stream_set_encoder_control_callback(ep->mSt, ms_video_conference_process_encoder_control, ep);
-	ms_ticker_attach(mTicker,mMixer);
-	if (ep->mSt->dir != MediaStreamSendOnly) {
-		mMembers=bctbx_list_append(mMembers,ep);
-	} else {
+	if (media_stream_get_direction(&ep->mSt->ms) == MediaStreamSendRecv) {
+
+	} else if (media_stream_get_direction(&ep->mSt->ms) == MediaStreamSendOnly) {
+		ep->mOutPin = findFreeOutputPin();
+		ms_message("[all to all] add endpoint %s with output pin %d", ep->mName.c_str(), ep->mOutPin);
+		connectEndpoint(ep);
 		mEndpoints = bctbx_list_append(mEndpoints, ep);
-	}
-	configureOutput(ep);
+	} else {
+		ep->mPin = findFreeInputPin();
+		ms_message("[all to all] add member %s with input pin %d", ep->mName.c_str(), ep->mPin);
+		mMembers=bctbx_list_append(mMembers,ep);
+		bctbx_list_for_each(mEndpoints, (void (*)(void*))configureEndpoint);
+   }
 }
 
 void VideoConferenceAllToAll::removeMember(VideoEndpoint *ep) {
-	if (ep->mSt->dir != MediaStreamSendOnly) {
+	if (media_stream_get_direction(&ep->mSt->ms) != MediaStreamSendOnly) {
+		ms_message("[all to all] remove member %s with input pin %d", ep->mName.c_str(), ep->mPin);
 		mMembers=bctbx_list_remove(mMembers,ep);
+		mInputs[ep->mPin] = -1;
 	} else {
+		ms_message("[all to all] remove endpoint %s with output pin %d", ep->mName.c_str(), ep->mOutPin);
 		mEndpoints=bctbx_list_remove(mEndpoints,ep);
+		mOutputs[ep->mOutPin] = -1;
 	}
+	
+	if (!ep->connected) {
+		ep->mConference=NULL;
+		return;
+	}
+
 	video_stream_set_encoder_control_callback(ep->mSt, NULL, NULL);
 	ms_ticker_detach(mTicker,mMixer);
+
+	if (mMembers == NULL) {
+		// unlink all outputs
+		bctbx_list_for_each(mEndpoints, (void (*)(void*))unlinkEndpoint);
+	}
+
 	unplumb_from_conf(ep);
 	ep->mConference=NULL;
-	
-	if (mMembers!=NULL || mEndpoints != NULL) {
+
+	if (mEndpoints == NULL) {
+		// unlink all inputs
+		bctbx_list_for_each(mMembers, (void (*)(void*))unlinkEndpoint);
+	}
+
+	if (mMembers!=NULL && mEndpoints != NULL) {
 		ms_ticker_attach(mTicker,mMixer);
+	}
+}
+
+void VideoConferenceAllToAll::connectEndpoint(VideoEndpoint *ep) {
+	if (ep->connected) return;
+	ep->mSource = findSourcePin(ep->mName);
+	if (ep->mSource > -1) {
+		if (mEndpoints != NULL) {
+			ms_ticker_detach(mTicker,mMixer);
+		}
+		VideoEndpoint *member = getMemberAtPin(ep->mSource);
+		if (!member->connected) {
+			ms_message("[all to all] connect member %s with input pin %d", member->mName.c_str(), member->mPin);
+			plumb_to_conf(member);
+			member->connected = true;
+			video_stream_set_encoder_control_callback(member->mSt, ms_video_conference_process_encoder_control, ep);
+		}
+		plumb_to_conf(ep);
+		ep->connected = true;
+		ms_ticker_attach(mTicker,mMixer);
+		configureOutput(ep);
 	}
 }
 
 void VideoConferenceAllToAll::configureOutput(VideoEndpoint *ep) {
 	MSVideoRouterPinData pd;
-	pd.input = ep->mPin;
+	pd.input = ep->mSource;
 	pd.output = ep->mOutPin;
 	ms_filter_call_method(mMixer, MS_VIDEO_ROUTER_CONFIGURE_OUTPUT, &pd);
 }
