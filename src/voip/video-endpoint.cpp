@@ -89,29 +89,35 @@ void VideoEndpoint::cutVideoStreamGraph(bool isRemote, VideoStream *st) {
 	mSt = st;
 	if (st->label) {
 		mName = st->label;
+		ms_message("[all to all] label %s", mName.c_str());
 	}
 	/*stop the video graph*/
 	if (mSt->source) ms_ticker_detach(mSt->ms.sessions.ticker, mSt->source);
 	if (mSt->ms.rtprecv) ms_ticker_detach(mSt->ms.sessions.ticker, mSt->ms.rtprecv);
 	mIsRemote=isRemote;
 	mInCutPointPrev.pin=0;
-	if (isRemote){
-		/*we need to cut just after the rtp recveiver*/
-		mInCutPointPrev.filter=mSt->ms.rtprecv;
-	}else{
-		/*we need to cut just after the encoder*/
-		mInCutPointPrev.filter=mSt->ms.encoder;
+	if (media_stream_get_direction(&mSt->ms) != MediaStreamSendOnly) {
+		if (isRemote){
+			/*we need to cut just after the rtp recveiver*/
+			mInCutPointPrev.filter=mSt->ms.rtprecv;
+		}else{
+			/*we need to cut just after the encoder*/
+			mInCutPointPrev.filter=mSt->ms.encoder;
+		}
 	}
+
 	if (mInCutPointPrev.filter){
 		mInCutPoint=just_after(mInCutPointPrev.filter);
 		ms_filter_unlink(mInCutPointPrev.filter,mInCutPointPrev.pin,mInCutPoint.filter, mInCutPoint.pin);
 	}
 
 	mOutCutPoint.pin=0;
-	if (isRemote){
-		mOutCutPoint.filter=mSt->ms.rtpsend;
-	}else{
-		mOutCutPoint.filter=mSt->ms.decoder;
+	if (media_stream_get_direction(&mSt->ms) != MediaStreamRecvOnly) {
+		if (isRemote){
+			mOutCutPoint.filter=mSt->ms.rtpsend;
+		}else{
+			mOutCutPoint.filter=mSt->ms.decoder;
+		}
 	}
 	if (mOutCutPoint.filter){
 		mOutCutPointPrev=just_before(mOutCutPoint.filter);

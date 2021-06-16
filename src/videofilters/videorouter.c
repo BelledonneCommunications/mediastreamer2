@@ -22,9 +22,6 @@
 #include "mediastreamer2/msticker.h"
 #include "vp8rtpfmt.h"
 
-#define ROUTER_MAX_CHANNELS 20
-#define ROUTER_MAX_OUTPUT_CHANNELS ROUTER_MAX_CHANNELS*(ROUTER_MAX_CHANNELS-1)
-
 
 static bool_t is_vp8_key_frame(mblk_t *m){
 	uint8_t *p;
@@ -238,7 +235,7 @@ MSFilterDesc ms_video_router_desc={
 	N_("A filter that router video streams from several inputs, used for video conferencing."),
 	MS_FILTER_OTHER,
 	NULL,
-	ROUTER_MAX_CHANNELS,
+	ROUTER_MAX_INPUT_CHANNELS,
 	ROUTER_MAX_OUTPUT_CHANNELS,
 	router_init,
 	router_preprocess,
@@ -257,7 +254,7 @@ MSFilterDesc ms_video_router_desc={
 	.name="MSVideoRouter",
 	.text=N_("A filter that router video streams from several inputs, used for video conferencing."),
 	.category=MS_FILTER_OTHER,
-	.ninputs=ROUTER_MAX_CHANNELS,
+	.ninputs=ROUTER_MAX_INPUT_CHANNELS,
 	.noutputs=ROUTER_MAX_OUTPUT_CHANNELS,
 	.init=router_init,
 	.preprocess=router_preprocess,
