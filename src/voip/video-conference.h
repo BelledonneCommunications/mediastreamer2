@@ -47,6 +47,8 @@ public:
 	MSVideoConference *mConference=NULL;
 	int mPin=-1;
 	int mOutPin=-1;
+	int mSource = -1;
+	bool connected = false;
 	std::string mName=""; /*Particapant*/
 	int mIsRemote=0;
 	int mLastTmmbrReceived=0; /*Value in bits/s */
@@ -118,11 +120,17 @@ public:
 	void setLocalMember(MSVideoConferenceFilterPinControl pc) override;
 	void notifyFir(int pin) override;
 	void notifySli(int pin) override;
+	void connectEndpoint(VideoEndpoint *ep);
+	int findFreeOutputPin();
+	int findFreeInputPin ();
+	
 
 protected:
-	int findInputPin(std::string participant);
+	int findSourcePin(std::string participant);
 	void configureOutput(VideoEndpoint *ep) override;
 	void unconfigureOutput(int pin) override;
+	int mOutputs[ROUTER_MAX_OUTPUT_CHANNELS] ;
+	int mInputs[ROUTER_MAX_INPUT_CHANNELS];
 };
 
 
