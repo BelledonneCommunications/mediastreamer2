@@ -96,7 +96,7 @@ void VideoEndpoint::cutVideoStreamGraph(bool isRemote, VideoStream *st) {
 	if (mSt->ms.rtprecv) ms_ticker_detach(mSt->ms.sessions.ticker, mSt->ms.rtprecv);
 	mIsRemote=isRemote;
 	mInCutPointPrev.pin=0;
-	if (media_stream_get_direction(&mSt->ms) != MediaStreamSendOnly) {
+	if (!st->use_router || media_stream_get_direction(&mSt->ms) != MediaStreamSendOnly) {
 		if (isRemote){
 			/*we need to cut just after the rtp recveiver*/
 			mInCutPointPrev.filter=mSt->ms.rtprecv;
@@ -112,7 +112,7 @@ void VideoEndpoint::cutVideoStreamGraph(bool isRemote, VideoStream *st) {
 	}
 
 	mOutCutPoint.pin=0;
-	if (media_stream_get_direction(&mSt->ms) != MediaStreamRecvOnly) {
+	if (!st->use_router || media_stream_get_direction(&mSt->ms) != MediaStreamRecvOnly) {
 		if (isRemote){
 			mOutCutPoint.filter=mSt->ms.rtpsend;
 		}else{
