@@ -580,6 +580,10 @@ void video_stream_set_label(VideoStream *s, const char *flabel){
 		s->label=ms_strdup(flabel);
 }
 
+void video_stream_enable_router(VideoStream *s, bool_t enable) {
+	s->use_router = enable;
+}
+
 static void ext_display_cb(void *ud, MSFilter* f, unsigned int event, void *eventdata){
 	MSExtDisplayOutput *output=(MSExtDisplayOutput*)eventdata;
 	VideoStream *st=(VideoStream*)ud;
