@@ -114,6 +114,42 @@ static int router_unconfigure_output(MSFilter *f, void *data){
 	return 0;
 }
 
+static void router_channel_update_input(RouterState *s, int pin, MSQueue *q){
+	InputContext *input_context = &s->input_contexts[pin];
+	mblk_t *m;
+	
+	input_context->key_frame_start = NULL;
+	
+	for(m = ms_queue_peek_first(q); !ms_queue_end(q, m); m = ms_queue_peek_next(q,m)){
+		uint32_t new_ts = mblk_get_timestamp_info(m);
+		uint16_t new_seq = mblk_get_cseq(m);
+		//uint8_t marker = mblk_get_marker_info(m);
+		
+		if (!input_context->seq_set){
+			input_context->state = STOPPED;
+			input_context->key_frame_requested = TRUE;
+		}else if (!input_context->ignore_cseq && (new_seq != input_context->cur_seq + 1)){
+			ms_warning("MSVideoSwitcher: Sequence discontinuity detected on pin %i, key-frame requested", pin);
+			input_context->state = STOPPED;
+			input_context->key_frame_requested = TRUE;
+		}
+		if (input_context->key_frame_requested){
+			if (!input_context->seq_set || input_context->cur_ts != new_ts){
+				/* Possibly a beginning of frame ! */
+				if (s->is_key_frame(m)){
+					ms_message("MSVideoSwitcher: key frame detected on pin %i", pin);
+					input_context->state = RUNNING;
+					input_context->key_frame_start = m;
+					input_context->key_frame_requested = FALSE;
+				}
+			}
+		}
+		input_context->cur_ts = new_ts;
+		input_context->cur_seq = new_seq;
+		input_context->seq_set = 1;
+	}
+}
+
 static void router_transfer(MSFilter *f, MSQueue *input,  MSQueue *output, OutputContext *output_context, mblk_t *start){
 	mblk_t *m;
 	if (ms_queue_empty(input)) return;
@@ -151,6 +187,21 @@ static void router_process(MSFilter *f){
 	int i;
 
 	ms_filter_lock(f);
+	/* First update channel states according to their received packets */
+	for(i=0;i<f->desc->ninputs;++i){
+		MSQueue *q=f->inputs[i];
+		InputContext *input_context=&s->input_contexts[i];
+		if (q) {
+			router_channel_update_input(s, i, q);
+			if (!ms_queue_empty(q) && input_context->key_frame_requested){
+				if (input_context->state == STOPPED){
+					ms_filter_notify(f, MS_VIDEO_ROUTER_SEND_PLI, &i);
+				}else{
+					ms_filter_notify(f,MS_VIDEO_ROUTER_SEND_FIR, &i);
+				}
+			}
+		}
+	}
 
 	/*fill outputs from inputs according to rules below*/
 	for(i=0;i<f->desc->noutputs;++i){
@@ -204,14 +255,34 @@ static int router_set_local_member_pin(MSFilter *f, void *data) {
 }
 
 static int router_notify_pli(MSFilter *f, void *data){
+	RouterState *s=(RouterState *)f->data;
 	int pin = *(int*)data;
-	ms_filter_notify(f, MS_VIDEO_ROUTER_SEND_PLI, &pin);
+	int source_pin;
+	if (pin < 0 || pin >= f->desc->noutputs){
+		ms_error("%s: invalid argument to MS_VIDEO_SWITCHER_NOTIFY_PLI", f->desc->name);
+		return -1;
+	}
+	/* Propagate the PLI to the current input source. */
+	source_pin = s->output_contexts[pin].source;
+	if (source_pin != -1){
+		ms_filter_notify(f, MS_VIDEO_ROUTER_SEND_PLI, &source_pin);
+	}
 	return 0;
 }
 
 static int router_notify_fir(MSFilter *f, void *data){
+	RouterState *s=(RouterState *)f->data;
 	int pin = *(int*)data;
-	ms_filter_notify(f, MS_VIDEO_ROUTER_SEND_FIR, &pin);
+	int source_pin;
+	if (pin < 0 || pin >= f->desc->noutputs){
+		ms_error("%s: invalid argument to MS_VIDEO_SWITCHER_NOTIFY_PLI", f->desc->name);
+		return -1;
+	}
+	/* Propagate the FIR to the current input source. */
+	source_pin = s->output_contexts[pin].source;
+	if (source_pin != -1){
+		ms_filter_notify(f, MS_VIDEO_ROUTER_SEND_FIR, &source_pin);
+	}
 	return 0;
 }
 
