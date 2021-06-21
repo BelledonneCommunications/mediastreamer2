@@ -25,7 +25,6 @@ using namespace ms2;
 namespace ms2 {
 
 static int find_free_pin(MSFilter *mixer) {
-	// todo
 	int i;
 	for(i=0;i<mixer->desc->ninputs-1;++i){
 		if (mixer->inputs[i]==NULL){
