@@ -142,7 +142,7 @@ void plumb_to_conf(VideoEndpoint *ep) {
 		ms_filter_link(ep->mMixerIn.filter,ep->mMixerIn.pin,conf->getMixer(),ep->mPin);
 	}
 
-	if (ep->mMixerIn.filter) {
+	if (ep->mPin > -1) {
 		pc.pin = ep->mPin;
 		pc.enabled = !ep->mIsRemote;
 		conf->setLocalMember(pc);
