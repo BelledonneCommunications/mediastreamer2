@@ -199,12 +199,12 @@ void ms_video_conference_process_encoder_control(VideoStream *vs, unsigned int m
 	VideoConferenceGeneric *conf = (VideoConferenceGeneric *)ep->mConference;
 	switch(method_id){
 		case MS_VIDEO_ENCODER_NOTIFY_FIR:
-			conf->notifyFir(ep->mPin);
+			conf->notifyFir(ep->mOutPin);
 		break;
 		case MS_VIDEO_ENCODER_NOTIFY_PLI:
 		case MS_VIDEO_ENCODER_NOTIFY_SLI:
 			/* SLI and PLI are processed in the same way.*/
-			conf->notifySli(ep->mPin);
+			conf->notifySli(ep->mOutPin);
 		break;
 		case MS_VIDEO_ENCODER_NOTIFY_RPSI:
 			/* Ignored. We can't do anything with RPSI in a case where there are multiple receivers of a given encoder stream.*/
