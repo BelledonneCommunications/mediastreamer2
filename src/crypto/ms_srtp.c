@@ -371,7 +371,7 @@ static int ms_add_srtp_stream(srtp_t srtp, MSCryptoSuite suite, uint32_t ssrc, c
 	policy.key = (uint8_t *)key;
 	policy.next = NULL;
 
-	err = srtp_add_stream(srtp, &policy);
+	err = srtp_add_or_update_stream(srtp, &policy);
 	if (err != err_status_ok) {
 		ms_error("Failed to add stream to srtp session (%d)", err);
 		return -1;
@@ -434,7 +434,7 @@ static int ms_media_stream_sessions_set_srtp_key_base(MSMediaStreamSessions *ses
 		return error;
 	}
 
-	stream_ctx->secured=TRUE;
+	stream_ctx->secured=(cipher_key_length!=0);
 	return 0;
 }
 
@@ -455,7 +455,7 @@ static int ms_media_stream_sessions_set_srtp_key(MSMediaStreamSessions *sessions
 	}
 
 	// RTCP stream
-	if (error == 0 && ((suite != MS_AES_128_SHA1_32) && (suite != MS_AES_128_SHA1_80_NO_AUTH) && (suite != MS_AES_128_SHA1_32_NO_AUTH)) && (stream_type == MSSRTP_ALL_STREAMS || stream_type == MSSRTP_RTCP_STREAM)) {
+	if (error == 0 && (stream_type == MSSRTP_ALL_STREAMS || stream_type == MSSRTP_RTCP_STREAM)) {
 		size_t cipher_key_length = 0;
 		if ((suite == MS_AES_128_SHA1_80_NO_CIPHER) || (suite == MS_AES_128_SHA1_80_SRTCP_NO_CIPHER)) {
 			// SRTCP is unencrypted therefore cipher key length is 0

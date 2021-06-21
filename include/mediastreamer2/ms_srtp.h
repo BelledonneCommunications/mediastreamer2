@@ -56,6 +56,7 @@ typedef struct _MSCryptoSuiteNameParams{
 MS2_PUBLIC MSCryptoSuite ms_crypto_suite_build_from_name_params(const MSCryptoSuiteNameParams *nameparams);
 MS2_PUBLIC int ms_crypto_suite_to_name_params(MSCryptoSuite cs, MSCryptoSuiteNameParams *nameparams);
 MS2_PUBLIC bool_t ms_crypto_suite_is_unencrypted(MSCryptoSuite cs);
+MS2_PUBLIC bool_t ms_crypto_suite_is_unauthenticated(MSCryptoSuite cs);
 
 
 /* defined in srtp.h*/

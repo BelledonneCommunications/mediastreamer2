@@ -149,7 +149,7 @@ static uint8_t ms_dtls_srtp_check_certificate_fingerprint(const bctbx_x509_certi
 	} else if (strncasecmp(peer_fingerprint, "sha-512 ", 8) ==0 ){
 		hash_function = BCTBX_MD_SHA512;
 	} else { /* we have an unknown hash function: return null */
-		ms_error("DTLS-SRTP received invalid peer fingerprint, hash function unknown");
+		ms_error("DTLS-SRTP received invalid peer fingerprint %s, hash function unknown", peer_fingerprint);
 		return 0;
 	}
 

@@ -598,7 +598,11 @@ error:
 }
 
 bool_t ms_crypto_suite_is_unencrypted(MSCryptoSuite cs){
-	return (cs == MS_AES_128_SHA1_80_SRTP_NO_CIPHER) || (cs == MS_AES_128_SHA1_80_SRTCP_NO_CIPHER) || (cs == MS_AES_128_SHA1_80_NO_CIPHER) || (cs == MS_AES_128_SHA1_80_NO_AUTH) || (cs == MS_AES_128_SHA1_32_NO_AUTH);
+	return (cs == MS_AES_128_SHA1_80_SRTP_NO_CIPHER) || (cs == MS_AES_128_SHA1_80_SRTCP_NO_CIPHER) || (cs == MS_AES_128_SHA1_80_NO_CIPHER);
+}
+
+bool_t ms_crypto_suite_is_unauthenticated(MSCryptoSuite cs){
+	return (cs == MS_AES_128_SHA1_80_NO_AUTH) || (cs == MS_AES_128_SHA1_32_NO_AUTH);
 }
 
 int ms_crypto_suite_to_name_params(MSCryptoSuite cs, MSCryptoSuiteNameParams *params ){
