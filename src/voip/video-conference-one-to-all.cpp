@@ -17,6 +17,7 @@
 * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifdef VIDEO_ENABLED
 #include "video-conference.h"
 #include "mediastreamer2/msconference.h"
 
@@ -143,3 +144,4 @@ VideoConferenceOneToAll::~VideoConferenceOneToAll() {
 
 
 } // namespace ms2
+#endif
