@@ -245,6 +245,12 @@ MS2_PUBLIC void ms_audio_endpoint_destroy(MSAudioEndpoint *ep);
 }
 #endif
 
+#ifndef VIDEO_ENABLED
+typedef struct _MSVideoEndpoint{
+} MSVideoEndpoint;
+typedef struct _MSVideoConference{
+} MSVideoConference;
+#else
 /**
  * @}
  */
@@ -427,10 +433,10 @@ MS2_PUBLIC void ms_video_endpoint_release_from_stream(MSVideoEndpoint *obj);
 #ifdef __cplusplus
 }
 #endif
+#endif
 
 /**
  * @}
  */
 
 #endif
-
