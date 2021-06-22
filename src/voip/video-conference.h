@@ -17,6 +17,7 @@
 * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifdef VIDEO_ENABLED
 #ifndef MS_VIDEO_CONFERENCE_H
 #define MS_VIDEO_CONFERENCE_H
 
@@ -142,3 +143,4 @@ void ms_video_conference_process_encoder_control(VideoStream *vs, unsigned int m
 
 } // namespace ms2
 #endif /* MS_VIDEO_CONFERENCE_H */
+#endif
