@@ -74,12 +74,12 @@ public:
 	virtual void notifyFir(int pin) = 0;
 	virtual void notifySli(int pin) = 0;
 	virtual VideoEndpoint *getMemberAtPin(int pin) const;
+	virtual void unconfigureOutput(int pin) {};
 
 protected:
 	virtual void addVideoPlaceholderMember() {};
 	virtual void setPin(VideoEndpoint *ep) {};
 	virtual void configureOutput(VideoEndpoint *ep) {};
-	virtual void unconfigureOutput(int pin) {};
 	virtual void applyNewBitrateRequest();
 
 	MSVideoConferenceParams mCfparams;
@@ -124,12 +124,12 @@ public:
 	void connectEndpoint(VideoEndpoint *ep);
 	int findFreeOutputPin();
 	int findFreeInputPin ();
+	void unconfigureOutput(int pin) override;
 	
 
 protected:
 	int findSourcePin(std::string participant);
 	void configureOutput(VideoEndpoint *ep) override;
-	void unconfigureOutput(int pin) override;
 	int mOutputs[ROUTER_MAX_OUTPUT_CHANNELS] ;
 	int mInputs[ROUTER_MAX_INPUT_CHANNELS];
 };

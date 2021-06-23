@@ -91,6 +91,14 @@ static void unlinkEndpoint(VideoEndpoint *ep){
 	ms_message("[all to all] unlink endpoint %s with output pin %d input pin %d", ep->mName.c_str(), ep->mOutPin, ep->mPin);
 }
 
+static void unconfigureEndpoint(VideoEndpoint *ep, int pin){
+	if (ep->mSource == pin) {
+		ep->mSource = -1;
+		VideoConferenceAllToAll *conf = (VideoConferenceAllToAll *)ep->mConference;
+		conf->unconfigureOutput(ep->mOutPin);
+	}
+}
+
 void VideoConferenceAllToAll::addMember(VideoEndpoint *ep) {
 	/* now connect to the filter */
 	ep->mConference = (MSVideoConference *)this;
@@ -114,6 +122,7 @@ void VideoConferenceAllToAll::removeMember(VideoEndpoint *ep) {
 		ms_message("[all to all] remove member %s with input pin %d", ep->mName.c_str(), ep->mPin);
 		mMembers=bctbx_list_remove(mMembers,ep);
 		mInputs[ep->mPin] = -1;
+		bctbx_list_for_each2(mEndpoints, (void (*)(void*,void*))unconfigureEndpoint, &ep->mPin);
 	} else {
 		ms_message("[all to all] remove endpoint %s with output pin %d", ep->mName.c_str(), ep->mOutPin);
 		mEndpoints=bctbx_list_remove(mEndpoints,ep);
@@ -158,7 +167,6 @@ void VideoConferenceAllToAll::connectEndpoint(VideoEndpoint *ep) {
 			ms_message("[all to all] connect member %s with input pin %d", member->mName.c_str(), member->mPin);
 			plumb_to_conf(member);
 			member->connected = true;
-			//video_stream_set_encoder_control_callback(member->mSt, ms_video_conference_process_encoder_control, ep);
 		}
 		plumb_to_conf(ep);
 		video_stream_set_encoder_control_callback(ep->mSt, ms_video_conference_process_encoder_control, ep);
