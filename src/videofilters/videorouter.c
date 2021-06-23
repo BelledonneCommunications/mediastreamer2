@@ -117,9 +117,8 @@ static int router_unconfigure_output(MSFilter *f, void *data){
 static void router_channel_update_input(RouterState *s, int pin, MSQueue *q){
 	InputContext *input_context = &s->input_contexts[pin];
 	mblk_t *m;
-	
 	input_context->key_frame_start = NULL;
-	
+
 	for(m = ms_queue_peek_first(q); !ms_queue_end(q, m); m = ms_queue_peek_next(q,m)){
 		uint32_t new_ts = mblk_get_timestamp_info(m);
 		uint16_t new_seq = mblk_get_cseq(m);
@@ -129,7 +128,7 @@ static void router_channel_update_input(RouterState *s, int pin, MSQueue *q){
 			input_context->state = STOPPED;
 			input_context->key_frame_requested = TRUE;
 		}else if (!input_context->ignore_cseq && (new_seq != input_context->cur_seq + 1)){
-			ms_warning("MSVideoSwitcher: Sequence discontinuity detected on pin %i, key-frame requested", pin);
+			ms_warning("MSVideoRouter: Sequence discontinuity detected on pin %i, key-frame requested", pin);
 			input_context->state = STOPPED;
 			input_context->key_frame_requested = TRUE;
 		}
@@ -137,7 +136,7 @@ static void router_channel_update_input(RouterState *s, int pin, MSQueue *q){
 			if (!input_context->seq_set || input_context->cur_ts != new_ts){
 				/* Possibly a beginning of frame ! */
 				if (s->is_key_frame(m)){
-					ms_message("MSVideoSwitcher: key frame detected on pin %i", pin);
+					ms_message("MSVideoRouter: key frame detected on pin %i", pin);
 					input_context->state = RUNNING;
 					input_context->key_frame_start = m;
 					input_context->key_frame_requested = FALSE;
@@ -153,21 +152,21 @@ static void router_channel_update_input(RouterState *s, int pin, MSQueue *q){
 static void router_transfer(MSFilter *f, MSQueue *input,  MSQueue *output, OutputContext *output_context, mblk_t *start){
 	mblk_t *m;
 	if (ms_queue_empty(input)) return;
-	
+
 	if (start == NULL) start = ms_queue_peek_first(input);
-	
+
 	for(m = start; !ms_queue_end(input, m) ; m = ms_queue_peek_next(input,m)){
 		mblk_t *o = dupmsg(m);
-		
+
 		if (mblk_get_timestamp_info(m) != output_context->out_ts){
 			/* Each time we observe a new input timestamp, we must select a new output timestamp */
 			output_context->out_ts = mblk_get_timestamp_info(m);
 			output_context->adjusted_out_ts = (uint32_t) (f->ticker->time * 90LL);
 		}
-		
+
 		/* We need to set sequence number for what we send out, otherwise the VP8 decoder won't be able
 		 * to verify the integrity of the stream*/
-		
+
 		mblk_set_timestamp_info(o, output_context->adjusted_out_ts);
 		mblk_set_cseq(o, output_context->out_seq++);
 		mblk_set_marker_info(o, mblk_get_marker_info(m));
@@ -259,7 +258,7 @@ static int router_notify_pli(MSFilter *f, void *data){
 	int pin = *(int*)data;
 	int source_pin;
 	if (pin < 0 || pin >= f->desc->noutputs){
-		ms_error("%s: invalid argument to MS_VIDEO_SWITCHER_NOTIFY_PLI", f->desc->name);
+		ms_error("%s: invalid argument to MS_VIDEO_ROUTER_NOTIFY_PLI", f->desc->name);
 		return -1;
 	}
 	/* Propagate the PLI to the current input source. */
@@ -275,7 +274,7 @@ static int router_notify_fir(MSFilter *f, void *data){
 	int pin = *(int*)data;
 	int source_pin;
 	if (pin < 0 || pin >= f->desc->noutputs){
-		ms_error("%s: invalid argument to MS_VIDEO_SWITCHER_NOTIFY_PLI", f->desc->name);
+		ms_error("%s: invalid argument to MS_VIDEO_ROUTER_NOTIFY_PLI", f->desc->name);
 		return -1;
 	}
 	/* Propagate the FIR to the current input source. */
