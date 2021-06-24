@@ -852,6 +852,10 @@ void ms_dtls_srtp_set_peer_fingerprint(MSDtlsSrtpContext *context, const char *p
 	}
 }
 
+MSDtlsSrtpRole ms_dtls_srtp_get_role(const MSDtlsSrtpContext *context){
+	return context->role;
+}
+
 void ms_dtls_srtp_set_role(MSDtlsSrtpContext *context, MSDtlsSrtpRole role) {
 	if (context) {
 		ms_mutex_lock(&context->rtp_dtls_context->ssl_context_mutex);
