@@ -774,6 +774,11 @@ void ms_factory_uninit_plugins(MSFactory *factory){
 
 	factory->ms_plugins_loaded_list = bctbx_list_free(factory->ms_plugins_loaded_list);
 #endif
+	
+	if (factory->plugins_dir != NULL) {
+		ms_free(factory->plugins_dir);
+		factory->plugins_dir = NULL;
+	}
 }
 
 void ms_factory_init_plugins(MSFactory *obj) {
