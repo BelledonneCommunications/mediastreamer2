@@ -159,6 +159,11 @@ typedef struct _MediastreamDatas {
 	char * video_display_filter;
 	FILE * logfile;
 	bool_t enable_speaker;
+
+    bool_t enable_fec;
+    RtpSession *fec_session;
+    int L;
+    int D;
 } MediastreamDatas;
 
 
@@ -235,6 +240,7 @@ const char *usage="mediastream --local <port>\n"
 								"[ --width <pixels> ]\n"
 								"[ --zoom zoom factor ]\n"
 								"[ --zrtp (enable zrtp) ]\n"
+                                "[ --fec (enable fec) ]\n"
 								#if TARGET_OS_IPHONE
 								"[ --speaker route audio to speaker ]\n"
 								#endif
@@ -355,6 +361,8 @@ MediastreamDatas* init_default_args(void) {
 	memset(args->ice_remote_candidates, 0, sizeof(args->ice_remote_candidates));
 	args->ice_local_candidates_nb = args->ice_remote_candidates_nb = 0;
 	args->video_display_filter=NULL;
+
+    args->enable_fec = FALSE;
 
 	return args;
 }
@@ -649,6 +657,8 @@ bool_t parse_args(int argc, char** argv, MediastreamDatas* out) {
 			out->freeze_on_error=TRUE;
 		} else if (strcmp(argv[i], "--speaker") == 0) {
 			out->enable_speaker=TRUE;
+        } else if (strcmp(argv[i], "--fec") == 0){
+            out->enable_fec = TRUE;
 		} else {
 			ms_error("Unknown option '%s'\n", argv[i]);
 			return FALSE;
@@ -690,6 +700,14 @@ static MSSndCard *get_sound_card(MSSndCardManager *manager, const char* card_nam
 		ms_free(cards);
 	}
 	return play;
+}
+
+void mediastream_fec_enable(MediastreamDatas* args){
+    args->fec_session = ms_create_duplex_rtp_session(ms_is_ipv6(args->ip) ? "::" : "0:0:0:0", rtp_session_get_local_port(args->session)+10, rtp_session_get_local_rtcp_port(args->session)+10, args->mtu);
+    rtp_session_set_remote_addr(args->fec_session, args->ip, args->remoteport+10);
+    args->fec_session->fec_stream = NULL;
+    const FecParameters *params = fec_params_new(args->L, args->D, args->L*10);
+    args->session->fec_stream = fec_stream_new(args->session, args->fec_session, params);
 }
 
 void setup_media_streams(MediastreamDatas* args) {
@@ -996,6 +1014,10 @@ void setup_media_streams(MediastreamDatas* args) {
 					args->srtp_local_master_key,
 					args->srtp_remote_master_key));
 		}
+
+        if(args->enable_fec){
+            mediastream_fec_enable(args);
+        }
 #else
 		ms_error("Error: video support not compiled.\n");
 #endif

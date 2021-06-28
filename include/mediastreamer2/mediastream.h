@@ -94,7 +94,7 @@ typedef struct _MediaStream MediaStream;
 typedef void (*media_stream_process_rtcp_callback_t)(MediaStream *stream, mblk_t *m);
 
 struct _MSMediaStreamSessions{
-	RtpSession *rtp_session;
+    RtpSession *rtp_session;
 	MSSrtpCtx* srtp_context;
 	MSZrtpContext *zrtp_context;
 	MSDtlsSrtpContext *dtls_context;
@@ -158,7 +158,7 @@ struct _MediaStream {
 	MSFactory *factory;
 	MSBandwidthController *bandwidth_controller;
 	MSVideoQualityController *video_quality_controller;
-	MediaStreamDir direction;
+    MediaStreamDir direction;
 };
 
 MS2_PUBLIC void media_stream_init(MediaStream *stream, MSFactory *factory, const MSMediaStreamSessions *sessions);
