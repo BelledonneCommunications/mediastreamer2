@@ -158,8 +158,9 @@ int ms_ticker_attach_multiple(MSTicker *ticker,MSFilter *f,...)
 				break;
 			}
 			/*run preprocess on each filter: */
-			for(it=filters;it!=NULL;it=it->next)
+			for(it=filters;it!=NULL;it=it->next) {
 				ms_filter_preprocess((MSFilter*)it->data,ticker);
+			}
 			bctbx_list_free(filters);
 			total_sources=bctbx_list_concat(total_sources,sources);
 		}else{
@@ -418,7 +419,7 @@ static int wait_next_tick(void *data, uint64_t virt_ticker_time){
 		diff=s->time-realtime;
 		if (diff>0){
 			/* sleep until next tick */
-			ortp_sleep_ms((int)diff);
+            ortp_sleep_ms((int)diff < 10 ? (int)diff : 10);
 		}else{
 			late=(int)-diff;
 			break; /*exit the while loop */
