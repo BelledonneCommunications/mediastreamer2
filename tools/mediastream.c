@@ -707,11 +707,12 @@ static MSSndCard *get_sound_card(MSSndCardManager *manager, const char* card_nam
 }
 
 void mediastream_fec_enable(MediastreamDatas* args){
-    args->fec_session = ms_create_duplex_rtp_session(ms_is_ipv6(args->ip) ? "::" : "0:0:0:0", rtp_session_get_local_port(args->session)+10, rtp_session_get_local_rtcp_port(args->session)+10, args->mtu);
+    args->fec_session = ms_create_duplex_rtp_session(ms_is_ipv6(args->ip) ? "::" : "0.0.0.0", rtp_session_get_local_port(args->session)+10, rtp_session_get_local_rtcp_port(args->session)+10, args->mtu);
     rtp_session_set_remote_addr(args->fec_session, args->ip, args->remoteport+10);
     args->fec_session->fec_stream = NULL;
     const FecParameters *params = fec_params_new(args->L, args->D, args->L*10);
     args->session->fec_stream = fec_stream_new(args->session, args->fec_session, params);
+    ms_message("FEC SESSION Socket number %d", args->fec_session->rtp.gs.socket);
 }
 
 void setup_media_streams(MediastreamDatas* args) {
