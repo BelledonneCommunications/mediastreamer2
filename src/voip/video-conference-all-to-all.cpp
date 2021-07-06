@@ -71,11 +71,11 @@ int VideoConferenceAllToAll::findSourcePin(std::string participant) {
 	for (const bctbx_list_t *elem = getMembers(); elem != nullptr; elem = elem->next){
 		VideoEndpoint *ep_it = (VideoEndpoint *)elem->data;
 		if (ep_it->mName.compare(participant) == 0) {
-			ms_message("Find source pin %d for %s", ep_it->mPin, participant.c_str());
+			ms_message("Found source pin %d for %s", ep_it->mPin, participant.c_str());
 			return ep_it->mPin;
 		}
 	}
-	ms_message("Can not find source pin for %s",participant.c_str());
+	ms_error("Can not find source pin for %s",participant.c_str());
 	return -1;
 }
 
