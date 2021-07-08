@@ -38,7 +38,6 @@
 #include "TargetConditionals.h"
 #endif
 
-#define MS2_NO_VIDEO_RESCALING 1
 
 static void configure_recorder_output(VideoStream *stream);
 static int video_stream_start_with_source_and_output(VideoStream *stream, RtpProfile *profile, const char *rem_rtp_ip, int rem_rtp_port,
@@ -423,6 +422,7 @@ VideoStream *video_stream_new_with_sessions(MSFactory* factory, const MSMediaStr
 
 	stream->ms.type = MSVideo;
 	stream->ms.sessions=*sessions;
+	stream->source_vsize = MS_VIDEO_SIZE_UNKNOWN;
 
 	media_stream_init(&stream->ms, factory, sessions);
 
@@ -687,7 +687,13 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate, boo
 			cam_vsize = vconf.vsize;
 		} else {
 			vconf.vsize = preview_vsize;
-			ms_filter_call_method(stream->source,MS_FILTER_SET_VIDEO_SIZE,&preview_vsize);
+
+			if (stream->source_vsize.width != MS_VIDEO_SIZE_UNKNOWN_W && stream->source_vsize.height != MS_VIDEO_SIZE_UNKNOWN_H) {
+				// Until now, this is only for testing size conversation
+				ms_filter_call_method(stream->source,MS_FILTER_SET_VIDEO_SIZE,&stream->source_vsize);
+			} else {
+				ms_filter_call_method(stream->source,MS_FILTER_SET_VIDEO_SIZE,&preview_vsize);
+			}
 			/*the camera may not support the target size and suggest a one close to the target */
 			ms_filter_call_method(stream->source,MS_FILTER_GET_VIDEO_SIZE,&cam_vsize);
 		}
@@ -706,6 +712,8 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate, boo
 		if (ms_video_get_scaler_impl() == NULL) {
 			vconf.vsize = cam_vsize;
 		} else {
+/* Libyuv can resize the video itself */
+#if !defined(HAVE_LIBYUV_H)
 			MSVideoSize resized=get_with_same_orientation_and_ratio(vconf.vsize,cam_vsize);
 			if (resized.width & 0x1 || resized.height & 0x1){
 				ms_warning("Resizing avoided because downsizing to an odd number of pixels (%ix%i)",resized.width,resized.height);
@@ -714,6 +722,7 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate, boo
 				vconf.vsize=resized;
 				ms_warning("Camera video size greater than encoder one. A scaling filter will be used!");
 			}
+#endif
 		}
 #endif
 	}
