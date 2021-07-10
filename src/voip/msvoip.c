@@ -104,6 +104,10 @@ extern MSSndCardDesc aq_card_desc;
 extern MSSndCardDesc pulse_card_desc;
 #endif
 
+#ifdef __SNDIO_ENABLED__
+extern MSSndCardDesc sndio_card_desc;
+#endif
+
 #if TARGET_OS_IPHONE
 extern MSSndCardDesc au_card_desc;
 #endif
@@ -121,6 +125,10 @@ static MSSndCardDesc * ms_snd_card_descs[]={
 
 #ifdef __PULSEAUDIO_ENABLED__
         &pulse_card_desc,
+#endif
+
+#ifdef __SNDIO_ENABLED__
+        &sndio_card_desc,
 #endif
 
 #ifdef __ALSA_ENABLED__

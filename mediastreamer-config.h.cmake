@@ -42,6 +42,7 @@
 
 #cmakedefine __ALSA_ENABLED__
 #cmakedefine __ARTS_ENABLED__
+#cmakedefine __SNDIO_ENABLED__
 #cmakedefine __MACSND_ENABLED__
 #cmakedefine __MAC_AQ_ENABLED__
 #cmakedefine __PORTAUDIO_ENABLED__
