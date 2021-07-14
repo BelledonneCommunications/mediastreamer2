@@ -21,6 +21,7 @@
 #include "mediastreamer2/msrtp.h"
 #include "mediastreamer2_tester.h"
 #include "mediastreamer2_tester_private.h"
+#include "private.h"
 #include <math.h>
 
 #ifdef _MSC_VER
@@ -189,6 +190,7 @@ typedef struct _video_stream_tester_t {
 	int local_rtcp;
 	MSWebCam * cam;
 	int payload_type;
+	MSVideoSize source_vsize;
 } video_stream_tester_t;
 
 void video_stream_tester_set_local_ip(video_stream_tester_t* obj,const char*ip) {
@@ -203,6 +205,7 @@ video_stream_tester_t* video_stream_tester_new(void) {
 	vst->cam = ms_web_cam_manager_get_cam(ms_factory_get_web_cam_manager(_factory), "Mire: Mire (synthetic moving picture)");
 	vst->local_rtp=-1; /*random*/
 	vst->local_rtcp=-1; /*random*/
+	vst->source_vsize = MS_VIDEO_SIZE_UNKNOWN;
 #if TARGET_OS_OSX
 	vst->vconf = ms_new0(MSVideoConfiguration, 1);
 	vst->vconf->vsize = MS_VIDEO_SIZE_VGA;
@@ -347,6 +350,10 @@ static void init_video_streams(video_stream_tester_t *vst1, video_stream_tester_
 
 	create_video_stream(vst1, payload_type);
 	create_video_stream(vst2, payload_type);
+	
+	if (vst2->source_vsize.width != MS_VIDEO_SIZE_UNKNOWN_W && vst2->source_vsize.height != MS_VIDEO_SIZE_UNKNOWN_H) {
+		vst2->vs->source_vsize = vst2->source_vsize;
+	}
 
 	/* Enable/disable avpf. */
 	pt = rtp_profile_get_payload(&rtp_profile, payload_type);
@@ -1050,6 +1057,34 @@ static void video_stream_normal_loss_with_retransmission_on_nack(void) {
 	video_stream_tester_destroy(margaux);
 }
 
+static void one_way_video_stream_with_size_conv(void) {
+#if !defined(MS2_NO_VIDEO_RESCALING) && defined(HAVE_LIBYUV_H)
+	/* Test sizeconv filter, change source 720P to QCIF */
+	video_stream_tester_t* marielle=video_stream_tester_new();
+	video_stream_tester_t* margaux=video_stream_tester_new();
+	bool_t supported = ms_factory_codec_supported(_factory, "vp8");
+	if (!margaux->vconf) {
+		margaux->vconf = ms_new0(MSVideoConfiguration, 1);
+	}
+	margaux->vconf->vsize = MS_VIDEO_SIZE_QCIF;
+	margaux->source_vsize = MS_VIDEO_SIZE_720P;
+
+	if (supported) {
+		init_video_streams(marielle, margaux, FALSE, TRUE, NULL,VP8_PAYLOAD_TYPE, FALSE);
+
+		BC_ASSERT_TRUE(wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms, &marielle->stats.number_of_RR, 2, 15000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats));
+		video_stream_get_local_rtp_stats(marielle->vs, &marielle->stats.rtp);
+		video_stream_get_local_rtp_stats(margaux->vs, &margaux->stats.rtp);
+		uninit_video_streams(marielle, margaux);
+	} else {
+		ms_error("VP8 codec is not supported!");
+	}
+	video_stream_tester_destroy(marielle);
+	video_stream_tester_destroy(margaux);
+#endif
+}
+
+
 static test_t tests[] = {
 	TEST_NO_TAG("Basic video stream VP8"                     , basic_video_stream_vp8),
 	TEST_NO_TAG("Basic video stream H264"                    , basic_video_stream_all_h264_codec_combinations),
@@ -1070,6 +1105,7 @@ static test_t tests[] = {
 	TEST_NO_TAG("Video steam camera ELPH264"                 , video_stream_elph264_camera),
 	TEST_NO_TAG("AVPF RPSI count"                            , avpf_rpsi_count),
 	TEST_NO_TAG("Video stream normal loss with retransmission on NACK" , video_stream_normal_loss_with_retransmission_on_nack),
+	TEST_NO_TAG("One-way video stream with sizeconv", one_way_video_stream_with_size_conv)
 };
 
 test_suite_t video_stream_test_suite = {
