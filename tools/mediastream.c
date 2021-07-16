@@ -1174,6 +1174,8 @@ void clear_mediastreams(MediastreamDatas* args) {
 #ifdef VIDEO_ENABLED
 	if (args->video) {
         if(args->enable_fec){
+            printf("Number of lost source packets : %d\n", args->session->fec_stream->total_lost_packets);
+            printf("Number of unrepaired packets : %d\n", args->session->fec_stream->reconstruction_fail);
             rtp_session_destroy(args->fec_session);
             fec_stream_destroy(args->session->fec_stream);
         }
