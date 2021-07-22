@@ -240,7 +240,7 @@ const char *usage="mediastream --local <port>\n"
 								"[ --width <pixels> ]\n"
 								"[ --zoom zoom factor ]\n"
 								"[ --zrtp (enable zrtp) ]\n"
-                                "[ --fec (enable fec) <L> <D> ]\n"
+                                "[ --fec <L [0-10]> <D [0-10]> (enable fec) ]\n"
 								#if TARGET_OS_IPHONE
 								"[ --speaker route audio to speaker ]\n"
 								#endif
@@ -710,7 +710,7 @@ void mediastream_fec_enable(MediastreamDatas* args){
     args->fec_session = ms_create_duplex_rtp_session(ms_is_ipv6(args->ip) ? "::" : "0.0.0.0", rtp_session_get_local_port(args->session)+10, rtp_session_get_local_rtcp_port(args->session)+10, args->mtu);
     rtp_session_set_remote_addr(args->fec_session, args->ip, args->remoteport+10);
     args->fec_session->fec_stream = NULL;
-    const FecParameters *params = fec_params_new(args->L, args->D);
+    const FecParameters *params = fec_params_new(args->L, args->D, args->jitter);
     args->session->fec_stream = fec_stream_new(args->session, args->fec_session, params);
     ms_message("FEC SESSION Socket number %d", args->fec_session->rtp.gs.socket);
 }
@@ -1178,6 +1178,7 @@ void clear_mediastreams(MediastreamDatas* args) {
             printf("Number of unrepaired packets : %d\n", args->session->fec_stream->reconstruction_fail);
             printf("Number of repair packets not found : %d\n", args->session->fec_stream->repair_packet_not_found);
             printf("Number of source packets not found : %d\n", args->session->fec_stream->source_packets_not_found);
+            printf("Number of errors : %d\n", args->session->fec_stream->source_packets_not_found-args->session->fec_stream->erreur);
         }
 		if (args->video->ms.ice_check_list) ice_check_list_destroy(args->video->ms.ice_check_list);
 		video_stream_stop(args->video);
