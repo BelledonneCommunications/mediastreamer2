@@ -162,6 +162,7 @@ typedef struct _MediastreamDatas {
 
     bool_t enable_fec;
     RtpSession *fec_session;
+    FecStream *fec_stream;
     int L;
     int D;
 } MediastreamDatas;
@@ -711,8 +712,9 @@ void mediastream_fec_enable(MediastreamDatas* args){
     rtp_session_set_remote_addr(args->fec_session, args->ip, args->remoteport+10);
     args->fec_session->fec_stream = NULL;
     const FecParameters *params = fec_params_new(args->L, args->D, args->jitter);
-    args->session->fec_stream = fec_stream_new(args->session, args->fec_session, params);
-    ms_message("FEC SESSION Socket number %d", args->fec_session->rtp.gs.socket);
+    args->fec_stream = fec_stream_new(args->session, args->fec_session, params);
+    args->session->fec_stream = args->fec_stream;
+    ms_message("FEC SESSION Socket number : %d", args->fec_session->rtp.gs.socket);
 }
 
 void setup_media_streams(MediastreamDatas* args) {
@@ -1174,19 +1176,19 @@ void clear_mediastreams(MediastreamDatas* args) {
 #ifdef VIDEO_ENABLED
     if (args->video) {
         if(args->enable_fec){
-            printf("Number of lost source packets : %d\n", args->session->fec_stream->total_lost_packets);
-            printf("Number of unrepaired packets : %d\n", args->session->fec_stream->reconstruction_fail);
-            printf("Number of repair packets not found : %d\n", args->session->fec_stream->repair_packet_not_found);
-            printf("Number of source packets not found : %d\n", args->session->fec_stream->source_packets_not_found);
-            printf("Number of errors : %d\n", args->session->fec_stream->source_packets_not_found-args->session->fec_stream->erreur);
+            ms_message("Number of lost source packets : %d", args->session->fec_stream->total_lost_packets);
+            ms_message("Number of unrepaired packets : %d", args->session->fec_stream->reconstruction_fail);
+            ms_message("Number of repair packets not found : %d", args->session->fec_stream->repair_packet_not_found);
+            ms_message("Number of source packets not found : %d", args->session->fec_stream->source_packets_not_found);
+            ms_message("Number of errors : %d\n", args->session->fec_stream->erreur);
+            args->fec_stream->fec_session = NULL;
+            rtp_session_destroy(args->fec_session);
+            args->session->fec_stream = NULL;
+            fec_stream_destroy(args->fec_stream);
         }
-		if (args->video->ms.ice_check_list) ice_check_list_destroy(args->video->ms.ice_check_list);
+        if (args->video->ms.ice_check_list) ice_check_list_destroy(args->video->ms.ice_check_list);
 		video_stream_stop(args->video);
         ms_factory_log_statistics(args->video->ms.factory);
-        if(args->enable_fec){
-            rtp_session_destroy(args->fec_session);
-            fec_stream_destroy(args->session->fec_stream);
-        }
 	}
 #endif
 	if (args->ice_session) ice_session_destroy(args->ice_session);
