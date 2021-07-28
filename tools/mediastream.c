@@ -1181,10 +1181,6 @@ void clear_mediastreams(MediastreamDatas* args) {
             ms_message("Number of repair packets not found : %d", args->session->fec_stream->repair_packet_not_found);
             ms_message("Number of source packets not found : %d", args->session->fec_stream->source_packets_not_found);
             ms_message("Number of errors : %d\n", args->session->fec_stream->erreur);
-            args->fec_stream->fec_session = NULL;
-            rtp_session_destroy(args->fec_session);
-            args->session->fec_stream = NULL;
-            fec_stream_destroy(args->fec_stream);
         }
         if (args->video->ms.ice_check_list) ice_check_list_destroy(args->video->ms.ice_check_list);
 		video_stream_stop(args->video);
