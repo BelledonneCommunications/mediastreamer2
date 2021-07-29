@@ -1162,13 +1162,14 @@ static void fec_stream_test_reconstruction(void){
     FecStream *fec_stream = fec_stream_new(source_session, repair_session, params);
     source_session->fec_stream = fec_stream;
 
+    srand((unsigned int) time(NULL));
+
     for(int stop = 0 ; stop < 1000 ; stop++){
 
         bool_t reconstruction = FALSE;
         uint16_t num = 0;
         int position = 0;
 
-        srand(time(NULL));
         rtp_session_set_payload_type(source_session, 114);
 
         for(int i = 0 ; i < 100 ; i++){
@@ -1231,12 +1232,13 @@ static void fec_stream_test_lost_repair_packet(void){
     FecStream *fec_stream = fec_stream_new(source_session, repair_session, params);
     source_session->fec_stream = fec_stream;
 
+    srand((unsigned int) time(NULL));
+
     for(int stop = 0 ; stop < 1000 ; stop++){
 
         uint16_t num = 0;
         int position = 0;
 
-        srand(time(NULL));
         rtp_session_set_payload_type(source_session, 114);
 
         for(int i = 0 ; i < L ; i++){
@@ -1291,11 +1293,12 @@ static void fec_stream_test_lost_2_source_packets(void){
     FecStream *fec_stream = fec_stream_new(source_session, repair_session, params);
     source_session->fec_stream = fec_stream;
 
+    srand((unsigned int) time(NULL));
+
     for(int stop = 0 ; stop < 1000 ; stop++){
 
         uint16_t num = 0;
 
-        srand(time(NULL));
         rtp_session_set_payload_type(source_session, 114);
 
         pos1 = rand()%L;
