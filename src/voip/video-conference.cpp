@@ -53,6 +53,10 @@ extern "C" void ms_video_conference_destroy(MSVideoConference *obj) {
 	delete ((VideoConferenceGeneric *)obj);
 }
 
+extern "C" bool_t ms_video_conference_is_all_to_all(MSVideoConference *obj) {
+	return !!((VideoConferenceGeneric *)obj)->allToAllEnabled();
+}
+
 extern "C" MSVideoConference * ms_video_conference_new(MSFactory *f, const MSVideoConferenceParams *params) {
 	if (params->all_to_all)
 		return (MSVideoConference *)(new VideoConferenceAllToAll(f, params));
