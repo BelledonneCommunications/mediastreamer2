@@ -364,6 +364,12 @@ MS2_PUBLIC void ms_video_conference_set_audio_conference(MSVideoConference *obj,
 MS2_PUBLIC int ms_video_conference_get_size(MSVideoConference *obj);
 
 /**
+ * Returns weather the conference uses all to all filter.
+ * @param obj the conference
+**/
+MS2_PUBLIC bool_t ms_video_conference_is_all_to_all(MSVideoConference *obj);
+
+/**
  * Destroys a conference.
  * @param obj the conference
  * All participants must have been removed before destroying the conference.
