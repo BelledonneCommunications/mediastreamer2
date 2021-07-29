@@ -689,6 +689,8 @@ const char *ms_resource_type_to_string(MSResourceType type){
 			return "MSResourceSoundcard";
 		case MSResourceVoid:
 			return "MSResourceVoid";
+		case MSResourceItc:
+			return "MSResourceItc";
 	}
 	return "INVALID";
 }
@@ -707,6 +709,7 @@ bool_t ms_media_resource_is_consistent(const MSMediaResource *r){
 		case MSResourceFile:
 			/*setting up file player/recorder without specifying the file to play immediately is allowed*/
 		case MSResourceDefault:
+		case MSResourceItc:
 			return TRUE;
 		case MSResourceInvalid:
 			ms_error("Invalid resource type specified");
