@@ -75,6 +75,7 @@ public:
 	virtual void notifySli(int pin) = 0;
 	virtual VideoEndpoint *getMemberAtPin(int pin) const;
 	virtual void unconfigureOutput(int pin) {};
+	virtual bool allToAllEnabled() const = 0;
 
 protected:
 	virtual void addVideoPlaceholderMember() {};
@@ -89,6 +90,7 @@ protected:
 	int mBitrate = 0;
 	VideoEndpoint *mVideoPlaceholderMember = NULL;
 	bctbx_list_t *mEndpoints = NULL;
+	bool allToAll = false;
 };
 
 class VideoConferenceOneToAll: public VideoConferenceGeneric {
@@ -103,6 +105,7 @@ public:
 	void notifySli(int pin) override;
 	void removeMember(VideoEndpoint *ep) override;
 	void addMember(VideoEndpoint *ep) override;
+	bool allToAllEnabled() const override { return false; }
 
 protected:
 	void addVideoPlaceholderMember() override;
@@ -125,6 +128,7 @@ public:
 	int findFreeOutputPin();
 	int findFreeInputPin ();
 	void unconfigureOutput(int pin) override;
+	bool allToAllEnabled() const override { return true; }
 	
 
 protected:
