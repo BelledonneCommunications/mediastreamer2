@@ -398,9 +398,10 @@ public:
 		size_t returnlen;
 		uint8_t capabilities = 0;
 
-		inputlen = wcslen(DeviceName->Data()) + 1;
-		name = (char *)ms_malloc(inputlen);
-		if (wcstombs_s(&returnlen, name, inputlen, DeviceName->Data(), inputlen) != 0) {
+		inputlen = wcslen(DeviceName->Data())+1;
+		returnlen = inputlen * 2;
+		name = (char *)ms_malloc(returnlen);
+		if ((err = WideCharToMultiByte(CP_ACP, 0, DeviceName->Data(), -1, name, (int)returnlen, NULL, NULL)) == 0) {
 			ms_error("mswasapi: Cannot convert card name to multi-byte string.");
 			return;
 		}
@@ -442,7 +443,8 @@ public:
 		} else {
 			DefaultId = MediaDevice::GetDefaultAudioRenderId(AudioDeviceRole::Communications);
 		}
-		AddOrUpdateCard(DefaultId, DefaultName, _dc);
+		if (DefaultId != "")
+			AddOrUpdateCard(DefaultId, DefaultName, _dc);
 		Windows::Foundation::IAsyncOperation<DeviceInformationCollection^>^ op = DeviceInformation::FindAllAsync(_dc);
 		op->Completed = ref new Windows::Foundation::AsyncOperationCompletedHandler<DeviceInformationCollection^>(
 				[this](Windows::Foundation::IAsyncOperation<DeviceInformationCollection^>^ asyncOp, Windows::Foundation::AsyncStatus asyncStatus) {
