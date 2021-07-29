@@ -23,6 +23,7 @@
 #include "mediastreamer2_tester_private.h"
 #include "private.h"
 #include <math.h>
+#include "mediastreamer2/msitc.h"
 
 #ifdef _MSC_VER
 #define unlink _unlink
@@ -1084,6 +1085,51 @@ static void one_way_video_stream_with_size_conv(void) {
 #endif
 }
 
+static void video_stream_with_itcsink(void) {
+	video_stream_tester_t* marielle=video_stream_tester_new();
+	video_stream_tester_t* margaux=video_stream_tester_new();
+	video_stream_tester_t* pauline=video_stream_tester_new();
+	bool_t supported = ms_factory_codec_supported(_factory, "vp8");
+	if (supported) {
+		PayloadType *pt;
+		create_video_stream(marielle, VP8_PAYLOAD_TYPE);
+		create_video_stream(margaux, VP8_PAYLOAD_TYPE);
+		create_video_stream(pauline, VP8_PAYLOAD_TYPE);
+
+		/* Enable/disable avpf. */
+		pt = rtp_profile_get_payload(&rtp_profile, VP8_PAYLOAD_TYPE);
+		if (BC_ASSERT_PTR_NOT_NULL(pt)) {
+			payload_type_unset_flag(pt, PAYLOAD_TYPE_RTCP_FEEDBACK_ENABLED);
+		}
+		media_stream_set_direction(&marielle->vs->ms, MediaStreamSendOnly);
+		media_stream_set_direction(&margaux->vs->ms, MediaStreamSendOnly);
+		media_stream_set_direction(&pauline->vs->ms, MediaStreamRecvOnly);
+		marielle->vs->use_preview_window = TRUE;
+
+		BC_ASSERT_EQUAL(video_stream_start(marielle->vs, &rtp_profile, "127.0.0.1",65004, "127.0.0.1", 65005, VP8_PAYLOAD_TYPE, 50, marielle->cam), 0,int,"%d");
+		link_video_stream_with_itc_sink(marielle->vs);
+
+		MSMediaStreamIO io = MS_MEDIA_STREAM_IO_INITIALIZER;
+		io.input.type = MSResourceItc;
+		io.output.type = MSResourceDefault;
+		io.output.resource_arg = NULL;
+		rtp_session_set_jitter_compensation(margaux->vs->ms.sessions.rtp_session, 50);
+		video_stream_start_from_io_and_sink(margaux->vs, &rtp_profile, pauline->local_ip, pauline->local_rtp, pauline->local_ip, pauline->local_rtcp, VP8_PAYLOAD_TYPE, &io,marielle->vs->itcsink );
+
+		BC_ASSERT_EQUAL(video_stream_start(pauline->vs, &rtp_profile, margaux->local_ip, margaux->local_rtp, margaux->local_ip, margaux->local_rtcp, VP8_PAYLOAD_TYPE, 50, pauline->cam), 0,int,"%d");
+
+
+		// Run some time to see the result.
+		wait_for_until_with_parse_events(&margaux->vs->ms, &pauline->vs->ms, &margaux->stats.number_of_RR, 2, 10000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats);
+		
+		destroy_video_stream(marielle);
+		destroy_video_stream(margaux);
+		destroy_video_stream(pauline);
+	}
+	video_stream_tester_destroy(marielle);
+	video_stream_tester_destroy(margaux);
+	video_stream_tester_destroy(pauline);
+}
 
 static test_t tests[] = {
 	TEST_NO_TAG("Basic video stream VP8"                     , basic_video_stream_vp8),
@@ -1105,7 +1151,8 @@ static test_t tests[] = {
 	TEST_NO_TAG("Video steam camera ELPH264"                 , video_stream_elph264_camera),
 	TEST_NO_TAG("AVPF RPSI count"                            , avpf_rpsi_count),
 	TEST_NO_TAG("Video stream normal loss with retransmission on NACK" , video_stream_normal_loss_with_retransmission_on_nack),
-	TEST_NO_TAG("One-way video stream with sizeconv", one_way_video_stream_with_size_conv)
+	TEST_NO_TAG("One-way video stream with sizeconv", one_way_video_stream_with_size_conv),
+	TEST_NO_TAG("One-way video stream with itcsink", video_stream_with_itcsink)
 };
 
 test_suite_t video_stream_test_suite = {
