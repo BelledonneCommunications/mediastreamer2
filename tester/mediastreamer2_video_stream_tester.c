@@ -22,6 +22,7 @@
 #include "mediastreamer2_tester.h"
 #include "mediastreamer2_tester_private.h"
 #include <math.h>
+#include <ortp/port.h>
 
 #ifdef _MSC_VER
 #define unlink _unlink
