@@ -176,6 +176,7 @@ static int sizeconv_set_vsize(MSFilter *f, void*arg){
 	SizeConvState *s=(SizeConvState*)f->data;
 	ms_filter_lock(f);
 	s->target_vsize=*(MSVideoSize*)arg;
+	ms_message("sizeconv_set_vsize(): set target size w %d, h %d", s->target_vsize.width, s->target_vsize.height);
 	freemsg(s->om);
 	s->om=NULL;
 	if (s->sws_ctx!=NULL) {

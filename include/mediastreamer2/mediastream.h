@@ -339,7 +339,8 @@ typedef enum MSResourceType{
 	MSResourceRtp,
 	MSResourceCamera,
 	MSResourceSoundcard,
-	MSResourceVoid
+	MSResourceVoid,
+	MSResourceItc
 }MSResourceType;
 
 MS2_PUBLIC const char *ms_resource_type_to_string(MSResourceType type);
@@ -922,8 +923,10 @@ struct _VideoStream
 	MSFilter *tee2;
 	MSFilter *tee3;
 	MSFilter *void_source;
+	MSFilter *itcsink;
 	MSVideoSize sent_vsize;
 	MSVideoSize preview_vsize;
+	MSVideoSize source_vsize; /* fix the source size of video stream */
 	float forced_fps; /*the target fps explicitely set by application, overrides internally selected fps*/
 	float configured_fps; /*the fps that was configured to the encoder. It might be different from the one really obtained from camera.*/
 	float real_fps; /*the fps obtained from camera.*/
@@ -962,6 +965,7 @@ struct _VideoStream
 	bool_t output_performs_decoding;
 	bool_t player_active;
 	bool_t staticimage_webcam_fps_optimization; /* if TRUE, the StaticImage webcam will ignore the fps target in order to save CPU time. Default is TRUE */
+	bool_t resize_from_source;
 };
 
 typedef struct _VideoStream VideoStream;
@@ -1015,6 +1019,29 @@ MS2_PUBLIC int video_stream_start_with_files(VideoStream *stream, RtpProfile *pr
  */
 MS2_PUBLIC int video_stream_start_from_io(VideoStream *stream, RtpProfile *profile, const char *rem_rtp_ip, int rem_rtp_port,
 	const char *rem_rtcp_ip, int rem_rtcp_port, int payload_type, const MSMediaStreamIO *io);
+
+/**
+ * Link a video stream with ItcSink filter. Used for starting another video stream.
+ *
+ * @param[in] stream VideoStream object previously created with video_stream_new().
+ */
+MS2_PUBLIC void link_video_stream_with_itc_sink(VideoStream *stream);
+
+/**
+ * Start a video stream according to the specified VideoStreamIO and use Itc source.
+ *
+ * @param[in] stream VideoStream object previously created with video_stream_new().
+ * @param[in] profile RtpProfile object holding the PayloadType that can be used during the video session.
+ * @param[in] rem_rtp_ip The remote IP address where to send the encoded video to.
+ * @param[in] rem_rtp_port The remote port where to send the encoded video to.
+ * @param[in] rem_rtcp_ip The remote IP address for RTCP.
+ * @param[in] rem_rtcp_port The remote port for RTCP.
+ * @param[in] payload_type The payload type number used to send the video stream. A valid PayloadType must be available at this index in the profile.
+ * @param[in] io A VideoStreamIO describing the input/output of the video stream.
+ * @param[in] sink A ItcSink filter used to be connected with ItcSource.
+ */
+MS2_PUBLIC int video_stream_start_from_io_and_sink(VideoStream *stream, RtpProfile *profile, const char *rem_rtp_ip, int rem_rtp_port,
+	const char *rem_rtcp_ip, int rem_rtcp_port, int payload_type, const MSMediaStreamIO *io, MSFilter *sink);
 
 MS2_PUBLIC void video_stream_prepare_video(VideoStream *stream);
 MS2_PUBLIC void video_stream_unprepare_video(VideoStream *stream);

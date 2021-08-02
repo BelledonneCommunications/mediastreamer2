@@ -38,7 +38,6 @@
 #include "TargetConditionals.h"
 #endif
 
-#define MS2_NO_VIDEO_RESCALING 1
 
 static void configure_recorder_output(VideoStream *stream);
 static int video_stream_start_with_source_and_output(VideoStream *stream, RtpProfile *profile, const char *rem_rtp_ip, int rem_rtp_port,
@@ -127,6 +126,8 @@ void video_stream_free(VideoStream *stream) {
 		ms_filter_destroy(stream->tee3);
 	if (stream->void_source)
 		ms_filter_destroy(stream->void_source);
+	if (stream->itcsink)
+		ms_filter_destroy(stream->itcsink);
 
 	if (stream->display_name)
 		ms_free(stream->display_name);
@@ -421,6 +422,7 @@ VideoStream *video_stream_new_with_sessions(MSFactory* factory, const MSMediaStr
 
 	stream->ms.type = MSVideo;
 	stream->ms.sessions=*sessions;
+	stream->source_vsize = MS_VIDEO_SIZE_UNKNOWN;
 
 	media_stream_init(&stream->ms, factory, sessions);
 
@@ -440,6 +442,7 @@ VideoStream *video_stream_new_with_sessions(MSFactory* factory, const MSMediaStr
 	stream->freeze_on_error = FALSE;
 	stream->source_performs_encoding = FALSE;
 	stream->output_performs_decoding = FALSE;
+	stream->resize_from_source = FALSE;
 	choose_display_name(stream);
 	stream->ms.process_rtcp=video_stream_process_rtcp;
 	video_stream_set_encoder_control_callback(stream, NULL, NULL);
@@ -614,7 +617,7 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate, boo
 	int ret;
 	MSVideoSize preview_vsize;
 	MSPinFormat pf={0};
-	bool_t is_player=ms_filter_get_id(stream->source)==MS_ITC_SOURCE_ID || ms_filter_get_id(stream->source)==MS_MKV_PLAYER_ID;
+	bool_t is_player= !stream->resize_from_source && (ms_filter_get_id(stream->source)==MS_ITC_SOURCE_ID || ms_filter_get_id(stream->source)==MS_MKV_PLAYER_ID);
 
 	if (source_changed) {
 		ms_filter_add_notify_callback(stream->source, event_cb, stream, FALSE);
@@ -672,7 +675,13 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate, boo
 			cam_vsize = vconf.vsize;
 		} else {
 			vconf.vsize = preview_vsize;
-			ms_filter_call_method(stream->source,MS_FILTER_SET_VIDEO_SIZE,&preview_vsize);
+
+			if (stream->source_vsize.width != MS_VIDEO_SIZE_UNKNOWN_W && stream->source_vsize.height != MS_VIDEO_SIZE_UNKNOWN_H) {
+				// Until now, this is only for testing size conversation
+				ms_filter_call_method(stream->source,MS_FILTER_SET_VIDEO_SIZE,&stream->source_vsize);
+			} else {
+				ms_filter_call_method(stream->source,MS_FILTER_SET_VIDEO_SIZE,&preview_vsize);
+			}
 			/*the camera may not support the target size and suggest a one close to the target */
 			ms_filter_call_method(stream->source,MS_FILTER_GET_VIDEO_SIZE,&cam_vsize);
 		}
@@ -691,6 +700,8 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate, boo
 		if (ms_video_get_scaler_impl() == NULL) {
 			vconf.vsize = cam_vsize;
 		} else {
+/* Libyuv can resize the video itself */
+#if !defined(HAVE_LIBYUV_H)
 			MSVideoSize resized=get_with_same_orientation_and_ratio(vconf.vsize,cam_vsize);
 			if (resized.width & 0x1 || resized.height & 0x1){
 				ms_warning("Resizing avoided because downsizing to an odd number of pixels (%ix%i)",resized.width,resized.height);
@@ -699,6 +710,7 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate, boo
 				vconf.vsize=resized;
 				ms_warning("Camera video size greater than encoder one. A scaling filter will be used!");
 			}
+#endif
 		}
 #endif
 	}
@@ -762,6 +774,10 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate, boo
 			ms_filter_call_method(stream->sizeconv,MS_FILTER_SET_VIDEO_SIZE,&vconf.vsize);
 		}
 #endif
+		if (stream->resize_from_source && !stream->sizeconv) {
+			stream->sizeconv=ms_factory_create_filter(stream->ms.factory, MS_SIZE_CONV_ID);
+			ms_filter_call_method(stream->sizeconv,MS_FILTER_SET_VIDEO_SIZE,&vconf.vsize);
+		}
 	}
 	if (stream->ms.rc){
 		ms_bitrate_controller_destroy(stream->ms.rc);
@@ -892,9 +908,8 @@ void video_recorder_handle_event(void *userdata, MSFilter *recorder, unsigned in
 			break;
 	}
 }
-
-int video_stream_start_from_io(VideoStream *stream, RtpProfile *profile, const char *rem_rtp_ip, int rem_rtp_port,
-	const char *rem_rtcp_ip, int rem_rtcp_port, int payload, const MSMediaStreamIO *io) {
+int video_stream_start_from_io_and_sink(VideoStream *stream, RtpProfile *profile, const char *rem_rtp_ip, int rem_rtp_port,
+										const char *rem_rtcp_ip, int rem_rtcp_port, int payload_type, const MSMediaStreamIO *io, MSFilter *sink) {
 	MSWebCam *cam = NULL;
 	MSFilter *source = NULL;
 	MSFilter *output = NULL;
@@ -933,6 +948,15 @@ int video_stream_start_from_io(VideoStream *stream, RtpProfile *profile, const c
 			case MSResourceVoid:
 				stream->source = ms_factory_create_filter(stream->ms.factory, MS_VOID_SOURCE_ID);
 			break;
+			case MSResourceItc:
+				stream->resize_from_source = TRUE;
+				stream->source = ms_factory_create_filter(stream->ms.factory, MS_ITC_SOURCE_ID);
+				if (sink) {
+					ms_filter_call_method(sink,MS_ITC_SINK_CONNECT,stream->source);
+				} else {
+					ms_error("video_stream_start_from_io_and_sink(): ItcSink is not set for ItcResource");
+				}
+				break;
 			default:
 				ms_error("Unhandled input resource type %s", ms_resource_type_to_string(io->input.type));
 			break;
@@ -968,8 +992,19 @@ int video_stream_start_from_io(VideoStream *stream, RtpProfile *profile, const c
 		}
 	}
 
-	return video_stream_start_with_source_and_output(stream, profile, rem_rtp_ip, rem_rtp_port, rem_rtcp_ip, rem_rtcp_port, payload, -1, cam, source, output);
+	return video_stream_start_with_source_and_output(stream, profile, rem_rtp_ip, rem_rtp_port, rem_rtcp_ip, rem_rtcp_port, payload_type, -1, cam, source, output);
 }
+int video_stream_start_from_io(VideoStream *stream, RtpProfile *profile, const char *rem_rtp_ip, int rem_rtp_port,
+	const char *rem_rtcp_ip, int rem_rtcp_port, int payload, const MSMediaStreamIO *io) {
+	return video_stream_start_from_io_and_sink(stream, profile, rem_rtp_ip, rem_rtp_port, rem_rtcp_ip, rem_rtcp_port, payload, io, NULL);
+}
+
+void link_video_stream_with_itc_sink(VideoStream *stream) {
+	if (!stream->itcsink)
+		stream->itcsink = ms_factory_create_filter(stream->ms.factory, MS_ITC_SINK_ID);
+	ms_filter_link(stream->tee,3,stream->itcsink,0);
+}
+
 
 bool_t video_stream_started(VideoStream *stream) {
 	return media_stream_started(&stream->ms);
@@ -1182,13 +1217,13 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 		/* and then connect all */
 		ms_connection_helper_start(&ch);
 		ms_connection_helper_link(&ch, stream->source, -1, 0);
-		if (stream->pixconv) {
+		if (!stream->resize_from_source && stream->pixconv) {
 			ms_connection_helper_link(&ch, stream->pixconv, 0, 0);
 		}
 		if (stream->tee) {
 			ms_connection_helper_link(&ch, stream->tee, 0, 0);
 		}
-		if (stream->sizeconv) {
+		if ( stream->sizeconv) {
 			ms_connection_helper_link(&ch, stream->sizeconv, 0, 0);
 		}
 		if ((stream->source_performs_encoding == FALSE) && !rtp_source) {
@@ -1648,8 +1683,11 @@ static MSFilter* _video_stream_stop(VideoStream * stream, bool_t keep_source)
 				bool_t rtp_source = (ms_filter_get_id(stream->source) == MS_RTP_RECV_ID) ? TRUE : FALSE;
 				ms_connection_helper_start(&ch);
 				ms_connection_helper_unlink(&ch, stream->source, -1, 0);
-				if (stream->pixconv) {
+				if (!stream->resize_from_source && stream->pixconv) {
 					ms_connection_helper_unlink(&ch, stream->pixconv, 0, 0);
+				}
+				if (stream->itcsink) {
+					ms_filter_unlink(stream->tee,3,stream->itcsink,0);
 				}
 				if (stream->tee) {
 					ms_connection_helper_unlink(&ch, stream->tee, 0, 0);
