@@ -118,15 +118,17 @@ void VideoConferenceAllToAll::addMember(VideoEndpoint *ep) {
 }
 
 void VideoConferenceAllToAll::removeMember(VideoEndpoint *ep) {
-	if (media_stream_get_direction(&ep->mSt->ms) != MediaStreamSendOnly) {
+	if (bctbx_list_find(mMembers,ep) != NULL) {
 		ms_message("[all to all] remove member %s with input pin %d", ep->mName.c_str(), ep->mPin);
 		mMembers=bctbx_list_remove(mMembers,ep);
 		mInputs[ep->mPin] = -1;
 		bctbx_list_for_each2(mEndpoints, (void (*)(void*,void*))unconfigureEndpoint, &ep->mPin);
-	} else {
+	} else if (bctbx_list_find(mEndpoints,ep) != NULL) {
 		ms_message("[all to all] remove endpoint %s with output pin %d", ep->mName.c_str(), ep->mOutPin);
 		mEndpoints=bctbx_list_remove(mEndpoints,ep);
 		mOutputs[ep->mOutPin] = -1;
+	} else {
+		return;
 	}
 	
 	if (!ep->connected) {
