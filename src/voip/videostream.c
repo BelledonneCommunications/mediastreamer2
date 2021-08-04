@@ -770,28 +770,29 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate, boo
 	if ((encoder_supports_source_format.supported == TRUE) || (stream->source_performs_encoding == TRUE)) {
 		ms_filter_call_method(stream->ms.encoder, MS_FILTER_SET_PIX_FMT, &format);
 	} else {
-		if (format==MS_MJPEG){
-			stream->pixconv=ms_factory_create_filter(stream->ms.factory, MS_MJPEG_DEC_ID);
-			if (stream->pixconv == NULL){
-				ms_error("Could not create mjpeg decoder, check your build options.");
+		if (stream->resize_from_source) {
+			stream->sizeconv=ms_factory_create_filter(stream->ms.factory, MS_SIZE_CONV_ID);
+			ms_filter_call_method(stream->sizeconv,MS_FILTER_SET_VIDEO_SIZE,&vconf.vsize);
+		} else {
+			if (format==MS_MJPEG){
+				stream->pixconv=ms_factory_create_filter(stream->ms.factory, MS_MJPEG_DEC_ID);
+				if (stream->pixconv == NULL){
+					ms_error("Could not create mjpeg decoder, check your build options.");
+				}
+			}else if (format==MS_PIX_FMT_UNKNOWN && pf.fmt != NULL){
+				stream->pixconv = ms_factory_create_decoder(stream->ms.factory, pf.fmt->encoding);
+			}else{
+				stream->pixconv = ms_factory_create_filter(stream->ms.factory, MS_PIX_CONV_ID);
+				/*set it to the pixconv */
+				ms_filter_call_method(stream->pixconv,MS_FILTER_SET_PIX_FMT,&format);
+				ms_filter_call_method(stream->pixconv,MS_FILTER_SET_VIDEO_SIZE,&cam_vsize);
 			}
-		}else if (format==MS_PIX_FMT_UNKNOWN && pf.fmt != NULL){
-			stream->pixconv = ms_factory_create_decoder(stream->ms.factory, pf.fmt->encoding);
-		}else{
-			stream->pixconv = ms_factory_create_filter(stream->ms.factory, MS_PIX_CONV_ID);
-			/*set it to the pixconv */
-			ms_filter_call_method(stream->pixconv,MS_FILTER_SET_PIX_FMT,&format);
-			ms_filter_call_method(stream->pixconv,MS_FILTER_SET_VIDEO_SIZE,&cam_vsize);
-		}
 #ifndef MS2_NO_VIDEO_RESCALING
-		if (ms_video_get_scaler_impl() != NULL) {
-			stream->sizeconv=ms_factory_create_filter(stream->ms.factory, MS_SIZE_CONV_ID);
-			ms_filter_call_method(stream->sizeconv,MS_FILTER_SET_VIDEO_SIZE,&vconf.vsize);
-		}
+			if (ms_video_get_scaler_impl() != NULL) {
+				stream->sizeconv=ms_factory_create_filter(stream->ms.factory, MS_SIZE_CONV_ID);
+				ms_filter_call_method(stream->sizeconv,MS_FILTER_SET_VIDEO_SIZE,&vconf.vsize);
+			}
 #endif
-		if (stream->resize_from_source && !stream->sizeconv) {
-			stream->sizeconv=ms_factory_create_filter(stream->ms.factory, MS_SIZE_CONV_ID);
-			ms_filter_call_method(stream->sizeconv,MS_FILTER_SET_VIDEO_SIZE,&vconf.vsize);
 		}
 	}
 	if (stream->ms.rc){
@@ -1017,7 +1018,9 @@ int video_stream_start_from_io(VideoStream *stream, RtpProfile *profile, const c
 void link_video_stream_with_itc_sink(VideoStream *stream) {
 	if (!stream->itcsink)
 		stream->itcsink = ms_factory_create_filter(stream->ms.factory, MS_ITC_SINK_ID);
-	ms_filter_link(stream->tee,3,stream->itcsink,0);
+	if (stream->tee) {
+		ms_filter_link(stream->tee,3,stream->itcsink,0);
+	}
 }
 
 
@@ -1237,6 +1240,9 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 		}
 		if (stream->tee) {
 			ms_connection_helper_link(&ch, stream->tee, 0, 0);
+		}
+		if (stream->itcsink) {
+			ms_filter_link(stream->tee,3,stream->itcsink,0);
 		}
 		if ( stream->sizeconv) {
 			ms_connection_helper_link(&ch, stream->sizeconv, 0, 0);
@@ -1503,8 +1509,12 @@ static MSFilter* _video_stream_change_camera(VideoStream *stream, MSWebCam *cam,
 		if (encoder_has_builtin_converter || (stream->source_performs_encoding == TRUE)) {
 			ms_filter_unlink(stream->source, 0, stream->tee, 0);
 		} else {
-			ms_filter_unlink (stream->source, 0, stream->pixconv, 0);
-			ms_filter_unlink (stream->pixconv, 0, stream->tee, 0);
+			if (stream->pixconv) {
+				ms_filter_unlink (stream->source, 0, stream->pixconv, 0);
+				ms_filter_unlink (stream->pixconv, 0, stream->tee, 0);
+			} else {
+				ms_filter_unlink (stream->source, 0, stream->tee, 0);
+			}
 			if (stream->sizeconv) {
 				ms_filter_unlink (stream->tee, 0, stream->sizeconv, 0);
 				if (stream->source_performs_encoding == FALSE) {
@@ -1580,8 +1590,12 @@ static MSFilter* _video_stream_change_camera(VideoStream *stream, MSWebCam *cam,
 			ms_filter_link (stream->source, 0, stream->tee, 0);
 		}
 		else {
-			ms_filter_link (stream->source, 0, stream->pixconv, 0);
-			ms_filter_link (stream->pixconv, 0, stream->tee, 0);
+			if (stream->pixconv) {
+				ms_filter_link (stream->source, 0, stream->pixconv, 0);
+				ms_filter_link (stream->pixconv, 0, stream->tee, 0);
+			} else {
+				ms_filter_link (stream->source, 0, stream->tee, 0);
+			}
 			if (stream->sizeconv) {
 				ms_filter_link (stream->tee, 0, stream->sizeconv, 0);
 				if (stream->source_performs_encoding == FALSE) {
