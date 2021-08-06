@@ -1175,12 +1175,13 @@ void clear_mediastreams(MediastreamDatas* args) {
 	}
 #ifdef VIDEO_ENABLED
     if (args->video) {
+        ms_message("Payload max size : %d", ms_factory_get_payload_max_size(args->factory));
         if(args->enable_fec){
             ms_message("Number of lost source packets : %d", args->session->fec_stream->total_lost_packets);
             ms_message("Number of unrepaired packets : %d", args->session->fec_stream->reconstruction_fail);
             ms_message("Number of repair packets not found : %d", args->session->fec_stream->repair_packet_not_found);
             ms_message("Number of source packets not found : %d", args->session->fec_stream->source_packets_not_found);
-            ms_message("Number of errors : %d\n", args->session->fec_stream->erreur);
+            ms_message("Number of errors : %d\n", args->session->fec_stream->error);
         }
         if (args->video->ms.ice_check_list) ice_check_list_destroy(args->video->ms.ice_check_list);
 		video_stream_stop(args->video);
@@ -1188,8 +1189,8 @@ void clear_mediastreams(MediastreamDatas* args) {
 	}
 #endif
 	if (args->ice_session) ice_session_destroy(args->ice_session);
-	ortp_ev_queue_destroy(args->q);
-	rtp_profile_destroy(args->profile);
+    ortp_ev_queue_destroy(args->q);
+    rtp_profile_destroy(args->profile);
 
 	if (args->logfile)
 		fclose(args->logfile);
