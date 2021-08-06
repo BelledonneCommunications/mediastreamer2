@@ -98,7 +98,7 @@ void VideoConferenceOneToAll::addMember(VideoEndpoint *ep) {
 }
 
 void VideoConferenceOneToAll::removeMember(VideoEndpoint *ep) {
-	if (bctbx_list_find(mMembers,ep) != NULL) {
+	if (bctbx_list_find(mMembers,ep) == NULL) {
 		return;
 	}
 	video_stream_set_encoder_control_callback(ep->mSt, NULL, NULL);
