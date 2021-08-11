@@ -85,10 +85,12 @@ static void configureEndpoint(VideoEndpoint *ep){
 }
 
 static void unlinkEndpoint(VideoEndpoint *ep){
-	unplumb_from_conf(ep);
-	ep->connected = false;
-	ep->mSource = -1;
-	ms_message("[all to all] unlink endpoint %s with output pin %d input pin %d", ep->mName.c_str(), ep->mOutPin, ep->mPin);
+	if (ep->connected) {
+		unplumb_from_conf(ep);
+		ep->connected = false;
+		ep->mSource = -1;
+		ms_message("[all to all] unlink endpoint %s with output pin %d input pin %d", ep->mName.c_str(), ep->mOutPin, ep->mPin);
+	}
 }
 
 static void unconfigureEndpoint(VideoEndpoint *ep, int pin){
