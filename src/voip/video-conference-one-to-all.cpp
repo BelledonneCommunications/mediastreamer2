@@ -46,14 +46,14 @@ static MSVideoEndpoint *create_video_placeholder_member(VideoConferenceOneToAll 
 	io.output.type = MSResourceVoid;
 	MSWebCam *nowebcam = ms_web_cam_manager_get_cam(obj->getMixer()->factory->wbcmanager, "StaticImage: Static picture");
 	io.input.camera = nowebcam;
-	RtpProfile *prof = rtp_profile_new("dummy video");
-	PayloadType *pt = payload_type_clone(&payload_type_vp8);
-	pt->clock_rate = 90000;
-	rtp_profile_set_payload(prof, 95, pt);
-	video_stream_start_from_io(stream, prof, "127.0.0.1",65004, "127.0.0.1", 65005, 95, &io);
+	video_stream_start_from_io(stream, obj->getPlaceholderProfile(), "127.0.0.1",65004, "127.0.0.1", 65005, 95, &io);
 	return ms_video_endpoint_get_from_stream(stream, FALSE);
 }
 //--------------------------------------------------------------------------
+
+RtpProfile *VideoConferenceOneToAll::getPlaceholderProfile() const {
+	return placeholderProfile;
+}
 
 void VideoConferenceOneToAll::addVideoPlaceholderMember() {
 	mVideoPlaceholderMember = (VideoEndpoint *)(create_video_placeholder_member(this));
@@ -77,6 +77,10 @@ VideoConferenceOneToAll::VideoConferenceOneToAll(MSFactory *f, const MSVideoConf
 	ms_filter_call_method(mMixer, MS_FILTER_SET_INPUT_FMT, (void*)fmt);
 	ms_filter_add_notify_callback(mMixer,on_filter_event,this,TRUE);
 	mCfparams=*params;
+	placeholderProfile = rtp_profile_new("dummy video");
+	PayloadType *pt = payload_type_clone(&payload_type_vp8);
+	pt->clock_rate = 90000;
+	rtp_profile_set_payload(placeholderProfile, 95, pt);
 }
 
 void VideoConferenceOneToAll::addMember(VideoEndpoint *ep) {
@@ -113,6 +117,7 @@ void VideoConferenceOneToAll::removeMember(VideoEndpoint *ep) {
 		ms_message("[one to all] remove video placeholder member %p", mVideoPlaceholderMember);
 		video_stream_set_encoder_control_callback(mVideoPlaceholderMember->mSt, NULL, NULL);
 		unplumb_from_conf(mVideoPlaceholderMember);
+
 		if (mVideoPlaceholderMember) {
 			video_stream_free(mVideoPlaceholderMember->mSt);
 			delete mVideoPlaceholderMember;
@@ -143,8 +148,9 @@ void VideoConferenceOneToAll::setLocalMember(MSVideoConferenceFilterPinControl p
 }
 
 VideoConferenceOneToAll::~VideoConferenceOneToAll() {
-	ms_ticker_destroy(mTicker);
-	ms_filter_destroy(mMixer);
+	if (placeholderProfile) {
+		rtp_profile_destroy(placeholderProfile);
+	}
 }
 
 

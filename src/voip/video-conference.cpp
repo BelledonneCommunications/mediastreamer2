@@ -67,6 +67,13 @@ extern "C" MSVideoConference * ms_video_conference_new(MSFactory *f, const MSVid
 namespace ms2 {
 
 //-----------------------------------------------
+VideoConferenceGeneric::~VideoConferenceGeneric() {
+	bctbx_list_free(mMembers);
+	bctbx_list_free(mEndpoints);
+	ms_ticker_destroy(mTicker);
+	ms_filter_destroy(mMixer);
+}
+
 int VideoConferenceGeneric::getSize() const {
 	return (int)bctbx_list_size(mMembers);
 }
