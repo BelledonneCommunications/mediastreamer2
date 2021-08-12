@@ -88,8 +88,8 @@ static void unlinkEndpoint(VideoEndpoint *ep){
 	if (ep->connected) {
 		unplumb_from_conf(ep);
 		ep->connected = false;
+		ms_message("[all to all] unlink endpoint %s with output pin %d source pin %d", ep->mName.c_str(), ep->mOutPin, ep->mSource);
 		ep->mSource = -1;
-		ms_message("[all to all] unlink endpoint %s with output pin %d input pin %d", ep->mName.c_str(), ep->mOutPin, ep->mPin);
 	}
 }
 
@@ -117,6 +117,11 @@ void VideoConferenceAllToAll::addMember(VideoEndpoint *ep) {
 		mMembers=bctbx_list_append(mMembers,ep);
 		bctbx_list_for_each(mEndpoints, (void (*)(void*))configureEndpoint);
    }
+}
+
+static int find_connected_endpoint(const VideoEndpoint *ep, const void *dummy)
+{
+	return !ep->connected;
 }
 
 void VideoConferenceAllToAll::removeMember(VideoEndpoint *ep) {
@@ -149,12 +154,13 @@ void VideoConferenceAllToAll::removeMember(VideoEndpoint *ep) {
 	unplumb_from_conf(ep);
 	ep->mConference=NULL;
 
-	if (mEndpoints == NULL) {
-		// unlink all inputs
+	bctbx_list_t *elem = bctbx_list_find_custom(mEndpoints, (bctbx_compare_func)find_connected_endpoint, NULL);
+	if (elem == NULL) {
+		// unlink all inputs when no output connected
 		bctbx_list_for_each(mMembers, (void (*)(void*))unlinkEndpoint);
 	}
 
-	if (mMembers!=NULL && mEndpoints != NULL) {
+	if (mMembers!=NULL && elem != NULL) {
 		ms_ticker_attach(mTicker,mMixer);
 	}
 }
@@ -175,6 +181,7 @@ void VideoConferenceAllToAll::connectEndpoint(VideoEndpoint *ep) {
 		plumb_to_conf(ep);
 		video_stream_set_encoder_control_callback(ep->mSt, ms_video_conference_process_encoder_control, ep);
 		ep->connected = true;
+		ms_message("[all to all] connect endpoint output pin %d with source pin %d", ep->mOutPin, ep->mSource);
 		ms_ticker_attach(mTicker,mMixer);
 		configureOutput(ep);
 	}
