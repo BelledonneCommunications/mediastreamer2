@@ -104,19 +104,17 @@ static void unconfigureEndpoint(VideoEndpoint *ep, int pin){
 void VideoConferenceAllToAll::addMember(VideoEndpoint *ep) {
 	/* now connect to the filter */
 	ep->mConference = (MSVideoConference *)this;
-	if (media_stream_get_direction(&ep->mSt->ms) == MediaStreamSendRecv) {
-
-	} else if (media_stream_get_direction(&ep->mSt->ms) == MediaStreamSendOnly) {
+	if (ep->mIsRemote && media_stream_get_direction(&ep->mSt->ms) == MediaStreamSendOnly) {
 		ep->mOutPin = findFreeOutputPin();
 		ms_message("[all to all] add endpoint %s with output pin %d", ep->mName.c_str(), ep->mOutPin);
 		connectEndpoint(ep);
 		mEndpoints = bctbx_list_append(mEndpoints, ep);
 	} else {
 		ep->mPin = findFreeInputPin();
-		ms_message("[all to all] add member %s with input pin %d", ep->mName.c_str(), ep->mPin);
+		ms_message("[all to all] add remote[%d] member %s with input pin %d", ep->mIsRemote, ep->mName.c_str(), ep->mPin);
 		mMembers=bctbx_list_append(mMembers,ep);
 		bctbx_list_for_each(mEndpoints, (void (*)(void*))configureEndpoint);
-   }
+	}
 }
 
 static int find_connected_endpoint(const VideoEndpoint *ep, const void *dummy)
