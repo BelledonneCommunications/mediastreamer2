@@ -1,6 +1,6 @@
 ############################################################################
 # CMakeLists.txt
-# Copyright (C) 2010-2019  Belledonne Communications, Grenoble France
+# Copyright (C) 2010-2021 Belledonne Communications, Grenoble France
 #
 ############################################################################
 #
@@ -20,7 +20,10 @@
 #
 ############################################################################
 
-cmake_minimum_required(VERSION 3.1)
+# CMake 3.13 required for new Flexisip build process.
+# See [CMP077](https://cmake.org/cmake/help/v3.13/policy/CMP0077.html).
+cmake_minimum_required(VERSION 3.13)
+
 project(mediastreamer2 VERSION 5.0.0 LANGUAGES C CXX)
 
 if(WIN32)
@@ -121,6 +124,10 @@ cmake_dependent_option(ENABLE_QNX "Build medistreamer2 with BB10 filters." NO "E
 option(ENABLE_JPEG "Enable JPEG support" YES)
 cmake_dependent_option(ENABLE_QRCODE "Enable QRCode support" YES "ENABLE_VIDEO" NO)
 
+# Hidden non-cache options:
+# * DISABLE_BC_PACKAGE_SEARCH: skip find_package() for every BC package (bctoolbox, ortp, etc.)
+
+
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS NO)
 
@@ -162,25 +169,19 @@ check_library_exists("dl" "dlopen" "" HAVE_DLOPEN)
 include(TestBigEndian)
 test_big_endian(WORDS_BIGENDIAN)
 
-find_package(ortp REQUIRED CONFIG)
+if(NOT DISABLE_BC_PACKAGE_SEARCH)
+	find_package(ortp REQUIRED CONFIG)
+endif()
 
 if(ENABLE_PCAP)
 	find_package(PCAP QUIET)
 endif()
 
 if(ENABLE_SRTP)
-	find_package(SRTP)
-	if(NOT SRTP_FOUND)
-		message(WARNING "Could not find SRTP library, Mediastreamer2 will be compiled without SRTP support.")
-		set(ENABLE_SRTP OFF CACHE BOOL "Build with the SRTP transport support." FORCE)
-	endif()
+	find_package(SRTP "2" REQUIRED)
 endif()
-if(ENABLE_ZRTP)
+if(ENABLE_ZRTP AND NOT DISABLE_BC_PACKAGE_SEARCH)
 	find_package(bzrtp REQUIRED CONFIG)
-	if(NOT BZRTP_FOUND)
-		message(WARNING "Could not find bzrtp library, mediastreamer2 will be compiled without ZRTP support.")
-		set(ENABLE_ZRTP OFF CACHE BOOL "Build mediastreamer2 with ZRTP support." FORCE)
-	endif()
 endif()
 if(ENABLE_G726)
 	find_package(SpanDSP REQUIRED)
@@ -385,7 +386,9 @@ if(ANDROID)
 endif()
 
 
-find_package(bctoolbox 0.0.3 REQUIRED OPTIONAL_COMPONENTS tester CONFIG)
+if(NOT DISABLE_BC_PACKAGE_SEARCH)
+	find_package(bctoolbox 0.0.3 REQUIRED OPTIONAL_COMPONENTS tester CONFIG)
+endif()
 
 include_directories(
 	include
@@ -750,9 +753,11 @@ write_basic_package_version_file(
 	VERSION ${MEDIASTREAMER_VERSION}
 	COMPATIBILITY AnyNewerVersion
 )
-export(EXPORT ${EXPORT_TARGETS_NAME}Targets
-	FILE "${CMAKE_CURRENT_BINARY_DIR}/Mediastreamer2Targets.cmake"
-)
+if(LINPHONE_BUILDER_GROUP_EXTERNAL_SOURCE_PATH_BUILDERS)
+	export(EXPORT ${EXPORT_TARGETS_NAME}Targets
+		FILE "${CMAKE_CURRENT_BINARY_DIR}/Mediastreamer2Targets.cmake"
+	)
+endif()
 configure_package_config_file(cmake/Mediastreamer2Config.cmake.in
 	"${CMAKE_CURRENT_BINARY_DIR}/Mediastreamer2Config.cmake"
 	INSTALL_DESTINATION ${CONFIG_PACKAGE_LOCATION}
