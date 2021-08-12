@@ -779,7 +779,12 @@ void setup_media_streams(MediastreamDatas* args) {
 		args->bw_controller = ms_bandwidth_controller_new();
 	}
 
-	if (args->mtu) ms_factory_set_mtu(factory, args->mtu);
+    if (args->mtu){
+        if (args->enable_fec){
+            ms_factory_set_mtu(factory, args->mtu - (12 + 4*args->L));
+        }
+        ms_factory_set_mtu(factory, args->mtu);
+    }
 	ms_factory_enable_statistics(factory, TRUE);
 	ms_factory_reset_statistics(factory);
 
