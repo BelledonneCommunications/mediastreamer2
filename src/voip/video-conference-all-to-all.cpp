@@ -209,8 +209,7 @@ void VideoConferenceAllToAll::notifySli(int pin) {
 }
 
 VideoConferenceAllToAll::~VideoConferenceAllToAll() {
-	ms_ticker_destroy(mTicker);
-	ms_filter_destroy(mMixer);
+
 }
 
 }// namespace ms2

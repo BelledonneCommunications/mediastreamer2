@@ -59,7 +59,7 @@ class VideoConferenceGeneric {
 	
 public:
 	VideoConferenceGeneric()=default;
-	virtual ~VideoConferenceGeneric()=default;
+	virtual ~VideoConferenceGeneric();
 
 	virtual int getSize() const;
 	virtual const bctbx_list_t* getMembers() const;
@@ -96,7 +96,7 @@ protected:
 class VideoConferenceOneToAll: public VideoConferenceGeneric {
 public:
 	VideoConferenceOneToAll(MSFactory *f, const MSVideoConferenceParams *params);
-	~VideoConferenceOneToAll();
+	virtual ~VideoConferenceOneToAll();
 
 	
 	void setFocus(VideoEndpoint *ep) override;
@@ -107,9 +107,14 @@ public:
 	void addMember(VideoEndpoint *ep) override;
 	bool allToAllEnabled() const override { return false; }
 
+	RtpProfile *getPlaceholderProfile() const;
+
 protected:
 	void addVideoPlaceholderMember() override;
 	void setPin(VideoEndpoint *ep) override;
+
+private:
+	RtpProfile *placeholderProfile = NULL;
 
 };
 
@@ -117,7 +122,7 @@ class VideoConferenceAllToAll: public VideoConferenceGeneric {
 
 public:
 	VideoConferenceAllToAll(MSFactory *f, const MSVideoConferenceParams *params);
-	~VideoConferenceAllToAll();
+	virtual ~VideoConferenceAllToAll();
 	
 	void removeMember(VideoEndpoint *ep) override;
 	void addMember(VideoEndpoint *ep) override;
