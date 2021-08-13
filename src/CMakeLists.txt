@@ -109,6 +109,7 @@ set(VOIP_SOURCE_FILES_C
 	voip/mediastream.c
 	voip/msiframerequestslimiter.c
 	voip/msmediaplayer.c
+	voip/msmediarecorder.c
 	voip/msvoip.c
 	voip/private.h
 	voip/qosanalyzer.c
@@ -214,6 +215,7 @@ if(ENABLE_VIDEO)
 	list(APPEND VOIP_SOURCE_FILES_C
 		utils/bits_rw.c
 		videofilters/extdisplay.c
+		videofilters/msanalysedisplay.c
 		videofilters/mire.c
 		videofilters/nowebcam.c
 		videofilters/pixconv.c

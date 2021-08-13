@@ -136,16 +136,20 @@ void video_stream_free(VideoStream *stream) {
 	ms_free(stream);
 }
 
+static void source_event_cb(void *ud, MSFilter* f, unsigned int event, void *eventdata){
+	VideoStream *st=(VideoStream*)ud;
+	switch (event) {// Allow a source to reinitialize all tree formats
+		case MS_FILTER_OUTPUT_FMT_CHANGED:
+				video_stream_update_video_params(st);
+			break;
+		default:{}
+	}
+}
+
 static void event_cb(void *ud, MSFilter* f, unsigned int event, void *eventdata){
 	VideoStream *st=(VideoStream*)ud;
 	if (st->eventcb!=NULL){
 		st->eventcb(st->event_pointer,f,event,eventdata);
-	}
-	switch (event) {// Allow a filter to reinitialize all tree formats
-		case MS_FILTER_OUTPUT_FMT_CHANGED:
-			video_stream_update_video_params(st);
-			break;
-		default:{}
 	}
 }
 
@@ -614,6 +618,7 @@ static void configure_video_source(VideoStream *stream, bool_t skip_bitrate, boo
 
 	if (source_changed) {
 		ms_filter_add_notify_callback(stream->source, event_cb, stream, FALSE);
+		ms_filter_add_notify_callback(stream->source, source_event_cb, stream, FALSE);
 		/* It is important that the internal_event_cb is called synchronously! */
 		ms_filter_add_notify_callback(stream->source, internal_event_cb, stream, TRUE);
 	}
@@ -2134,8 +2139,9 @@ void video_stream_send_only_stop(VideoStream *vs){
 void video_stream_enable_zrtp(VideoStream *vstream, AudioStream *astream){
 	if (astream->ms.sessions.zrtp_context != NULL && vstream->ms.sessions.zrtp_context == NULL) {
 		vstream->ms.sessions.zrtp_context=ms_zrtp_multistream_new(&(vstream->ms.sessions), astream->ms.sessions.zrtp_context);
-	} else if (vstream->ms.sessions.zrtp_context && !media_stream_secured(&vstream->ms))
+	} else if (vstream->ms.sessions.zrtp_context && !media_stream_secured(&vstream->ms)) {
 		ms_zrtp_reset_transmition_timer(vstream->ms.sessions.zrtp_context);
+	}
 }
 
 void video_stream_start_zrtp(VideoStream *stream) {
@@ -2239,4 +2245,16 @@ void video_stream_close_remote_record(VideoStream *stream){
 	if (state != MSRecorderClosed){
 		ms_filter_call_method_noarg(recorder, MS_RECORDER_CLOSE);
 	}
+}
+
+void video_stream_enable_fec(VideoStream *stream, char* local_ip, int local_port, int local_rtcp_port, char* remote_ip, int remote_port, int L, int D){
+    ms_factory_set_mtu(stream->ms.factory, ms_factory_get_mtu(stream->ms.factory) - (12 + L*4));
+    RtpSession *fec_session = ms_create_duplex_rtp_session(ms_is_ipv6(local_ip) ? "::" : "0.0.0.0", local_port+10, local_rtcp_port+10, 0);
+    rtp_session_set_remote_addr(fec_session, remote_ip, remote_port+10);
+    fec_session->fec_stream = NULL;
+    JBParameters jitter_params;
+    rtp_session_get_jitter_buffer_params(stream->ms.sessions.rtp_session, &jitter_params);
+    const FecParameters *fec_params = fec_params_new(L, D, jitter_params.nom_size);
+    FecStream *fec_stream = fec_stream_new(stream->ms.sessions.rtp_session, fec_session, fec_params);
+    stream->ms.sessions.rtp_session->fec_stream = fec_stream;
 }

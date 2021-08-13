@@ -29,6 +29,11 @@ else()
 	endif()
 endif()
 
+if(WIN32)
+    #required for htons()
+    list(APPEND MS2_LIBS_FOR_TESTER Ws2_32)
+endif()
+
 if(SPEEXDSP_FOUND)
 	#required for neon resampler tester
 	list(APPEND MS2_LIBS_FOR_TESTER ${SPEEXDSP_LIBRARIES})
@@ -105,6 +110,7 @@ set(SOURCE_FILES_C
 	mediastreamer2_basic_audio_tester.c
 	mediastreamer2_framework_tester.c
 	mediastreamer2_player_tester.c
+	mediastreamer2_recorder_tester.c
 	mediastreamer2_sound_card_tester.c
 	mediastreamer2_tester.c
 	mediastreamer2_tester_private.c
@@ -212,4 +218,3 @@ else()
 	endif()
 
 endif()
-
