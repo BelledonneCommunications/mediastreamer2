@@ -347,7 +347,7 @@ static void destroy_video_stream(video_stream_tester_t *vst) {
 	ortp_ev_queue_destroy(vst->stats.q);
 }
 
-static void init_video_streams(video_stream_tester_t *vst1, video_stream_tester_t *vst2, bool_t avpf, bool_t one_way, OrtpNetworkSimulatorParams *params, int payload_type, bool_t nack, bool_t fec_enable) {
+static void init_video_streams(video_stream_tester_t *vst1, video_stream_tester_t *vst2, bool_t avpf, bool_t one_way, OrtpNetworkSimulatorParams *params, int payload_type, bool_t nack) {
 	PayloadType *pt;
 
 	create_video_stream(vst1, payload_type);
@@ -378,24 +378,6 @@ static void init_video_streams(video_stream_tester_t *vst1, video_stream_tester_
 		rtp_session_enable_avpf_feature(video_stream_get_rtp_session(vst2->vs), ORTP_AVPF_FEATURE_IMMEDIATE_NACK, TRUE);
 		video_stream_enable_retransmission_on_nack(vst1->vs, TRUE);
 		video_stream_enable_retransmission_on_nack(vst2->vs, TRUE);
-	}
-
-    if(fec_enable){
-        int L = 5;
-        RtpSession *fec_vst1 = ms_create_duplex_rtp_session(ms_is_ipv6(vst1->local_ip) ? "::" : "0.0.0.0", rtp_session_get_local_port(vst1->vs->ms.sessions.rtp_session)+10, rtp_session_get_local_rtcp_port(vst1->vs->ms.sessions.rtp_session)+10, 0);
-        rtp_session_set_remote_addr(fec_vst1, vst2->local_ip, vst2->local_rtp+10);
-        fec_vst1->fec_stream = NULL;
-        RtpSession *fec_vst2 = ms_create_duplex_rtp_session(ms_is_ipv6(vst2->local_ip) ? "::" : "0.0.0.0", rtp_session_get_local_port(vst2->vs->ms.sessions.rtp_session)+10, rtp_session_get_local_rtcp_port(vst2->vs->ms.sessions.rtp_session)+10, 0);
-        rtp_session_set_remote_addr(fec_vst2, vst1->local_ip, vst1->local_rtp+10);
-        fec_vst2->fec_stream = NULL;
-        JBParameters jitter_params;
-        rtp_session_get_jitter_buffer_params(vst1->vs->ms.sessions.rtp_session, &jitter_params);
-        const FecParameters *params_vst1 = fec_params_new(L, 0, jitter_params.nom_size);
-        const FecParameters *params_vst2 = fec_params_new(L, 0, jitter_params.nom_size);
-        FecStream *fec_stream_vst1 = fec_stream_new(vst1->vs->ms.sessions.rtp_session, fec_vst1, params_vst1);
-        FecStream *fec_stream_vst2 = fec_stream_new(vst2->vs->ms.sessions.rtp_session, fec_vst2, params_vst2);
-        vst1->vs->ms.sessions.rtp_session->fec_stream = fec_stream_vst1;
-        vst2->vs->ms.sessions.rtp_session->fec_stream = fec_stream_vst2;
     }
 
 	BC_ASSERT_EQUAL(video_stream_start(vst1->vs, &rtp_profile, vst2->local_ip, vst2->local_rtp, vst2->local_ip, vst2->local_rtcp, payload_type, 50, vst1->cam), 0,int,"%d");
@@ -438,7 +420,7 @@ static void basic_video_stream_base(int payload_type) {
 	video_stream_tester_t* marielle=video_stream_tester_new();
 	video_stream_tester_t* margaux=video_stream_tester_new();
 
-    init_video_streams(marielle, margaux, FALSE, FALSE, NULL, payload_type, FALSE, FALSE);
+    init_video_streams(marielle, margaux, FALSE, FALSE, NULL, payload_type, FALSE);
 
 	BC_ASSERT_TRUE(wait_for_until_with_parse_events(&marielle->vs->ms,
 													&margaux->vs->ms,
@@ -482,7 +464,7 @@ static void basic_one_way_video_stream(void) {
 	bool_t supported = ms_factory_codec_supported(_factory, "vp8");
 
 	if (supported) {
-        init_video_streams(marielle, margaux, FALSE, TRUE, NULL,VP8_PAYLOAD_TYPE, FALSE, FALSE);
+        init_video_streams(marielle, margaux, FALSE, TRUE, NULL,VP8_PAYLOAD_TYPE, FALSE);
 
 		BC_ASSERT_TRUE(wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms, &marielle->stats.number_of_RR, 2, 15000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats));
 		video_stream_get_local_rtp_stats(marielle->vs, &marielle->stats.rtp);
@@ -503,7 +485,7 @@ static void codec_change_for_video_stream(void) {
 	bool_t mp4v_supported = ms_factory_codec_supported(_factory, "mp4v-es");
 
 	if (vp8_supported) {
-        init_video_streams(marielle, margaux, FALSE, FALSE, NULL, VP8_PAYLOAD_TYPE, FALSE, FALSE);
+        init_video_streams(marielle, margaux, FALSE, FALSE, NULL, VP8_PAYLOAD_TYPE, FALSE);
 		BC_ASSERT_TRUE(wait_for_until(&marielle->vs->ms, &margaux->vs->ms, &marielle->stats.number_of_decoder_first_image_decoded, 1, 2000));
 		BC_ASSERT_TRUE(wait_for_until(&marielle->vs->ms, &margaux->vs->ms, &margaux->stats.number_of_decoder_first_image_decoded, 1, 2000));
 		BC_ASSERT_TRUE(wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms, &marielle->stats.number_of_SR, 2, 15000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats));
@@ -540,7 +522,7 @@ static void multicast_video_stream(void) {
 
 	if (supported) {
 		int dummy=0;
-        init_video_streams(marielle, margaux, FALSE, TRUE, NULL,VP8_PAYLOAD_TYPE, FALSE, FALSE);
+        init_video_streams(marielle, margaux, FALSE, TRUE, NULL,VP8_PAYLOAD_TYPE, FALSE);
 
 		BC_ASSERT_TRUE(wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms, &margaux->stats.number_of_SR, 2, 15000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats));
 
@@ -583,7 +565,7 @@ static void avpf_video_stream_base(int payload_type) {
 		params.enabled = TRUE;
 		params.loss_rate = 5.;
 		params.rtp_only = TRUE;
-        init_video_streams(marielle, margaux, TRUE, FALSE, &params, payload_type, FALSE, FALSE);
+        init_video_streams(marielle, margaux, TRUE, FALSE, &params, payload_type, FALSE);
 
         BC_ASSERT_TRUE(wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms, &marielle->stats.number_of_SR, 2, 15000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats));
 
@@ -665,7 +647,7 @@ static void avpf_rpsi_count(void) {
 	margaux->cam = mediastreamer2_tester_get_mire_webcam(ms_factory_get_web_cam_manager(_factory));
 
 	if (supported) {
-        init_video_streams(marielle, margaux, TRUE, FALSE, &params,VP8_PAYLOAD_TYPE, FALSE, FALSE);
+        init_video_streams(marielle, margaux, TRUE, FALSE, &params,VP8_PAYLOAD_TYPE, FALSE);
 		BC_ASSERT_TRUE(wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms,  &marielle->stats.number_of_decoder_first_image_decoded, 1, 10000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats));
 		BC_ASSERT_TRUE(wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms,  &margaux->stats.number_of_decoder_first_image_decoded, 1, 10000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats));
 
@@ -706,7 +688,7 @@ static void video_stream_first_iframe_lost_base(int payload_type) {
 		/* Make sure first Iframe is lost. */
 		params.enabled = TRUE;
 		params.loss_rate = 100.;
-        init_video_streams(marielle, margaux, FALSE, FALSE, &params, payload_type, FALSE, FALSE);
+        init_video_streams(marielle, margaux, FALSE, FALSE, &params, payload_type, FALSE);
 		wait_for_until(&marielle->vs->ms, &margaux->vs->ms,&dummy,1,1000);
 
 		/* Use 10% packet lost to be sure to have decoding errors. */
@@ -776,7 +758,7 @@ static void avpf_video_stream_first_iframe_lost_base(int payload_type) {
 		/* Make sure first Iframe is lost. */
 		params.enabled = TRUE;
 		params.loss_rate = 100.;
-        init_video_streams(marielle, margaux, TRUE, FALSE, &params, payload_type, FALSE, FALSE);
+        init_video_streams(marielle, margaux, TRUE, FALSE, &params, payload_type, FALSE);
 		wait_for_until(&marielle->vs->ms, &margaux->vs->ms,&dummy,1,1000);
 
 		/* Remove the lost to be sure that a PLI will be sent and not a SLI. */
@@ -835,7 +817,7 @@ static void avpf_high_loss_video_stream_base(float rate, int payload_type) {
 	if (supported) {
 		params.enabled = TRUE;
 		params.loss_rate = rate;
-        init_video_streams(marielle, margaux, TRUE, FALSE, &params, payload_type, FALSE, FALSE);
+        init_video_streams(marielle, margaux, TRUE, FALSE, &params, payload_type, FALSE);
 		BC_ASSERT_TRUE(wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms,
 			&marielle->stats.number_of_SR, 10, 15000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats));
 		switch (payload_type) {
@@ -891,7 +873,7 @@ static void video_configuration_stream_base(MSVideoConfiguration* asked, MSVideo
 		margaux->vconf->vsize=asked->vsize;
 		margaux->vconf->fps=asked->fps;
 
-        init_video_streams(marielle, margaux, FALSE, TRUE, NULL,payload_type, FALSE, FALSE);
+        init_video_streams(marielle, margaux, FALSE, TRUE, NULL,payload_type, FALSE);
 
 		BC_ASSERT_TRUE(wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms, &marielle->stats.number_of_RR, 4, 30000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats));
 
@@ -1006,7 +988,7 @@ static void video_stream_elph264_camera(void) {
 		margaux->vconf->vsize = asked.vsize;
 		margaux->vconf->fps = asked.fps;
 
-        init_video_streams(marielle, margaux, FALSE, TRUE, NULL, H264_PAYLOAD_TYPE, FALSE, FALSE);
+        init_video_streams(marielle, margaux, FALSE, TRUE, NULL, H264_PAYLOAD_TYPE, FALSE);
 
 		BC_ASSERT_TRUE(wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms, &marielle->stats.number_of_RR, 4, 30000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats));
 
@@ -1040,7 +1022,7 @@ static void video_stream_normal_loss_with_retransmission_on_nack(void) {
 		params.enabled = TRUE;
 		params.loss_rate = 3.;
 
-        init_video_streams(marielle, margaux, TRUE, FALSE, &params, VP8_PAYLOAD_TYPE, TRUE, FALSE);
+        init_video_streams(marielle, margaux, TRUE, FALSE, &params, VP8_PAYLOAD_TYPE, TRUE);
 
 		rtp_session_get_jitter_buffer_params(margaux->vs->ms.sessions.rtp_session, &initial_jitter_params);
 
@@ -1343,7 +1325,10 @@ static void media_stream_test_2_videostreams(int payload_type){
     params.enabled = TRUE;
     params.loss_rate = 5.;
 
-    init_video_streams(marielle, margaux, FALSE, FALSE, &params, payload_type, FALSE, TRUE);
+    init_video_streams(marielle, margaux, FALSE, FALSE, &params, payload_type, FALSE);
+
+    video_stream_enable_fec(marielle->vs, marielle->local_ip, marielle->local_rtp, marielle->local_rtcp, margaux->local_ip, margaux->local_rtp, 3, 0);
+    video_stream_enable_fec(margaux->vs, margaux->local_ip, margaux->local_rtp, margaux->local_rtcp, marielle->local_ip, marielle->local_rtp, 3, 0);
 
     BC_ASSERT_TRUE(wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms,
         &marielle->stats.number_of_packet_reconstructed, 1, 6000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats));

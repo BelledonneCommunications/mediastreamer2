@@ -1257,6 +1257,8 @@ MS2_PUBLIC void video_stream_close_remote_record(VideoStream *stream);
 MS2_PUBLIC void video_stream_enable_retransmission_on_nack(VideoStream *stream, bool_t enable);
 MS2_PUBLIC void video_stream_set_retransmission_on_nack_max_packet(VideoStream *stream, unsigned int max);
 
+MS2_PUBLIC void video_stream_enable_fec(VideoStream *stream, char* local_ip, int local_port, int local_rtcp_port, char* remote_ip, int remote_port, int L, int D);
+
 /**
  * Small API to display a local preview window.
 **/
