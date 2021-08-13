@@ -573,6 +573,7 @@ if(ENABLE_SHARED)
 			PRIVATE ${MEDIASTREAMER2_INCLUDE_DIRS}
 		)
         target_link_libraries(mediastreamer PRIVATE ${LINK_LIBS})
+		message(STATUS "LINK_LIBS=${LINK_LIBS}")
 	if(IOS)
 		target_link_libraries(mediastreamer INTERFACE "-framework Foundation" "-framework AVFoundation")
 	endif()
