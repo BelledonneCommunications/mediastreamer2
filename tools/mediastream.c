@@ -707,7 +707,8 @@ static MSSndCard *get_sound_card(MSSndCardManager *manager, const char* card_nam
 	return play;
 }
 
-void mediastream_fec_enable(MediastreamDatas* args){
+void mediastream_fec_enable(MediastreamDatas *args, MSFactory *factory){
+    ms_factory_set_mtu(factory, ms_factory_get_mtu(factory) - (12 + 4*args->L));
     args->fec_session = ms_create_duplex_rtp_session(ms_is_ipv6(args->ip) ? "::" : "0.0.0.0", rtp_session_get_local_port(args->session)+10, rtp_session_get_local_rtcp_port(args->session)+10, args->mtu);
     rtp_session_set_remote_addr(args->fec_session, args->ip, args->remoteport+10);
     args->fec_session->fec_stream = NULL;
@@ -779,12 +780,7 @@ void setup_media_streams(MediastreamDatas* args) {
 		args->bw_controller = ms_bandwidth_controller_new();
 	}
 
-    if (args->mtu){
-        if (args->enable_fec){
-            ms_factory_set_mtu(factory, args->mtu - (12 + 4*args->L));
-        }
-        ms_factory_set_mtu(factory, args->mtu);
-    }
+    if (args->mtu) ms_factory_set_mtu(factory, args->mtu);
 	ms_factory_enable_statistics(factory, TRUE);
 	ms_factory_reset_statistics(factory);
 
@@ -1028,7 +1024,7 @@ void setup_media_streams(MediastreamDatas* args) {
 		}
 
         if(args->enable_fec){
-            mediastream_fec_enable(args);
+            mediastream_fec_enable(args, factory);
         }
 #else
 		ms_error("Error: video support not compiled.\n");
