@@ -126,6 +126,7 @@ cmake_dependent_option(ENABLE_QRCODE "Enable QRCode support" YES "ENABLE_VIDEO" 
 
 # Hidden non-cache options:
 # * DISABLE_BC_PACKAGE_SEARCH: skip find_package() for every BC package (bctoolbox, ortp, etc.)
+# * DISABLE_SRTP_SEARCH: skip find_package() for SRTP.
 
 
 set(CMAKE_CXX_STANDARD 14)
@@ -176,9 +177,13 @@ endif()
 if(ENABLE_PCAP)
 	find_package(PCAP QUIET)
 endif()
-
 if(ENABLE_SRTP)
-	find_package(SRTP "2" REQUIRED)
+	if(NOT DISABLE_SRTP_SEARCH)
+		find_package(SRTP "2" REQUIRED)
+	else()
+		set(SRTP_FOUND YES)
+		set(SRTP_VERSION 2)
+	endif()
 endif()
 if(ENABLE_ZRTP AND NOT DISABLE_BC_PACKAGE_SEARCH)
 	find_package(bzrtp REQUIRED CONFIG)
@@ -525,9 +530,11 @@ if(BZRTP_FOUND)
 endif()
 
 if(SRTP_FOUND)
-	list(APPEND LINK_LIBS ${SRTP_LIBRARIES})
-	list(APPEND MEDIASTREAMER2_INCLUDE_DIRS ${SRTP_INCLUDE_DIRS})
+	list(APPEND LINK_LIBS "SRTP")
 	set(HAVE_SRTP 1)
+	message(STATUS "SRTP_INCLUDE_DIRS=$<TARGET_PROPERTY:SRTP,INTERFACE_INCLUDE_DIRECTORIES>")
+	message(STATUS "SRTP_LIBRARIES=$<TARGET_PROPERTY:SRTP,IMPORTED_LOCATION>")
+	message(STATUS "SRTP_LINKER_FILE=$<TARGET_LINKER_FILE:SRTP>")
 endif()
 if(SPANDSP_FOUND)
 	list(APPEND MEDIASTREAMER2_INCLUDE_DIRS ${SPANDSP_INCLUDE_DIRS})
