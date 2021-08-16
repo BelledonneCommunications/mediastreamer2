@@ -83,7 +83,7 @@ static mblk_t *size_conv_alloc_mblk(SizeConvState *s){
 			return dupmsg(s->om);
 		}else{
 			/*the last msg is still referenced by somebody else*/
-			ms_message("size_conv_alloc_mblk: Somebody still retaining yuv buffer (ref=%i)",ref);
+			ms_message("size_conv_alloc_mblk: Somebody still retaining yuv buffer %p (ref=%i)",s->om->b_datap,ref);
 			freemsg(s->om);
 			s->om=NULL;
 		}
