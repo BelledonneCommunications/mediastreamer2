@@ -137,6 +137,7 @@ public:
 	
 
 protected:
+	int findSinkPin(std::string participant);
 	int findSourcePin(std::string participant);
 	void configureOutput(VideoEndpoint *ep) override;
 	int mOutputs[ROUTER_MAX_OUTPUT_CHANNELS] ;
