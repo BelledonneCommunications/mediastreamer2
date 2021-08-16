@@ -53,7 +53,8 @@ QOpenGLFramebufferObject *BufferRenderer::createFramebufferObject (const QSize &
 	
 	mWidth = size.width();
 	mHeight = size.height();
-	mParent->update_context = TRUE;
+	if(mParent)// if mParent is NULL here, that means that the current FrameBuffer is not associated to a windows. It can happen when changing configuration.
+		mParent->update_context = TRUE;
 	
 	return new QOpenGLFramebufferObject(size, format);
 }
