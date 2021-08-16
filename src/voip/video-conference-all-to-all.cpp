@@ -67,6 +67,18 @@ int VideoConferenceAllToAll::findFreeInputPin() {
 	return -1;
 }
 
+int VideoConferenceAllToAll::findSinkPin(std::string participant) {
+	for (const bctbx_list_t *elem = mEndpoints; elem != nullptr; elem = elem->next){
+		VideoEndpoint *ep_it = (VideoEndpoint *)elem->data;
+		if (ep_it->mName.compare(participant) == 0) {
+			ms_message("Found sink pin %d for %s", ep_it->mPin, participant.c_str());
+			return ep_it->mPin;
+		}
+	}
+	ms_error("Can not find sink pin for %s",participant.c_str());
+	return -1;
+}
+
 int VideoConferenceAllToAll::findSourcePin(std::string participant) {
 	for (const bctbx_list_t *elem = getMembers(); elem != nullptr; elem = elem->next){
 		VideoEndpoint *ep_it = (VideoEndpoint *)elem->data;
@@ -105,16 +117,25 @@ void VideoConferenceAllToAll::addMember(VideoEndpoint *ep) {
 	/* now connect to the filter */
 	ep->mConference = (MSVideoConference *)this;
 	if (ep->mIsRemote && media_stream_get_direction(&ep->mSt->ms) == MediaStreamSendOnly) {
-		ep->mOutPin = findFreeOutputPin();
-		ms_message("[all to all] add endpoint %s with output pin %d", ep->mName.c_str(), ep->mOutPin);
-		connectEndpoint(ep);
-		mEndpoints = bctbx_list_append(mEndpoints, ep);
+		if (findSinkPin(ep->mName) == -1) {
+			ep->mOutPin = findFreeOutputPin();
+			ms_message("[all to all] add endpoint %s with output pin %d", ep->mName.c_str(), ep->mOutPin);
+			connectEndpoint(ep);
+			mEndpoints = bctbx_list_append(mEndpoints, ep);
+		}
 	} else {
-		ep->mPin = findFreeInputPin();
-		ms_message("[all to all] add remote[%d] member %s with input pin %d", ep->mIsRemote, ep->mName.c_str(), ep->mPin);
-		mMembers=bctbx_list_append(mMembers,ep);
-		bctbx_list_for_each(mEndpoints, (void (*)(void*))configureEndpoint);
+		if (findSourcePin(ep->mName) == -1) {
+			ep->mPin = findFreeInputPin();
+			ms_message("[all to all] add remote[%d] member %s with input pin %d", ep->mIsRemote, ep->mName.c_str(), ep->mPin);
+			mMembers=bctbx_list_append(mMembers,ep);
+			bctbx_list_for_each(mEndpoints, (void (*)(void*))configureEndpoint);
+		}
 	}
+}
+
+static int find_first_remote_endpoint(const VideoEndpoint *ep, const void *dummy)
+{
+	return !ep->mIsRemote;
 }
 
 static int find_connected_endpoint(const VideoEndpoint *ep, const void *dummy)
@@ -158,7 +179,9 @@ void VideoConferenceAllToAll::removeMember(VideoEndpoint *ep) {
 		bctbx_list_for_each(mMembers, (void (*)(void*))unlinkEndpoint);
 	}
 
-	if (mMembers!=NULL && elem != NULL) {
+	const bool isRemoteFound = (bctbx_list_find_custom(mMembers, (bctbx_compare_func)find_first_remote_endpoint, NULL) != 0);
+	// Attach only if at least one remote participant is still in the member list
+	if (isRemoteFound && (elem != NULL)) {
 		ms_ticker_attach(mTicker,mMixer);
 	}
 }
