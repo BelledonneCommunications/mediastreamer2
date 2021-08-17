@@ -309,6 +309,7 @@ static void video_stream_track_fps_changes(VideoStream *stream){
 						MSVideoConfiguration vconf;
 						ms_warning("Measured and target fps significantly different (%f<->%f), updating encoder.",
 							fps,stream->configured_fps);
+						//ms_filter_call_method(stream->source,MS_FILTER_GET_FPS,&fps);
 						stream->real_fps=fps;
 
 						ms_filter_call_method(stream->ms.encoder,MS_VIDEO_ENCODER_GET_CONFIGURATION,&vconf);
@@ -1416,12 +1417,54 @@ MSFilter* video_stream_get_source_filter(const VideoStream* stream) {
 		return NULL;
 	}
 }
+/*
+static void unplumb_av_player(AudioStream *stream){
+	struct _AVPlayer *player=&stream->av_player;
+	MSConnectionHelper ch;
+	bool_t reattach=stream->ms.state==MSStreamStarted;
 
-void video_stream_update_video_params(VideoStream *stream){
-	/*calling video_stream_change_camera() does the job of unplumbing/replumbing and configuring the new graph*/
-	video_stream_change_camera(stream,stream->cam);
+	if (!player->plumbed) return;
+
+	/ *detach the outbound graph before modifying the graph* /
+	ms_ticker_detach(stream->ms.sessions.ticker,stream->soundread);
+	if (player->videopin!=-1){
+		ms_connection_helper_start(&ch);
+		ms_connection_helper_unlink(&ch,player->player,-1,player->videopin);
+		ms_connection_helper_unlink(&ch,player->video_output,0,0);
+	}
+	ms_connection_helper_start(&ch);
+	ms_connection_helper_unlink(&ch,player->player,-1,player->audiopin);
+	if (player->decoder)
+		ms_connection_helper_unlink(&ch,player->decoder,0,0);
+	ms_connection_helper_unlink(&ch,player->resampler,0,0);
+	ms_connection_helper_unlink(&ch,stream->outbound_mixer,1,-1);
+	/ *and attach back* /
+	if (reattach) ms_ticker_attach(stream->ms.sessions.ticker,stream->soundread);
+	player->plumbed = FALSE;
 }
+static void plumb_av_player(AudioStream *stream, bool_t pReattach){
+	struct _AVPlayer *player=&stream->av_player;
+	MSConnectionHelper ch;
+	bool_t reattach= pReattach && stream->ms.state==MSStreamStarted;
 
+	if (player->videopin!=-1){
+		ms_connection_helper_start(&ch);
+		ms_connection_helper_link(&ch,player->player,-1,player->videopin);
+		ms_connection_helper_link(&ch,player->video_output,0,0);
+	}
+	ms_connection_helper_start(&ch);
+	ms_connection_helper_link(&ch,player->player,-1,player->audiopin);
+	if (player->decoder)
+		ms_connection_helper_link(&ch,player->decoder,0,0);
+	ms_connection_helper_link(&ch,player->resampler,0,0);
+	/ *detach the outbound graph before attaching to the outbound mixer* /
+	if (reattach) ms_ticker_detach(stream->ms.sessions.ticker,stream->soundread);
+	ms_connection_helper_link(&ch,stream->outbound_mixer,1,-1);
+	/ *and attach back* /
+	if (reattach) ms_ticker_attach(stream->ms.sessions.ticker,stream->soundread);
+	player->plumbed=TRUE;
+}
+*/
 /**
  * Will update the source camera for the videostream passed as argument.
  * The parameters:
@@ -1439,12 +1482,12 @@ static MSFilter* _video_stream_change_camera(VideoStream *stream, MSWebCam *cam,
 	MSFilter* old_source = NULL;
 	bool_t new_src_different = (new_source && new_source != stream->source);
 	bool_t use_player        = (sink && !stream->player_active) || (!sink && stream->player_active);
-	bool_t change_source       = ( cam!=stream->cam || new_src_different || use_player);
+	bool_t change_source       = ( cam!=stream->cam || new_src_different || use_player); //(use_player && !stream->player_active) );
 	bool_t encoder_has_builtin_converter = (!stream->pixconv && !stream->sizeconv);
 	/* We get the ticker from the source filter rather than stream->ms.sessions.ticker, for the case where the graph is actually running
 	 * in a MSVideoConference that has its own ticker. */
 	MSTicker *current_ticker = stream->source ? ms_filter_get_ticker(stream->source) : NULL;
-
+//MSFilter * s = sink;
 	if (current_ticker && stream->source){
 		ms_ticker_detach(current_ticker, stream->source);
 		/*unlink source filters and subsequent post processing filters */
@@ -1486,10 +1529,17 @@ static MSFilter* _video_stream_change_camera(VideoStream *stream, MSWebCam *cam,
 
 		/*re create new ones and configure them*/
 		if (change_source) {
+		
+//static MSFilter * lastSink = NULL;
+			//if(lastSink && !sink)
+				//sink = lastSink;
+				
 			if (sink){
+				//unplumb_av_player(stream->audiostream);
 				stream->source = ms_factory_create_filter(stream->ms.factory, MS_ITC_SOURCE_ID);
 				ms_filter_call_method(sink,MS_ITC_SINK_CONNECT,stream->source);
 				stream->player_active = TRUE;
+				//lastSink = sink;
 			} else {
 				stream->source = new_source ? new_source : ms_web_cam_create_reader(cam);
 				stream->cam = cam;
@@ -1555,6 +1605,8 @@ static MSFilter* _video_stream_change_camera(VideoStream *stream, MSWebCam *cam,
 
 		ms_ticker_attach(current_ticker, stream->source);
 	}
+	//if(change_source && sink)
+		//plumb_av_player(stream->audiostream, s == NULL);
 	return old_source;
 }
 
@@ -1572,6 +1624,19 @@ MSFilter* video_stream_change_camera_keep_previous_source(VideoStream *stream, M
 
 MSFilter* video_stream_change_source_filter(VideoStream *stream, MSWebCam* cam, MSFilter* filter, bool_t keep_previous ){
 	return _video_stream_change_camera(stream, cam, filter, NULL, keep_previous, FALSE, FALSE);
+}
+
+void video_stream_update_video_params(VideoStream *stream){
+	/*calling video_stream_change_camera() does the job of unplumbing/replumbing and configuring the new graph*/
+	ms_message("[Videostream] Updating video parameters");
+	//video_stream_change_camera(stream,stream->cam);	// Old
+	
+	//video_stream_change_camera(stream,stream->cam);
+	if( stream->audiostream != NULL)
+		_video_stream_change_camera(stream, stream->cam, stream->source, stream->audiostream->av_player.video_output, FALSE, FALSE, FALSE);
+	else
+		video_stream_change_camera(stream,stream->cam);
+		
 }
 
 void video_stream_open_player(VideoStream *stream, MSFilter *sink){

@@ -206,7 +206,8 @@ static void itc_sink_preprocess(MSFilter *f){
 	ms_filter_unlock(f);
 	
 	ms_mutex_lock(&ss->mutex);
-	if (ss->source && ss->fmt != NULL) ms_filter_notify_no_arg(ss->source,MS_FILTER_OUTPUT_FMT_CHANGED);
+	if (ss->source && ss->fmt != NULL) 
+		ms_filter_notify_no_arg(ss->source,MS_FILTER_OUTPUT_FMT_CHANGED);
 	ms_mutex_unlock(&ss->mutex);
 }
 
