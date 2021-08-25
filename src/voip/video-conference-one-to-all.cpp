@@ -58,9 +58,9 @@ static MSVideoEndpoint *create_video_placeholder_member(VideoConferenceOneToAll 
 void VideoConferenceOneToAll::addVideoPlaceholderMember() {
 	mVideoPlaceholderMember = (VideoEndpoint *)(create_video_placeholder_member(this));
 
-	ms_message("[one to all] add video placeholder to pin %i", mMixer->desc->ninputs-1);
 	mVideoPlaceholderMember->mConference = (MSVideoConference *)this;
 	mVideoPlaceholderMember->mPin = mMixer->desc->ninputs-1;
+	ms_message("[one to all] add video placeholder %p to pin %i", mVideoPlaceholderMember, mVideoPlaceholderMember->mPin);
 	plumb_to_conf(mVideoPlaceholderMember);
 	video_stream_set_encoder_control_callback(mVideoPlaceholderMember->mSt, ms_video_conference_process_encoder_control, mVideoPlaceholderMember);
 }
@@ -88,7 +88,7 @@ void VideoConferenceOneToAll::addMember(VideoEndpoint *ep) {
 		ms_ticker_detach(mTicker,mMixer);
 	}
 	setPin(ep);
-	ms_message("[one to all] add member to pin %i", ep->mPin);
+	ms_message("[one to all] add member %s (%p) to pin %i", ep->mName.c_str(), mVideoPlaceholderMember, ep->mPin);
 	plumb_to_conf(ep);
 	video_stream_set_encoder_control_callback(ep->mSt, ms_video_conference_process_encoder_control, ep);
 	ms_ticker_attach(mTicker,mMixer);
@@ -107,10 +107,10 @@ void VideoConferenceOneToAll::removeMember(VideoEndpoint *ep) {
 	ep->mConference=NULL;
 	mMembers=bctbx_list_remove(mMembers,ep);
 	if (mMembers!=NULL) {
-		ms_message("[one to all] remove member at pin %i", ep->mPin);
+		ms_message("[one to all] remove member %s (%p) at pin %i", ep->mName.c_str(), ep, ep->mPin);
 		ms_ticker_attach(mTicker,mMixer);
 	} else {
-		ms_message("[one to all] remove video placeholder member %p", mVideoPlaceholderMember);
+		ms_message("[one to all] remove video placeholder member %p at pin %0d", mVideoPlaceholderMember, mVideoPlaceholderMember->mPin);
 		video_stream_set_encoder_control_callback(mVideoPlaceholderMember->mSt, NULL, NULL);
 		unplumb_from_conf(mVideoPlaceholderMember);
 		if (mVideoPlaceholderMember) {
