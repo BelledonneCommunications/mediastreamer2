@@ -28,6 +28,8 @@
 
 #define MAX_RTP_SIZE	UDP_MAX_SIZE
 
+#define MS2_NO_VIDEO_RESCALING 1
+
 struct _MSAudioConference;
 struct _MSVideoConference;
 
