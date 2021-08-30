@@ -623,49 +623,49 @@ bool_t ms_crypto_suite_is_unauthenticated(MSCryptoSuite cs){
 }
 
 int ms_crypto_suite_to_name_params(MSCryptoSuite cs, MSCryptoSuiteNameParams *params ){
-     params->name=NULL;
-     params->params=NULL;
-     switch(cs){
-        case MS_CRYPTO_SUITE_INVALID:
-     		break;
-        case MS_AES_128_SHA1_80:
-     		params->name= "AES_CM_128_HMAC_SHA1_80";
-     		break;
-     	case MS_AES_128_SHA1_32:
-     		params->name="AES_CM_128_HMAC_SHA1_32";
-     		break;
-     	case MS_AES_128_SHA1_80_NO_AUTH:
-     		params->name="AES_CM_128_HMAC_SHA1_80";
-     		params->params="UNAUTHENTICATED_SRTP";
-     		break;
-     	case MS_AES_128_SHA1_32_NO_AUTH:
-     		params->name="AES_CM_128_HMAC_SHA1_32";
-     		params->params="UNAUTHENTICATED_SRTP";
-     		break;
-     	case MS_AES_128_SHA1_80_SRTP_NO_CIPHER:
-     		params->name="AES_CM_128_HMAC_SHA1_80";
-     		params->params="UNENCRYPTED_SRTP";
-     		break;
-     	case MS_AES_128_SHA1_80_SRTCP_NO_CIPHER:
-     		params->name="AES_CM_128_HMAC_SHA1_80";
-     		params->params="UNENCRYPTED_SRTCP";
-     		break;
-     	case MS_AES_128_SHA1_80_NO_CIPHER:
-     		params->name="AES_CM_128_HMAC_SHA1_80";
-     		params->params="UNENCRYPTED_SRTP UNENCRYPTED_SRTCP";
-     		break;
-     	case MS_AES_256_SHA1_80:
-     		params->name="AES_256_CM_HMAC_SHA1_80";
-     		break;
-     	case MS_AES_CM_256_SHA1_80:
-     	    params->name="AES_CM_256_HMAC_SHA1_80";
-     	    break;
-     	case MS_AES_256_SHA1_32:
-     		params->name= "AES_256_CM_HMAC_SHA1_32";
-     		break;
-     }
-     if (params->name==NULL) return -1;
-     return 0;
+	params->name=NULL;
+	params->params=NULL;
+	switch(cs){
+		case MS_CRYPTO_SUITE_INVALID:
+			break;
+		case MS_AES_128_SHA1_80:
+			params->name= "AES_CM_128_HMAC_SHA1_80";
+			break;
+		case MS_AES_128_SHA1_32:
+			params->name="AES_CM_128_HMAC_SHA1_32";
+			break;
+		case MS_AES_128_SHA1_80_NO_AUTH:
+			params->name="AES_CM_128_HMAC_SHA1_80";
+			params->params="UNAUTHENTICATED_SRTP";
+			break;
+		case MS_AES_128_SHA1_32_NO_AUTH:
+			params->name="AES_CM_128_HMAC_SHA1_32";
+			params->params="UNAUTHENTICATED_SRTP";
+			break;
+		case MS_AES_128_SHA1_80_SRTP_NO_CIPHER:
+			params->name="AES_CM_128_HMAC_SHA1_80";
+			params->params="UNENCRYPTED_SRTP";
+			break;
+		case MS_AES_128_SHA1_80_SRTCP_NO_CIPHER:
+			params->name="AES_CM_128_HMAC_SHA1_80";
+			params->params="UNENCRYPTED_SRTCP";
+			break;
+		case MS_AES_128_SHA1_80_NO_CIPHER:
+			params->name="AES_CM_128_HMAC_SHA1_80";
+			params->params="UNENCRYPTED_SRTP UNENCRYPTED_SRTCP";
+			break;
+		case MS_AES_256_SHA1_80:
+			params->name="AES_256_CM_HMAC_SHA1_80";
+			break;
+		case MS_AES_CM_256_SHA1_80:
+			params->name="AES_CM_256_HMAC_SHA1_80";
+			break;
+		case MS_AES_256_SHA1_32:
+			params->name= "AES_256_CM_HMAC_SHA1_32";
+			break;
+	}
+	if (params->name==NULL) return -1;
+	return 0;
 }
 
 OrtpEvDispatcher* media_stream_get_event_dispatcher(const MediaStream *stream) {
