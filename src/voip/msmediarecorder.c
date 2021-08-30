@@ -232,6 +232,10 @@ static void _create_encoders(MSMediaRecorder *obj, int device_orientation) {
 					ms_filter_call_method(obj->audio_encoder, MS_FILTER_GET_SAMPLE_RATE, &encoder_sample_rate);
 					ms_filter_call_method(obj->audio_source, MS_FILTER_GET_SAMPLE_RATE, &source_sample_rate);
 					ms_filter_call_method(obj->audio_source, MS_FILTER_GET_NCHANNELS, &source_nchannels);
+					if (ms_filter_has_method(obj->audio_source, MS_AUDIO_CAPTURE_ENABLE_AEC)) {
+						bool_t aec_enabled = FALSE;
+						ms_filter_call_method(obj->audio_source, MS_AUDIO_CAPTURE_MUTE, &aec_enabled);
+					}
 
 					if (source_sample_rate != sample_rate || encoder_sample_rate != source_sample_rate || source_nchannels != nchannels) {
 						ms_message("Resampling to %dHz and %d channels", source_sample_rate, nchannels);
