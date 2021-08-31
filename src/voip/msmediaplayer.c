@@ -193,7 +193,7 @@ bool_t ms_media_player_open(MSMediaPlayer *obj, const char *filepath) {
 			return FALSE;
 		}
 		close(fd);
-		if(wave_header_get_format_type(&header) != WAVE_FORMAT_PCM) {
+		if(wave_header_get_format_type(&header) != WAVE_FORMAT_PCM && wave_header_get_format_type(&header) != WAVE_FORMAT_MULAW && wave_header_get_format_type(&header) != WAVE_FORMAT_ALAW) {
 			ms_error("Cannot open %s. Codec not supported", filepath);
 			return FALSE;
 		}
