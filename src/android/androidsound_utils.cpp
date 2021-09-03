@@ -250,8 +250,7 @@ unsigned int ms_android_get_device_capabilities(JNIEnv *env, jobject deviceInfo)
 }
 
 char * ms_android_get_device_product_name(JNIEnv *env, jobject deviceInfo) {
-
-	char * productName = NULL;
+	char *productName = NULL;
 
 	jclass audioDeviceInfoClass = env->FindClass("android/media/AudioDeviceInfo");
 	if (audioDeviceInfoClass != NULL) {
@@ -264,8 +263,7 @@ char * ms_android_get_device_product_name(JNIEnv *env, jobject deviceInfo) {
 					jmethodID toStringID = env->GetMethodID(charSequenceClass, "toString", "()Ljava/lang/String;");
 					if (toStringID != NULL) {
 						jstring productNameString = static_cast<jstring>(env->CallObjectMethod(productNameChar, toStringID));
-						productName = (char *) env->GetStringUTFChars(productNameString, nullptr);
-
+						productName = ms_strdup((char *) env->GetStringUTFChars(productNameString, nullptr));
 						env->ReleaseStringUTFChars(productNameString, productName);
 						env->DeleteLocalRef(productNameString);
 					}
