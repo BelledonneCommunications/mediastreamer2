@@ -21,8 +21,10 @@
 #include "mediastreamer2/msrtp.h"
 #include "mediastreamer2_tester.h"
 #include "mediastreamer2_tester_private.h"
+#include "private.h"
 #include <math.h>
 #include <ortp/port.h>
+#include "mediastreamer2/msitc.h"
 
 #ifdef _MSC_VER
 #define unlink _unlink
@@ -192,6 +194,7 @@ typedef struct _video_stream_tester_t {
 	int local_rtcp;
 	MSWebCam * cam;
 	int payload_type;
+	MSVideoSize source_vsize;
 } video_stream_tester_t;
 
 void video_stream_tester_set_local_ip(video_stream_tester_t* obj,const char*ip) {
@@ -206,6 +209,7 @@ video_stream_tester_t* video_stream_tester_new(void) {
 	vst->cam = ms_web_cam_manager_get_cam(ms_factory_get_web_cam_manager(_factory), "Mire: Mire (synthetic moving picture)");
 	vst->local_rtp=-1; /*random*/
 	vst->local_rtcp=-1; /*random*/
+	vst->source_vsize = MS_VIDEO_SIZE_UNKNOWN;
 #if TARGET_OS_OSX
 	vst->vconf = ms_new0(MSVideoConfiguration, 1);
 	vst->vconf->vsize = MS_VIDEO_SIZE_VGA;
@@ -352,6 +356,10 @@ static void init_video_streams(video_stream_tester_t *vst1, video_stream_tester_
 
 	create_video_stream(vst1, payload_type);
 	create_video_stream(vst2, payload_type);
+	
+	if (vst2->source_vsize.width != MS_VIDEO_SIZE_UNKNOWN_W && vst2->source_vsize.height != MS_VIDEO_SIZE_UNKNOWN_H) {
+		vst2->vs->source_vsize = vst2->source_vsize;
+	}
 
 	/* Enable/disable avpf. */
 	pt = rtp_profile_get_payload(&rtp_profile, payload_type);
@@ -1060,6 +1068,79 @@ static void video_stream_normal_loss_with_retransmission_on_nack(void) {
 	video_stream_tester_destroy(margaux);
 }
 
+static void one_way_video_stream_with_size_conv(void) {
+#if !defined(MS2_NO_VIDEO_RESCALING) && defined(HAVE_LIBYUV_H)
+	/* Test sizeconv filter, change source 720P to QCIF */
+	video_stream_tester_t* marielle=video_stream_tester_new();
+	video_stream_tester_t* margaux=video_stream_tester_new();
+	bool_t supported = ms_factory_codec_supported(_factory, "vp8");
+	if (!margaux->vconf) {
+		margaux->vconf = ms_new0(MSVideoConfiguration, 1);
+	}
+	margaux->vconf->vsize = MS_VIDEO_SIZE_QCIF;
+	margaux->source_vsize = MS_VIDEO_SIZE_720P;
+
+	if (supported) {
+		init_video_streams(marielle, margaux, FALSE, TRUE, NULL,VP8_PAYLOAD_TYPE, FALSE);
+
+		BC_ASSERT_TRUE(wait_for_until_with_parse_events(&marielle->vs->ms, &margaux->vs->ms, &marielle->stats.number_of_RR, 2, 15000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats));
+		video_stream_get_local_rtp_stats(marielle->vs, &marielle->stats.rtp);
+		video_stream_get_local_rtp_stats(margaux->vs, &margaux->stats.rtp);
+		uninit_video_streams(marielle, margaux);
+	} else {
+		ms_error("VP8 codec is not supported!");
+	}
+	video_stream_tester_destroy(marielle);
+	video_stream_tester_destroy(margaux);
+#endif
+}
+
+static void video_stream_with_itcsink(void) {
+	video_stream_tester_t* marielle=video_stream_tester_new();
+	video_stream_tester_t* margaux=video_stream_tester_new();
+	video_stream_tester_t* pauline=video_stream_tester_new();
+	bool_t supported = ms_factory_codec_supported(_factory, "vp8");
+	if (supported) {
+		PayloadType *pt;
+		create_video_stream(marielle, VP8_PAYLOAD_TYPE);
+		create_video_stream(margaux, VP8_PAYLOAD_TYPE);
+		create_video_stream(pauline, VP8_PAYLOAD_TYPE);
+
+		/* Enable/disable avpf. */
+		pt = rtp_profile_get_payload(&rtp_profile, VP8_PAYLOAD_TYPE);
+		if (BC_ASSERT_PTR_NOT_NULL(pt)) {
+			payload_type_unset_flag(pt, PAYLOAD_TYPE_RTCP_FEEDBACK_ENABLED);
+		}
+		media_stream_set_direction(&marielle->vs->ms, MediaStreamSendOnly);
+		media_stream_set_direction(&margaux->vs->ms, MediaStreamSendOnly);
+		media_stream_set_direction(&pauline->vs->ms, MediaStreamRecvOnly);
+		marielle->vs->use_preview_window = TRUE;
+
+		BC_ASSERT_EQUAL(video_stream_start(marielle->vs, &rtp_profile, "127.0.0.1",65004, "127.0.0.1", 65005, VP8_PAYLOAD_TYPE, 50, marielle->cam), 0,int,"%d");
+		link_video_stream_with_itc_sink(marielle->vs);
+
+		MSMediaStreamIO io = MS_MEDIA_STREAM_IO_INITIALIZER;
+		io.input.type = MSResourceItc;
+		io.output.type = MSResourceDefault;
+		io.output.resource_arg = NULL;
+		rtp_session_set_jitter_compensation(margaux->vs->ms.sessions.rtp_session, 50);
+		video_stream_start_from_io_and_sink(margaux->vs, &rtp_profile, pauline->local_ip, pauline->local_rtp, pauline->local_ip, pauline->local_rtcp, VP8_PAYLOAD_TYPE, &io,marielle->vs->itcsink );
+
+		BC_ASSERT_EQUAL(video_stream_start(pauline->vs, &rtp_profile, margaux->local_ip, margaux->local_rtp, margaux->local_ip, margaux->local_rtcp, VP8_PAYLOAD_TYPE, 50, pauline->cam), 0,int,"%d");
+
+
+		// Run some time to see the result.
+		wait_for_until_with_parse_events(&margaux->vs->ms, &pauline->vs->ms, &margaux->stats.number_of_RR, 2, 10000, event_queue_cb, &marielle->stats, event_queue_cb, &margaux->stats);
+		
+		destroy_video_stream(marielle);
+		destroy_video_stream(margaux);
+		destroy_video_stream(pauline);
+	}
+	video_stream_tester_destroy(marielle);
+	video_stream_tester_destroy(margaux);
+	video_stream_tester_destroy(pauline);
+}
+
 mblk_t *fec_stream_on_new_source_packet_sent_test(FecStream *fec_stream, mblk_t *source_packet){
     msgpullup(source_packet, -1);
 
@@ -1355,8 +1436,8 @@ static void fec_video_stream_h264(void) {
     } else {
         ms_error("H264 codec is not supported!");
     }
-}
 
+}
 
 static test_t tests[] = {
 	TEST_NO_TAG("Basic video stream VP8"                     , basic_video_stream_vp8),
@@ -1378,11 +1459,13 @@ static test_t tests[] = {
 	TEST_NO_TAG("Video steam camera ELPH264"                 , video_stream_elph264_camera),
 	TEST_NO_TAG("AVPF RPSI count"                            , avpf_rpsi_count),
 	TEST_NO_TAG("Video stream normal loss with retransmission on NACK" , video_stream_normal_loss_with_retransmission_on_nack),
-    TEST_NO_TAG("Reconstruction packet with FEC"             , fec_stream_test_reconstruction),
-    TEST_NO_TAG("Lost repair packet"                         , fec_stream_test_lost_repair_packet),
-    TEST_NO_TAG("Lost 2 source packets"                      , fec_stream_test_lost_2_source_packets),
-    TEST_NO_TAG("FEC video stream VP8"                       , fec_video_stream_vp8),
-    TEST_NO_TAG("FEC video stream H264"                      , fec_video_stream_h264),
+	TEST_NO_TAG("One-way video stream with sizeconv"         , one_way_video_stream_with_size_conv),
+	TEST_NO_TAG("One-way video stream with itcsink"          , video_stream_with_itcsink),
+	TEST_NO_TAG("Reconstruction packet with FEC"             , fec_stream_test_reconstruction),
+	TEST_NO_TAG("Lost repair packet"                         , fec_stream_test_lost_repair_packet),
+	TEST_NO_TAG("Lost 2 source packets"                      , fec_stream_test_lost_2_source_packets),
+	TEST_NO_TAG("FEC video stream VP8"                       , fec_video_stream_vp8),
+	TEST_NO_TAG("FEC video stream H264"                      , fec_video_stream_h264)
 };
 
 test_suite_t video_stream_test_suite = {

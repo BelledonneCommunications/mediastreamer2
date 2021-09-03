@@ -245,6 +245,12 @@ MS2_PUBLIC void ms_audio_endpoint_destroy(MSAudioEndpoint *ep);
 }
 #endif
 
+#ifndef VIDEO_ENABLED
+typedef struct _MSVideoEndpoint{
+} MSVideoEndpoint;
+typedef struct _MSVideoConference{
+} MSVideoConference;
+#else
 /**
  * @}
  */
@@ -258,6 +264,7 @@ MS2_PUBLIC void ms_audio_endpoint_destroy(MSAudioEndpoint *ep);
  * Structure that holds audio conference parameters
 **/
 struct _MSVideoConferenceParams{
+	int all_to_all;
 	int min_switch_interval;
 	const char *codec_mime_type;
 };
@@ -266,6 +273,12 @@ struct _MSVideoConferenceParams{
  * Typedef to structure that holds conference parameters
 **/
 typedef struct _MSVideoConferenceParams MSVideoConferenceParams;
+
+#ifdef __cplusplus
+
+extern "C" {
+
+#endif
 
 /**
  * The MSVideoConference is the object representing a video conference.
@@ -286,12 +299,6 @@ typedef struct _MSVideoConference MSVideoConference;
 **/
 typedef struct _MSVideoEndpoint MSVideoEndpoint;
 
-
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /**
  * Creates a conference.
@@ -320,7 +327,6 @@ MS2_PUBLIC void ms_video_conference_add_member(MSVideoConference *obj, MSVideoEn
  * @param ep the participant, represented as a MSVideoEndpoint object
 **/
 MS2_PUBLIC void ms_video_conference_remove_member(MSVideoConference *obj, MSVideoEndpoint *ep);
-
 
 /**
  * Switch the focus of the video conf on a given member.
@@ -356,6 +362,12 @@ MS2_PUBLIC void ms_video_conference_set_audio_conference(MSVideoConference *obj,
  * @param obj the conference
 **/
 MS2_PUBLIC int ms_video_conference_get_size(MSVideoConference *obj);
+
+/**
+ * Returns weather the conference uses all to all filter.
+ * @param obj the conference
+**/
+MS2_PUBLIC bool_t ms_video_conference_is_all_to_all(MSVideoConference *obj);
 
 /**
  * Destroys a conference.
@@ -427,10 +439,10 @@ MS2_PUBLIC void ms_video_endpoint_release_from_stream(MSVideoEndpoint *obj);
 #ifdef __cplusplus
 }
 #endif
+#endif
 
 /**
  * @}
  */
 
 #endif
-
