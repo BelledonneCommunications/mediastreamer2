@@ -110,7 +110,7 @@ static int player_open(MSFilter *f, void *arg){
 	if (d->fd!=-1){
 		player_close(f,NULL);
 	}
-	if ((fd=open(file,O_RDONLY|O_BINARY))==-1){
+	if ((fd=open(file,O_RDONLY))==-1){
 		ms_warning("MSPCAPFilePlayer[%p]: failed to open %s: %s",f,file,strerror(errno));
 		return -1;
 	}
