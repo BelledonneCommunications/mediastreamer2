@@ -281,6 +281,12 @@ static void dtmfgen_process(MSFilter *f){
 	int nsamples;
 
 	ms_filter_lock(f);
+// The only case where s->silence wasn't reduce is : ms_queue_empty && s->nosamples_time<=NO_SAMPLES_THRESHOLD
+	if (s->current_tone.interval > 0) {	// && s->playing?
+			s->silence-=f->ticker->interval;
+			if (s->silence<0) s->silence=0;
+	} else s->silence=0;
+//-------------------------------------	
 	if (ms_queue_empty(f->inputs[0])){
 		s->nosamples_time+=f->ticker->interval;
 		if ((s->playing || s->silence!=0) && s->nosamples_time>NO_SAMPLES_THRESHOLD){
@@ -298,18 +304,12 @@ static void dtmfgen_process(MSFilter *f){
 				write_dtmf(s,(int16_t*)m->b_wptr,nsamples);
 			}else{
 				memset(m->b_wptr,0,nsamples*s->nchannels*2);
-				s->silence-=f->ticker->interval;
-				if (s->silence<0) s->silence=0;
 			}
 			m->b_wptr+=nsamples*s->nchannels*2;
 			ms_queue_put(f->outputs[0],m);
 		}
 	}else{
 		s->nosamples_time=0;
-		if (s->current_tone.interval > 0) {
-			s->silence-=f->ticker->interval;
-			if (s->silence<0) s->silence=0;
-		} else s->silence=0;
 		while((m=ms_queue_get(f->inputs[0]))!=NULL){
 			if (s->playing && s->silence==0){
 				if (s->pos==0){
