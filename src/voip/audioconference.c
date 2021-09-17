@@ -232,7 +232,9 @@ void ms_audio_conference_process_events(MSAudioConference *obj){
 	
 	for (elem = obj->members; elem != NULL; elem = elem->next){
 		MSAudioEndpoint *ep = (MSAudioEndpoint *) elem->data;
-		int is_remote = (ep->in_cut_point_prev.filter == ep->st->volrecv);
+		int is_remote;
+		if (ep->st == NULL) continue; /* This happens for the player/recorder special endpoint */
+		is_remote = (ep->in_cut_point_prev.filter == ep->st->volrecv);
 		MSFilter *volume_filter = is_remote ? ep->st->volrecv : ep->st->volsend;
 		if (ep->muted) continue;
 		if (volume_filter){
