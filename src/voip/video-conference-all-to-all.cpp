@@ -135,7 +135,7 @@ void VideoConferenceAllToAll::addMember(VideoEndpoint *ep) {
 
 static int find_first_remote_endpoint(const VideoEndpoint *ep, const void *dummy)
 {
-	return !ep->mIsRemote;
+	return !(ep->mIsRemote && ep->connected);
 }
 
 static int find_connected_endpoint(const VideoEndpoint *ep, const void *dummy)
