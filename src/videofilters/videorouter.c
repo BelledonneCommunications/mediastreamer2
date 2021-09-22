@@ -75,17 +75,22 @@ typedef struct _OutputContext{
 	uint32_t adjusted_out_ts;
 	uint16_t out_seq;
 	int source;
+	int next_source;
+	int current_source;
+	int switched;
 }OutputContext;
 
 typedef struct RouterState{
 	InputContext input_contexts[ROUTER_MAX_CHANNELS];
 	OutputContext output_contexts[ROUTER_MAX_OUTPUT_CHANNELS];
+	int focus_pin;
 	is_key_frame_func_t is_key_frame;
 } RouterState;
 
 static void router_init(MSFilter *f){
 	RouterState *s=ms_new0(RouterState,1);
 	s->is_key_frame=is_key_frame_dummy;
+	s->focus_pin = -1;
 	f->data=s;
 }
 
@@ -99,6 +104,7 @@ static int router_configure_output(MSFilter *f, void *data){
 	MSVideoRouterPinData *pd = (MSVideoRouterPinData *)data;
 	ms_filter_lock(f);
 	s->output_contexts[pd->output].source = pd->input;
+	s->output_contexts[pd->output].switched =pd->switched;
 	ms_filter_unlock(f);
 	ms_message("%s: router configure output pin %i with input pin %i", f->desc->name, pd->output, pd->input);
 	return 0;
@@ -149,6 +155,16 @@ static void router_channel_update_input(RouterState *s, int pin, MSQueue *q){
 	}
 }
 
+static int next_input_pin(MSFilter *f, int i){
+	int k;
+	for(k=i+1;k<i+1+f->desc->ninputs;k++){
+		int next_pin=k % f->desc->ninputs;
+		if (f->inputs[next_pin]) return next_pin;
+	}
+	ms_error("next_input_pin: should not happen");
+	return 0;
+}
+
 static void router_transfer(MSFilter *f, MSQueue *input,  MSQueue *output, OutputContext *output_context, mblk_t *start){
 	mblk_t *m;
 	if (ms_queue_empty(input)) return;
@@ -175,7 +191,29 @@ static void router_transfer(MSFilter *f, MSQueue *input,  MSQueue *output, Outpu
 	}
 }
 
+static void _router_set_focus(MSFilter *f, RouterState *s , int pin){
+	int i;
+	for (i = 0 ; i < f->desc->noutputs ; ++i){
+		if (i != pin){
+			s->output_contexts[i].next_source = pin;
+		}
+	}
+	s->focus_pin=pin;
+}
+
 static void router_preprocess(MSFilter *f){
+	RouterState *s=(RouterState *)f->data;
+	int i;
+	
+	if (s->focus_pin == -1){
+		for(i=0;i<f->desc->noutputs;++i){
+			MSQueue *q = f->outputs[i];
+			if (q){
+				_router_set_focus(f, s, i);
+				break;
+			}
+		}
+	}
 }
 
 static void router_postprocess(MSFilter *f){
@@ -209,7 +247,43 @@ static void router_process(MSFilter *f){
 		InputContext *input_context;
 
 		if (q){
-			if (output_context->source != -1 && f->inputs[output_context->source]){
+			mblk_t *key_frame_start = NULL;
+
+			if (output_context->switched) {
+				// need to be switched
+				if (f->inputs[output_context->next_source] == NULL){
+					ms_warning("%s: next source %i disapeared, choosing another one.", f->desc->name, output_context->next_source);
+					output_context->next_source = next_input_pin(f, output_context->next_source);
+				}
+				if (output_context->current_source != -1 && f->inputs[output_context->current_source] == NULL){
+					ms_warning("%s: current source %i disapeared, choosing another one to switch to.", f->desc->name, output_context->current_source);
+					output_context->next_source = next_input_pin(f, output_context->current_source);
+					output_context->current_source = -1; /* Invalidate the current source until the switch.*/
+				}
+				
+				if (output_context->current_source != output_context->next_source){
+					/* This output is waiting a key-frame to start */
+					input_context = &s->input_contexts[output_context->next_source];
+					if (input_context->key_frame_start != NULL){
+						/* The input just got a key frame, we can switch ! */
+						output_context->current_source = output_context->next_source;
+						key_frame_start = input_context->key_frame_start;
+					}else{
+						/* else request a key frame */
+						if (input_context->key_frame_requested == FALSE){
+							ms_message("%s: need key-frame for pin %i", f->desc->name, output_context->next_source);
+							input_context->key_frame_requested = TRUE;
+						}
+					}
+				}
+				
+				if (output_context->current_source != -1){
+					input_context = &s->input_contexts[output_context->current_source];
+					if (input_context->state == RUNNING){
+						router_transfer(f, f->inputs[output_context->current_source], q, output_context, key_frame_start);
+					}
+				}
+			} else if (output_context->source != -1 && f->inputs[output_context->source]){
 				input_context = &s->input_contexts[output_context->source];
 				if (input_context->state == RUNNING){
 					router_transfer(f, f->inputs[output_context->source], q, output_context, NULL);
@@ -223,6 +297,22 @@ static void router_process(MSFilter *f){
 		if (q) ms_queue_flush(q);
 	}
 	ms_filter_unlock(f);
+}
+
+static int router_set_focus(MSFilter *f, void *data){
+	RouterState *s=(RouterState *)f->data;
+	int pin=*(int*)data;
+	if (pin<0 || pin>=f->desc->ninputs){
+		ms_warning("router_set_focus: invalid pin number %i",pin);
+		return -1;
+	}
+	if (s->focus_pin!=pin){
+		ms_filter_lock(f);
+		_router_set_focus(f, s, pin);
+		ms_filter_unlock(f);
+		ms_message("%s: focus requested on pin %i", f->desc->name, pin);
+	}
+	return 0;
 }
 
 static int router_set_fmt(MSFilter *f, void *data){
@@ -288,6 +378,7 @@ static int router_notify_fir(MSFilter *f, void *data){
 static MSFilterMethod methods[]={
 	{	MS_VIDEO_ROUTER_CONFIGURE_OUTPUT , router_configure_output },
 	{	MS_VIDEO_ROUTER_UNCONFIGURE_OUTPUT , router_unconfigure_output },
+	{	MS_VIDEO_ROUTER_SET_FOCUS , router_set_focus},
 	{	MS_VIDEO_ROUTER_SET_AS_LOCAL_MEMBER , router_set_local_member_pin },
 	{	MS_VIDEO_ROUTER_NOTIFY_PLI, router_notify_pli },
 	{	MS_VIDEO_ROUTER_NOTIFY_FIR, router_notify_fir },

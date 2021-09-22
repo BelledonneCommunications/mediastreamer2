@@ -583,6 +583,14 @@ void video_stream_set_label(VideoStream *s, const char *flabel){
 		s->label=ms_strdup(flabel);
 }
 
+void video_stream_enable_thumbnail(VideoStream *s, bool_t enabled) {
+	s->is_thumbnail = enabled;
+}
+
+bool_t video_stream_thumbnail_enabled(VideoStream *s) {
+	return s->is_thumbnail;
+}
+
 void video_stream_enable_router(VideoStream *s, bool_t enable) {
 	s->use_router = enable;
 }
