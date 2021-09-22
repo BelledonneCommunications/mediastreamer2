@@ -968,6 +968,7 @@ struct _VideoStream
 	char *label;
 	bool_t use_router;
 	bool_t resize_from_source;
+	bool_t is_thumbnail;
 };
 
 typedef struct _VideoStream VideoStream;
@@ -1001,6 +1002,8 @@ MS2_PUBLIC void video_stream_set_event_callback(VideoStream *s, VideoStreamEvent
 MS2_PUBLIC void video_stream_set_camera_not_working_callback(VideoStream *s, VideoStreamCameraNotWorkingCallback cb, void *user_pointer);
 MS2_PUBLIC void video_stream_set_display_filter_name(VideoStream *s, const char *fname);
 MS2_PUBLIC void video_stream_set_label(VideoStream *s, const char *flabel);
+MS2_PUBLIC void video_stream_enable_thumbnail(VideoStream *s, bool_t enabled);
+MS2_PUBLIC bool_t video_stream_thumbnail_enabled(VideoStream *s);
 MS2_PUBLIC void video_stream_enable_router(VideoStream *s, bool_t enable);
 MS2_PUBLIC int video_stream_start_with_source(VideoStream *stream, RtpProfile *profile, const char *rem_rtp_ip, int rem_rtp_port,
 		const char *rem_rtcp_ip, int rem_rtcp_port, int payload, int jitt_comp, MSWebCam* cam, MSFilter* source);

@@ -53,6 +53,8 @@ public:
 	std::string mName=""; /*Particapant*/
 	int mIsRemote=0;
 	int mLastTmmbrReceived=0; /*Value in bits/s */
+	bool thumbnail = false; /* todo ? false for active speaker */
+	bool switched = false;
 };
 
 class VideoConferenceGeneric {
@@ -129,9 +131,11 @@ public:
 	int findFreeInputPin ();
 	void unconfigureOutput(int pin) override;
 	bool allToAllEnabled() const override { return true; }
+	void setFocus(VideoEndpoint *ep) override;
 	
 
 protected:
+	void addVideoPlaceholderMember() override;
 	int findSinkPin(std::string participant);
 	int findSourcePin(std::string participant);
 	void configureOutput(VideoEndpoint *ep) override;
