@@ -151,6 +151,10 @@ static int rec_open(MSFilter *f, void *arg){
 				ms_error("Could not lseek to end of file: %s",strerror(err));
 			}
 		}else ms_error("fstat() failed: %s",strerror(errno));
+	}else{
+                if (s->is_wav){
+                        write_wav_header(s->fd, s->rate, s->nchannels, s->size);
+                }
 	}
 	ms_message("MSFileRec: recording into %s",filename);
 	s->writer = ms_async_writer_new(s->fd);
