@@ -53,7 +53,6 @@ public:
 	std::string mName=""; /*Particapant*/
 	int mIsRemote=0;
 	int mLastTmmbrReceived=0; /*Value in bits/s */
-	bool thumbnail = false; /* todo ? false for active speaker */
 	bool switched = false;
 };
 

@@ -74,7 +74,6 @@ typedef struct _OutputContext{
 	uint32_t out_ts;
 	uint32_t adjusted_out_ts;
 	uint16_t out_seq;
-	int source;
 	int next_source;
 	int current_source;
 	int switched;
@@ -103,7 +102,7 @@ static int router_configure_output(MSFilter *f, void *data){
 	RouterState *s=(RouterState *)f->data;
 	MSVideoRouterPinData *pd = (MSVideoRouterPinData *)data;
 	ms_filter_lock(f);
-	s->output_contexts[pd->output].source = pd->input;
+	s->output_contexts[pd->output].current_source = pd->input;
 	s->output_contexts[pd->output].switched =pd->switched;
 	ms_filter_unlock(f);
 	ms_message("%s: router configure output pin %i with input pin %i", f->desc->name, pd->output, pd->input);
@@ -114,7 +113,7 @@ static int router_unconfigure_output(MSFilter *f, void *data){
 	RouterState *s=(RouterState *)f->data;
 	int pin = *(int*)data;
 	ms_filter_lock(f);
-	s->output_contexts[pin].source = -1;
+	s->output_contexts[pin].current_source = -1;
 	ms_filter_unlock(f);
 	ms_message("%s: router unconfigure output pin %i ", f->desc->name, pin);
 	return 0;
@@ -250,7 +249,6 @@ static void router_process(MSFilter *f){
 			mblk_t *key_frame_start = NULL;
 
 			if (output_context->switched) {
-				// need to be switched
 				if (f->inputs[output_context->next_source] == NULL){
 					ms_warning("%s: next source %i disapeared, choosing another one.", f->desc->name, output_context->next_source);
 					output_context->next_source = next_input_pin(f, output_context->next_source);
@@ -283,10 +281,10 @@ static void router_process(MSFilter *f){
 						router_transfer(f, f->inputs[output_context->current_source], q, output_context, key_frame_start);
 					}
 				}
-			} else if (output_context->source != -1 && f->inputs[output_context->source]){
-				input_context = &s->input_contexts[output_context->source];
+			} else if (output_context->current_source != -1 && f->inputs[output_context->current_source]){
+				input_context = &s->input_contexts[output_context->current_source];
 				if (input_context->state == RUNNING){
-					router_transfer(f, f->inputs[output_context->source], q, output_context, NULL);
+					router_transfer(f, f->inputs[output_context->current_source], q, output_context, NULL);
 				}
 			}
 		}
@@ -352,7 +350,7 @@ static int router_notify_pli(MSFilter *f, void *data){
 		return -1;
 	}
 	/* Propagate the PLI to the current input source. */
-	source_pin = s->output_contexts[pin].source;
+	source_pin = s->output_contexts[pin].current_source;
 	if (source_pin != -1){
 		ms_filter_notify(f, MS_VIDEO_ROUTER_SEND_PLI, &source_pin);
 	}
@@ -368,7 +366,7 @@ static int router_notify_fir(MSFilter *f, void *data){
 		return -1;
 	}
 	/* Propagate the FIR to the current input source. */
-	source_pin = s->output_contexts[pin].source;
+	source_pin = s->output_contexts[pin].current_source;
 	if (source_pin != -1){
 		ms_filter_notify(f, MS_VIDEO_ROUTER_SEND_FIR, &source_pin);
 	}
