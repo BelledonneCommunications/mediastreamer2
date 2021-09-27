@@ -80,7 +80,7 @@ typedef struct _OutputContext{
 }OutputContext;
 
 typedef struct RouterState{
-	InputContext input_contexts[ROUTER_MAX_CHANNELS];
+	InputContext input_contexts[ROUTER_MAX_INPUT_CHANNELS];
 	OutputContext output_contexts[ROUTER_MAX_OUTPUT_CHANNELS];
 	int focus_pin;
 	is_key_frame_func_t is_key_frame;
