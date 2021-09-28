@@ -145,7 +145,7 @@ void VideoConferenceAllToAll::addMember(VideoEndpoint *ep) {
 	/* now connect to the filter */
 	ep->mConference = (MSVideoConference *)this;
 	if (media_stream_get_direction(&ep->mSt->ms) == MediaStreamSendOnly) {
-		if (findSinkPin(ep->mName) == -1) { // todo
+		if (!ep->mName.empty() && findSinkPin(ep->mName) == -1) { // todo
 			ep->mOutPin = findFreeOutputPin();
 			ms_message("[all to all] add endpoint %s with output pin %d", ep->mName.c_str(), ep->mOutPin);
 			connectEndpoint(ep);
