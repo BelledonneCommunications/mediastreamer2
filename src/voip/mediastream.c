@@ -208,6 +208,7 @@ void ms_media_stream_sessions_uninit(MSMediaStreamSessions *sessions){
 		ms_srtp_context_delete(sessions->srtp_context);
 		sessions->srtp_context=NULL;
 	}
+
 	if (sessions->rtp_session) {
 		rtp_session_destroy(sessions->rtp_session);
 		sessions->rtp_session=NULL;
