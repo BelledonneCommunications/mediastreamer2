@@ -128,8 +128,22 @@ static void router_channel_update_input(RouterState *s, int pin, MSQueue *q){
 		uint32_t new_ts = mblk_get_timestamp_info(m);
 		uint16_t new_seq = mblk_get_cseq(m);
 		//uint8_t marker = mblk_get_marker_info(m);
-		
-		if (!input_context->seq_set){
+	
+		if (!input_context->ignore_cseq && (new_seq != input_context->cur_seq + 1)){
+			ms_warning("MSVideoRouter: Sequence discontinuity detected on pin %i, key-frame requested", pin);
+			input_context->state = STOPPED;
+			//input_context->key_frame_requested = TRUE;
+		}
+		if (!input_context->seq_set || input_context->cur_ts != new_ts){
+			/* Possibly a beginning of frame ! */
+			//if (s->is_key_frame(m)){
+			//	ms_message("MSVideoRouter: key frame detected on pin %i", pin);
+				input_context->state = RUNNING;
+				input_context->key_frame_start = m;
+			//	input_context->key_frame_requested = FALSE;
+			//}
+		}
+	/*	if (!input_context->seq_set){
 			input_context->state = STOPPED;
 			input_context->key_frame_requested = TRUE;
 		}else if (!input_context->ignore_cseq && (new_seq != input_context->cur_seq + 1)){
@@ -139,7 +153,7 @@ static void router_channel_update_input(RouterState *s, int pin, MSQueue *q){
 		}
 		if (input_context->key_frame_requested){
 			if (!input_context->seq_set || input_context->cur_ts != new_ts){
-				/* Possibly a beginning of frame ! */
+				
 				if (s->is_key_frame(m)){
 					ms_message("MSVideoRouter: key frame detected on pin %i", pin);
 					input_context->state = RUNNING;
@@ -147,7 +161,7 @@ static void router_channel_update_input(RouterState *s, int pin, MSQueue *q){
 					input_context->key_frame_requested = FALSE;
 				}
 			}
-		}
+		} */
 		input_context->cur_ts = new_ts;
 		input_context->cur_seq = new_seq;
 		input_context->seq_set = 1;
@@ -226,16 +240,17 @@ static void router_process(MSFilter *f){
 	/* First update channel states according to their received packets */
 	for(i=0;i<f->desc->ninputs;++i){
 		MSQueue *q=f->inputs[i];
-		InputContext *input_context=&s->input_contexts[i];
+		//InputContext *input_context=&s->input_contexts[i];
 		if (q) {
 			router_channel_update_input(s, i, q);
-			if (!ms_queue_empty(q) && input_context->key_frame_requested){
+		/*	if (!ms_queue_empty(q) && input_context->key_frame_requested){
+			
 				if (input_context->state == STOPPED){
 					ms_filter_notify(f, MS_VIDEO_ROUTER_SEND_PLI, &i);
 				}else{
 					ms_filter_notify(f,MS_VIDEO_ROUTER_SEND_FIR, &i);
 				}
-			}
+			}*/
 		}
 	}
 
