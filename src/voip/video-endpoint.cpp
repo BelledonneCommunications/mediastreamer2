@@ -97,14 +97,12 @@ void VideoEndpoint::cutVideoStreamGraph(bool isRemote, VideoStream *st) {
 	mIsRemote=isRemote;
 	mInCutPointPrev.pin=0;
 	// todo remove use_router
-	if (media_stream_get_direction(&mSt->ms) != MediaStreamSendOnly) {
-		if (isRemote){
-			/*we need to cut just after the rtp recveiver*/
-			mInCutPointPrev.filter=mSt->ms.rtprecv;
-		}else{
-			/*we need to cut just after the encoder*/
-			mInCutPointPrev.filter=mSt->ms.encoder;
-		}
+	if (isRemote && media_stream_get_direction(&mSt->ms) != MediaStreamSendOnly) {
+		/*we need to cut just after the rtp recveiver*/
+		mInCutPointPrev.filter=mSt->ms.rtprecv;
+	} else if (!isRemote && media_stream_get_direction(&mSt->ms) != MediaStreamRecvOnly) {
+		/*we need to cut just after the encoder*/
+		mInCutPointPrev.filter=mSt->ms.encoder;
 	}
 
 	if (mInCutPointPrev.filter){
@@ -113,12 +111,10 @@ void VideoEndpoint::cutVideoStreamGraph(bool isRemote, VideoStream *st) {
 	}
 
 	mOutCutPoint.pin=0;
-	if (media_stream_get_direction(&mSt->ms) != MediaStreamRecvOnly) {
-		if (isRemote){
-			mOutCutPoint.filter=mSt->ms.rtpsend;
-		}else{
-			mOutCutPoint.filter=mSt->ms.decoder;
-		}
+	if (isRemote && media_stream_get_direction(&mSt->ms) != MediaStreamRecvOnly) {
+		mOutCutPoint.filter=mSt->ms.rtpsend;
+	} else if (!isRemote && media_stream_get_direction(&mSt->ms) != MediaStreamSendOnly) {
+		mOutCutPoint.filter=mSt->ms.decoder;
 	}
 	if (mOutCutPoint.filter){
 		mOutCutPointPrev=just_before(mOutCutPoint.filter);
