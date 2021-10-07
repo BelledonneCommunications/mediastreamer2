@@ -141,7 +141,7 @@
 
 		glClearColor(0, 0, 0, 0);
 		glClear(GL_COLOR_BUFFER_BIT);
-		ogl_display_render(display_helper, 0);
+		ogl_display_render(display_helper, 0, mode);
 
 		CGLUnlockContext(cglContext);
 		CGLSetCurrentContext(savedContext);
@@ -179,6 +179,7 @@
 	CALayer* layer;
 	CAMsGLLayer* glLayer;
 	int corner;
+	OglDisplayMode mode;
 }
 @property (assign) BOOL closeWindow;
 @property (assign) BOOL autoWindow;
@@ -213,6 +214,7 @@
 		closeWindow = FALSE;
 		autoWindow = TRUE;
 		corner = 0;
+		mode = OglDisplayBlackBars;
 	}
 	return self;
 }
@@ -461,12 +463,19 @@ static int osx_gl_set_local_view_mode(MSFilter* f, void* arg) {
 	return 0;
 }
 
+static int osx_gl_set_mode(MSFilter* f, void* arg) {
+	OSXDisplay* thiz = (OSXDisplay*) f->data;
+	thiz.mode = *(OglDisplayMode*)arg;
+	return 0;
+}
+
 static MSFilterMethod methods[]={
 	{MS_FILTER_SET_VIDEO_SIZE, osx_gl_set_vsize},
 	{MS_VIDEO_DISPLAY_GET_NATIVE_WINDOW_ID, osx_gl_get_native_window_id},
 	{MS_VIDEO_DISPLAY_SET_NATIVE_WINDOW_ID, osx_gl_set_native_window_id},
 	{MS_VIDEO_DISPLAY_ENABLE_MIRRORING, osx_gl_enable_mirroring},
 	{MS_VIDEO_DISPLAY_SET_LOCAL_VIEW_MODE, osx_gl_set_local_view_mode},
+	{MS_VIDEO_DISPLAY_SET_MODE, osx_gl_set_mode},
 	{ 0, NULL }
 };
 
