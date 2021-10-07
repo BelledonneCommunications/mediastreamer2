@@ -439,7 +439,7 @@ static void check_stun_sending(MSFilter *f) {
 	uint64_t last_sent_timeout = 20000;
 	if (rtp_session_get_stats(s)->packet_sent == 0)
 		last_sent_timeout = 2000;
-	if ((d->last_rtp_stun_sent_time == -1) || (  (d->stun_forced_enabled ||  ((f->ticker->time - d->last_sent_time) > last_sent_timeout))
+	if ((d->last_rtp_stun_sent_time == -1 && f->ticker) || (  (d->stun_forced_enabled ||  ((f->ticker->time - d->last_sent_time) > last_sent_timeout))
 											&& (f->ticker->time - d->last_rtp_stun_sent_time) >= 500)) {
 		/* send stun packet every 500 ms: 
 		 * - in absence of any RTP packet for more than last_sent_timeout
@@ -448,7 +448,7 @@ static void check_stun_sending(MSFilter *f) {
 		send_stun_packet(d,TRUE,FALSE);
 	}
 	
-	if ( rtp_session_rtcp_enabled(s) && (d->last_rtcp_stun_sent_time == -1
+	if ( rtp_session_rtcp_enabled(s) && ((d->last_rtcp_stun_sent_time == -1 && f->ticker)
 										 || (rtp_session_get_stats(s)->recv_rtcp_packets == 0 /*no need to send stun packets if rtcp packet already received*/
 											 && (f->ticker->time - d->last_rtcp_stun_sent_time) >= 500))) {
 		d->last_rtcp_stun_sent_time = f->ticker->time;
@@ -511,6 +511,8 @@ static void _sender_process(MSFilter * f)
 	im = ms_queue_get(f->inputs[0]);
 	do {
 		mblk_t *header = NULL;
+		if (f->ticker) {
+		
 
 		timestamp = get_cur_timestamp(f, im);
 		
@@ -527,7 +529,8 @@ static void _sender_process(MSFilter * f)
 				send_dtmf(f, origin_ts);
 			}
 		}
-		if (im){
+		}
+		if (im && f->ticker){
 			compute_processing_delay_stats(f, im);
 			if (d->skip == FALSE && d->mute==FALSE){
 				if ((d->mixer_to_client_extension_id > 0 || d->client_to_mixer_extension_id > 0)
