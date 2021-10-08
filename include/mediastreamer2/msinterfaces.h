@@ -96,6 +96,10 @@ struct _MSVideoDisplayDecodingSupport {
 #define MS_VIDEO_DISPLAY_SET_DEVICE_ORIENTATION \
    MS_FILTER_METHOD(MSFilterVideoDisplayInterface,11,int)
 
+/**Specify the display mode */
+#define MS_VIDEO_DISPLAY_SET_MODE \
+   MS_FILTER_METHOD(MSFilterVideoDisplayInterface,12,int)
+
 /**
   * Interface definitions for players
 **/
