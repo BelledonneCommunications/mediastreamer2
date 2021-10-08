@@ -699,6 +699,44 @@ struct ReceiverData {
 
 typedef struct ReceiverData ReceiverData;
 
+/* Workround  Send dummy STUN packet to open NAT ports ASAP. */
+static void send_stun_packet_for_recvonly(ReceiverData *d, bool_t enable_rtp, bool_t enable_rtcp)
+{
+	MSStunMessage *msg;
+	mblk_t *mp;
+	RtpSession *s = d->session;
+	char *buf = NULL;
+	size_t len;
+
+	//if (!d->stun_enabled && !d->stun_forced_enabled) return;
+	if (ms_is_multicast_addr((const struct sockaddr *)&s->rtcp.gs.loc_addr)) {
+		ms_debug("Stun packet not sent for session [%p] because of multicast",s);
+		return;
+	}
+
+	msg = ms_stun_binding_request_create();
+	len = ms_stun_message_encode(msg, &buf);
+	if (len > 0) {
+		if (enable_rtp) {
+			mp = allocb(len, BPRI_MED);
+			memcpy(mp->b_wptr, buf, len);
+			mp->b_wptr += len;
+
+			ms_message("Stun packet of length %0zd sent on rtp for session [%p]",len, s);
+			rtp_session_sendm_with_ts(s, mp, 0);
+		}
+		if (enable_rtcp) {
+			mp = allocb(len, BPRI_MED);
+			memcpy(mp->b_wptr, buf, len);
+			mp->b_wptr += len;
+			ms_message("Stun packet of length %0zd sent on rtcp for session [%p]",len, s);
+			rtp_session_rtcp_sendm_raw(s,mp);
+		}
+	}
+	if (buf != NULL) ms_free(buf);
+	ms_stun_message_destroy(msg);
+}
+
 static void receiver_init(MSFilter * f)
 {
 	ReceiverData *d = (ReceiverData *)ms_new0(ReceiverData, 1);
@@ -890,6 +928,10 @@ static void receiver_process(MSFilter * f)
 	/*every second compute recv bandwidth*/
 	if (f->ticker->time % 1000 == 0)
 		rtp_session_compute_recv_bandwidth(d->session);
+
+	/*Workround every second send stun*/
+    if (f->ticker->time % 1000 == 0)
+        send_stun_packet_for_recvonly(d,TRUE,TRUE);
 }
 
 static int get_receiver_output_fmt(MSFilter *f, void *arg) {
