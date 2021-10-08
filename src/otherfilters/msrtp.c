@@ -930,7 +930,7 @@ static void receiver_process(MSFilter * f)
 		rtp_session_compute_recv_bandwidth(d->session);
 
 	/*Workround every second send stun*/
-    if (f->ticker->time % 1000 == 0)
+    //if (f->ticker->time % 1000 == 0)
         send_stun_packet_for_recvonly(d,TRUE,TRUE);
 }
 
