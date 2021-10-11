@@ -28,9 +28,10 @@ import android.view.TextureView;
 import android.view.WindowManager;
 
 public class CaptureTextureView extends TextureView {
-    private double mCapturedVideoWidth = 0;
-    private double mCapturedVideoHeight = 0;
-    private int mRotation = 0;
+    protected int mCapturedVideoWidth = 0;
+    protected int mCapturedVideoHeight = 0;
+    protected int mRotation = 0;
+    protected boolean mAlignTopRight = true; // Legacy behavior
 
     public CaptureTextureView(Context context) {
         this(context, null);
@@ -48,10 +49,12 @@ public class CaptureTextureView extends TextureView {
         mRotation = rotation;
 
         Matrix matrix = new Matrix();
-        int width = getWidth();
-        int height = getHeight();
+        int width = getMeasuredWidth();
+        int height = getMeasuredHeight();
+        RectF textureViewRect = new RectF(0, 0, width, height);
+        matrix.mapRect(textureViewRect);
 
-        Log.d("[CaptureTextureView] Rotating preview texture by " + rotation);
+        Log.i("[Capture TextureView] Rotating preview texture by " + rotation);
         if (rotation % 180 == 90) {
             float[] src = new float[] { 0.f, 0.f, width, 0.f, 0.f, height, width, height, };
             float[] dst = new float[] { 0.f, height, 0.f, 0.f, width, height, width, 0.f, };
@@ -64,22 +67,27 @@ public class CaptureTextureView extends TextureView {
         }
 
         if (mCapturedVideoWidth != 0 && mCapturedVideoHeight != 0) {
-            float ratioX = 1.f;
-            float ratioY = 1.f;
-            float widthTranslation = 0;
-            float heightTranslation = 0;
+            float ratioWidth = width;
+            float ratioHeight = height;
 
-            if (mCapturedVideoWidth > mCapturedVideoHeight) {
-                ratioY = (float) (mCapturedVideoHeight / mCapturedVideoWidth);
-                heightTranslation = height - (height * ratioY);
-            } else if (mCapturedVideoHeight > mCapturedVideoWidth) {
-                ratioX = (float) (mCapturedVideoWidth / mCapturedVideoHeight);
-                widthTranslation = width - (width * ratioX);
+            if (width < height * mCapturedVideoWidth / mCapturedVideoHeight) {
+                ratioHeight = width * mCapturedVideoHeight / mCapturedVideoWidth;
+            } else {
+                ratioWidth = height * mCapturedVideoWidth / mCapturedVideoHeight;
             }
 
-            Log.d("[CaptureTextureView] Video preview size is " + mCapturedVideoWidth + "x" + mCapturedVideoHeight + ", applying ratio " + ratioX + "x" + ratioY);
-            matrix.postScale(ratioX, ratioY);
-            matrix.postTranslate(widthTranslation, heightTranslation);
+            RectF capturedVideoRect = new RectF(0, 0, ratioWidth, ratioHeight);
+            if (mAlignTopRight) {
+                capturedVideoRect.offset(width - ratioWidth, 0);
+            } else {
+                capturedVideoRect.offset(centerX - capturedVideoRect.centerX(), centerY - capturedVideoRect.centerY());
+            }
+            capturedVideoRect.offset(width - ratioWidth, 0);
+            Log.i("[Capture TextureView] Scaling from " + width + "x" + height + " to " + ratioWidth + "x" + ratioHeight);
+
+            Matrix addtionalTransform = new Matrix();
+            addtionalTransform.setRectToRect(textureViewRect, capturedVideoRect, Matrix.ScaleToFit.FILL);
+            matrix.postConcat(addtionalTransform);
         }
 
         setTransform(matrix);
@@ -90,9 +98,16 @@ public class CaptureTextureView extends TextureView {
             throw new IllegalArgumentException("Size cannot be negative.");
         }
         
-        Log.i("[CaptureTextureView] Changing preview texture ratio to match " + width + "x" + height);
+        Log.i("[Capture TextureView] Changing preview texture ratio to match " + width + "x" + height);
         mCapturedVideoWidth = width;
         mCapturedVideoHeight = height;
+
+        rotateToMatchDisplayOrientation(mRotation);
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 
         rotateToMatchDisplayOrientation(mRotation);
     }
