@@ -80,7 +80,7 @@ public class CaptureTextureView extends TextureView {
             if (mAlignTopRight) {
                 capturedVideoRect.offset(width - ratioWidth, 0);
             } else {
-                capturedVideoRect.offset(centerX - capturedVideoRect.centerX(), centerY - capturedVideoRect.centerY());
+                capturedVideoRect.offset(textureViewRect.centerX() - capturedVideoRect.centerX(), textureViewRect.centerY() - capturedVideoRect.centerY());
             }
             capturedVideoRect.offset(width - ratioWidth, 0);
             Log.i("[Capture TextureView] Scaling from " + width + "x" + height + " to " + ratioWidth + "x" + ratioHeight);
