@@ -69,7 +69,7 @@ extern "C" void audio_stream_volumes_reset_values(AudioStreamVolumes *volumes) {
 uint32_t audio_stream_volumes_get_best(AudioStreamVolumes *volumes) {
 	float max_db_over_member = MS_VOLUME_DB_LOWEST;
 	auto map = (VolumeMap *) volumes;
-	uint32_t best;
+	uint32_t best=0;
 
 	for (auto &values : *(map)) {
 		if (values.second > audio_threshold_min_db && values.second > max_db_over_member) {
