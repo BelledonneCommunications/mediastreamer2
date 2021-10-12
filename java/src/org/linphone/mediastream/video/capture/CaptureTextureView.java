@@ -37,6 +37,7 @@ public class CaptureTextureView extends TextureView {
     private int mCapturedVideoHeight = 0;
     private int mRotation = 0;
     private DisplayMode mActualMode = DisplayMode.BLACK_BARS;
+    private RectF mPreviewRect = null;
 
     protected boolean mAlignTopRight = true; // Legacy behavior, not used when display mode is OCCUPY_ALL_SPACE (obviously)
     protected DisplayMode mDisplayMode = DisplayMode.BLACK_BARS; // Legacy behavior
@@ -59,6 +60,10 @@ public class CaptureTextureView extends TextureView {
 
     public Size getPreviewVideoSize() {
         return new Size(mCapturedVideoWidth, mCapturedVideoHeight);
+    }
+
+    public RectF getPreviewRectF() {
+        return mPreviewRect;
     }
 
     public void rotateToMatchDisplayOrientation(int rotation) {
@@ -125,6 +130,8 @@ public class CaptureTextureView extends TextureView {
                     capturedVideoRect.offset(textureViewRect.centerX() - capturedVideoRect.centerX(), textureViewRect.centerY() - capturedVideoRect.centerY());
                 }
                 addtionalTransform.setRectToRect(textureViewRect, capturedVideoRect, Matrix.ScaleToFit.FILL);
+
+                mPreviewRect = capturedVideoRect;
             } else {
                 RectF capturedVideoRect = new RectF(0, 0, mCapturedVideoWidth, mCapturedVideoHeight);
                 float centerX = textureViewRect.centerX() - capturedVideoRect.centerX();
@@ -134,6 +141,8 @@ public class CaptureTextureView extends TextureView {
 
                 float scale = Math.max((float) height / mCapturedVideoHeight, (float) width / mCapturedVideoWidth);
                 addtionalTransform.postScale(scale, scale, textureViewRect.centerX(), textureViewRect.centerY());
+
+                mPreviewRect = textureViewRect;
             }
             matrix.postConcat(addtionalTransform);
         }
