@@ -24,6 +24,7 @@ import android.content.Context;
 import android.graphics.Matrix;
 import android.graphics.RectF;
 import android.util.AttributeSet;
+import android.util.Size;
 import android.view.TextureView;
 import android.view.WindowManager;
 
@@ -32,9 +33,11 @@ public class CaptureTextureView extends TextureView {
         BLACK_BARS, OCCUPY_ALL_SPACE, HYBRID  
     }
 
-    protected int mCapturedVideoWidth = 0;
-    protected int mCapturedVideoHeight = 0;
-    protected int mRotation = 0;
+    private int mCapturedVideoWidth = 0;
+    private int mCapturedVideoHeight = 0;
+    private int mRotation = 0;
+    private DisplayMode mActualMode = DisplayMode.BLACK_BARS;
+
     protected boolean mAlignTopRight = true; // Legacy behavior, not used when display mode is OCCUPY_ALL_SPACE (obviously)
     protected DisplayMode mDisplayMode = DisplayMode.BLACK_BARS; // Legacy behavior
 
@@ -48,6 +51,14 @@ public class CaptureTextureView extends TextureView {
 
     public CaptureTextureView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
+    }
+
+    public DisplayMode getActualDisplayMode() {
+        return mActualMode;
+    }
+
+    public Size getPreviewVideoSize() {
+        return new Size(mCapturedVideoWidth, mCapturedVideoHeight);
     }
 
     public void rotateToMatchDisplayOrientation(int rotation) {
@@ -73,7 +84,6 @@ public class CaptureTextureView extends TextureView {
         }
 
         if (mCapturedVideoWidth != 0 && mCapturedVideoHeight != 0) {
-            DisplayMode mode = mDisplayMode;
             Log.i("[Capture TextureView] TextureView size is " + width + "x" + height + ", captured video size is " + mCapturedVideoWidth + "x" + mCapturedVideoHeight);
             
             if (mDisplayMode == DisplayMode.HYBRID) {
@@ -82,10 +92,10 @@ public class CaptureTextureView extends TextureView {
                     || (height >= width && mCapturedVideoHeight >= mCapturedVideoWidth)
                 ) {
                     Log.i("[Capture TextureView] Hybrid mode enabled, display mode will be 'occupy all space'");
-                    mode = DisplayMode.OCCUPY_ALL_SPACE;
+                    mActualMode = DisplayMode.OCCUPY_ALL_SPACE;
                 } else {
                     Log.i("[Capture TextureView] Hybrid mode enabled, display mode will be 'black bars'");
-                    mode = DisplayMode.BLACK_BARS;
+                    mActualMode = DisplayMode.BLACK_BARS;
                 }
             } else {
                 if (mDisplayMode == DisplayMode.BLACK_BARS) {
@@ -93,13 +103,14 @@ public class CaptureTextureView extends TextureView {
                 } else {
                     Log.i("[Capture TextureView] Hybrid mode disabled, display mode will be 'occupy all space'");
                 }
+                mActualMode = mDisplayMode;
             }
 
             Matrix addtionalTransform = new Matrix();
             float ratioWidth = width;
             float ratioHeight = height;
 
-            if (mode == DisplayMode.BLACK_BARS) {
+            if (mActualMode == DisplayMode.BLACK_BARS) {
                 if (width < height * mCapturedVideoWidth / mCapturedVideoHeight) {
                     ratioHeight = width * mCapturedVideoHeight / mCapturedVideoWidth;
                 } else {
