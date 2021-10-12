@@ -28,10 +28,15 @@ import android.view.TextureView;
 import android.view.WindowManager;
 
 public class CaptureTextureView extends TextureView {
+    public enum DisplayMode {
+        BLACK_BARS, OCCUPY_ALL_SPACE, HYBRID  
+    }
+
     protected int mCapturedVideoWidth = 0;
     protected int mCapturedVideoHeight = 0;
     protected int mRotation = 0;
-    protected boolean mAlignTopRight = true; // Legacy behavior
+    protected boolean mAlignTopRight = true; // Legacy behavior, not used when display mode is OCCUPY_ALL_SPACE (obviously)
+    protected DisplayMode mDisplayMode = DisplayMode.BLACK_BARS; // Legacy behavior
 
     public CaptureTextureView(Context context) {
         this(context, null);
@@ -48,9 +53,10 @@ public class CaptureTextureView extends TextureView {
     public void rotateToMatchDisplayOrientation(int rotation) {
         mRotation = rotation;
 
-        Matrix matrix = new Matrix();
         int width = getMeasuredWidth();
         int height = getMeasuredHeight();
+
+        Matrix matrix = new Matrix();
         RectF textureViewRect = new RectF(0, 0, width, height);
         matrix.mapRect(textureViewRect);
 
@@ -67,25 +73,57 @@ public class CaptureTextureView extends TextureView {
         }
 
         if (mCapturedVideoWidth != 0 && mCapturedVideoHeight != 0) {
+            DisplayMode mode = mDisplayMode;
+            Log.i("[Capture TextureView] TextureView size is " + width + "x" + height + ", captured video size is " + mCapturedVideoWidth + "x" + mCapturedVideoHeight);
+            
+            if (mDisplayMode == DisplayMode.HYBRID) {
+                // If the image has the same orientation as the screen then use OccupyAllSpace mode
+                if ((width >= height && mCapturedVideoWidth >= mCapturedVideoHeight)
+                    || (height >= width && mCapturedVideoHeight >= mCapturedVideoWidth)
+                ) {
+                    Log.i("[Capture TextureView] Hybrid mode enabled, display mode will be 'occupy all space'");
+                    mode = DisplayMode.OCCUPY_ALL_SPACE;
+                } else {
+                    Log.i("[Capture TextureView] Hybrid mode enabled, display mode will be 'black bars'");
+                    mode = DisplayMode.BLACK_BARS;
+                }
+            } else {
+                if (mDisplayMode == DisplayMode.BLACK_BARS) {
+                    Log.i("[Capture TextureView] Hybrid mode disabled, display mode will be 'black bars'");
+                } else {
+                    Log.i("[Capture TextureView] Hybrid mode disabled, display mode will be 'occupy all space'");
+                }
+            }
+
+            Matrix addtionalTransform = new Matrix();
             float ratioWidth = width;
             float ratioHeight = height;
 
-            if (width < height * mCapturedVideoWidth / mCapturedVideoHeight) {
-                ratioHeight = width * mCapturedVideoHeight / mCapturedVideoWidth;
-            } else {
-                ratioWidth = height * mCapturedVideoWidth / mCapturedVideoHeight;
-            }
+            if (mode == DisplayMode.BLACK_BARS) {
+                if (width < height * mCapturedVideoWidth / mCapturedVideoHeight) {
+                    ratioHeight = width * mCapturedVideoHeight / mCapturedVideoWidth;
+                } else {
+                    ratioWidth = height * mCapturedVideoWidth / mCapturedVideoHeight;
+                }
 
-            RectF capturedVideoRect = new RectF(0, 0, ratioWidth, ratioHeight);
-            if (mAlignTopRight) {
-                capturedVideoRect.offset(width - ratioWidth, 0);
+                RectF capturedVideoRect = new RectF(0, 0, ratioWidth, ratioHeight);
+                if (mAlignTopRight) {
+                    Log.i("[Capture TextureView] Aligning the video in the rop-right corner");
+                    capturedVideoRect.offset(width - ratioWidth, 0);
+                } else {
+                    capturedVideoRect.offset(textureViewRect.centerX() - capturedVideoRect.centerX(), textureViewRect.centerY() - capturedVideoRect.centerY());
+                }
+                addtionalTransform.setRectToRect(textureViewRect, capturedVideoRect, Matrix.ScaleToFit.FILL);
             } else {
-                capturedVideoRect.offset(textureViewRect.centerX() - capturedVideoRect.centerX(), textureViewRect.centerY() - capturedVideoRect.centerY());
-            }
-            Log.i("[Capture TextureView] Scaling from " + width + "x" + height + " to " + ratioWidth + "x" + ratioHeight);
+                RectF capturedVideoRect = new RectF(0, 0, mCapturedVideoWidth, mCapturedVideoHeight);
+                float centerX = textureViewRect.centerX() - capturedVideoRect.centerX();
+                float centerY = textureViewRect.centerY() - capturedVideoRect.centerY();
+                capturedVideoRect.offset(centerX, centerY);
+                addtionalTransform.setRectToRect(textureViewRect, capturedVideoRect, Matrix.ScaleToFit.FILL);
 
-            Matrix addtionalTransform = new Matrix();
-            addtionalTransform.setRectToRect(textureViewRect, capturedVideoRect, Matrix.ScaleToFit.FILL);
+                float scale = Math.max((float) height / mCapturedVideoHeight, (float) width / mCapturedVideoWidth);
+                addtionalTransform.postScale(scale, scale, textureViewRect.centerX(), textureViewRect.centerY());
+            }
             matrix.postConcat(addtionalTransform);
         }
 
@@ -97,7 +135,7 @@ public class CaptureTextureView extends TextureView {
             throw new IllegalArgumentException("Size cannot be negative.");
         }
         
-        Log.i("[Capture TextureView] Changing preview texture ratio to match " + width + "x" + height);
+        Log.i("[Capture TextureView] Changing preview texture ratio to match " + width + "x" + height + " captured video size");
         mCapturedVideoWidth = width;
         mCapturedVideoHeight = height;
 
