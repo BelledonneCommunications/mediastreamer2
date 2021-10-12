@@ -482,6 +482,7 @@ static IceCheckList * ice_find_check_list_from_state(const IceSession *session, 
 {
 	int i;
 	for (i = 0; i < ICE_SESSION_MAX_CHECK_LISTS; i++) {
+ms_message("%s - DEBUG DEBUG stream idx %0d check list state %s searched state %s\n", __func__, i, (session->streams[i] ? ice_check_list_state_to_string(ice_check_list_state(session->streams[i])) : "Unknown"), ice_check_list_state_to_string(state));
 		if (session->streams[i] && ice_check_list_state(session->streams[i]) == state) return session->streams[i];
 	}
 	return NULL;
@@ -489,6 +490,7 @@ static IceCheckList * ice_find_check_list_from_state(const IceSession *session, 
 
 void ice_check_list_set_state(IceCheckList *cl, IceCheckListState state)
 {
+ms_message("%s - DEBUG DEBUG check list state %s new state %s\n", __func__, ice_check_list_state_to_string(cl->state), ice_check_list_state_to_string(state));
 	if (cl->state != state) {
 		cl->state = state;
 		if (ice_find_check_list_from_state(cl->session, ICL_Running) == NULL) {
