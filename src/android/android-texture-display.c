@@ -370,6 +370,7 @@ static int android_texture_display_set_zoom(MSFilter* f, void* arg) {
 static int android_texture_display_set_mode(MSFilter* f, void* arg) {
 	AndroidTextureDisplay *ad = (AndroidTextureDisplay*)f->data;
 	ad->mode = *((MSVideoDisplayMode *) arg);
+	ms_message("[TextureView Display] New display mode set: %i", ad->mode);
 	return 0;
 }
 
