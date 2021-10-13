@@ -872,6 +872,11 @@ static void ms_audio_flow_control_event_handler(void *user_data, MSFilter *sourc
 	}
 }
 
+void audio_stream_set_event_callback (AudioStream *s, AudioStreamEventCallback cb, void *user_pointer){
+	s->eventcb=cb;
+	s->event_pointer=user_pointer;
+}
+
 static void on_volumes_received(void *data, MSFilter *f, unsigned int event_id, void *event_arg) {
 	AudioStream *as=(AudioStream*)data;
 	rtp_audio_level_t *mtc_volumes;
@@ -884,6 +889,17 @@ static void on_volumes_received(void *data, MSFilter *f, unsigned int event_id, 
 			for(i = 0; i < RTP_MAX_MIXER_TO_CLIENT_AUDIO_LEVEL && mtc_volumes[i].csrc != 0; i++) {
 				audio_stream_volumes_insert(as->participants_volumes, mtc_volumes[i].csrc, (int)ms_volume_dbov_to_dbm0(mtc_volumes[i].dbov));
 			}
+
+			uint32_t ssrc = audio_stream_volumes_get_best(as->participants_volumes);
+			if (as->speaking_ssrc != ssrc && as->soundread) {
+				if (as->eventcb != NULL){
+					as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_SPEAKING_DEVICE_CHANGED,&ssrc);
+				} else {
+					ms_warning("IsSpeaking: can not notify participant device because eventcb is null.");
+				}
+				as->speaking_ssrc = ssrc;
+			}
+
 			break;
 		case MS_RTP_RECV_CLIENT_TO_MIXER_AUDIO_LEVEL_RECEIVED:
 			// Do nothing for now
@@ -928,7 +944,7 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 	ms_filter_call_method(stream->ms.rtpsend,MS_RTP_SEND_SET_SESSION,rtps);
 	stream->ms.rtprecv=ms_factory_create_filter(stream->ms.factory,MS_RTP_RECV_ID);
 	ms_filter_call_method(stream->ms.rtprecv,MS_RTP_RECV_SET_SESSION,rtps);
-	ms_filter_add_notify_callback(stream->ms.rtprecv, on_volumes_received, stream, TRUE);
+	ms_filter_add_notify_callback(stream->ms.rtprecv, on_volumes_received, stream, FALSE);
 	stream->ms.sessions.rtp_session=rtps;
 
 	// Set the header extension id for mixer to client audio level indication

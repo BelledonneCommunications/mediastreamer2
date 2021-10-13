@@ -382,6 +382,7 @@ typedef struct _MSMediaStreamIO {
 
 MS2_PUBLIC bool_t ms_media_stream_io_is_consistent(const MSMediaStreamIO *io);
 
+typedef void (*AudioStreamEventCallback)(void *user_pointer, const MSFilter *f, const unsigned int event_id, const void *args);
 struct _AudioStream
 {
 	MediaStream ms;
@@ -448,6 +449,9 @@ struct _AudioStream
 	struct _AudioStreamVolumes *participants_volumes;
 	int mixer_to_client_extension_id;
 	int client_to_mixer_extension_id;
+	uint32_t speaking_ssrc;
+	AudioStreamEventCallback eventcb;
+	void *event_pointer;
 };
 
 /**
@@ -856,6 +860,7 @@ MS2_PUBLIC void audio_stream_set_mixer_to_client_extension_id(AudioStream *strea
  */
 MS2_PUBLIC void audio_stream_set_client_to_mixer_extension_id(AudioStream *stream, int extension_id);
 
+MS2_PUBLIC void audio_stream_set_event_callback(AudioStream *s, AudioStreamEventCallback cb, void *user_pointer);
 /**
  * Retrieve the volume of the given participant.
  *
@@ -882,6 +887,7 @@ MS2_PUBLIC int audio_stream_volumes_find(AudioStreamVolumes *volumes, uint32_t s
 
 MS2_PUBLIC void audio_stream_volumes_reset_values(AudioStreamVolumes *volumes);
 
+uint32_t audio_stream_volumes_get_best(AudioStreamVolumes *volumes);
 /**
  * @}
 **/
