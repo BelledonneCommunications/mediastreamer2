@@ -254,7 +254,7 @@ void VideoConferenceAllToAll::connectEndpoint(VideoEndpoint *ep) {
 			member->connected = true;
 		}
 		plumb_to_conf(ep);
-		video_stream_set_encoder_control_callback(ep->mSt, ms_video_conference_process_encoder_control, ep);
+//		video_stream_set_encoder_control_callback(ep->mSt, ms_video_conference_process_encoder_control, ep);
 		ep->connected = true;
 		ms_message("[all to all] connect endpoint output pin %d with source pin %d", ep->mOutPin, ep->mSource);
 		ms_ticker_attach(mTicker,mMixer);
