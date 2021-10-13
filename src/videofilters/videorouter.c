@@ -129,11 +129,11 @@ static void router_channel_update_input(RouterState *s, int pin, MSQueue *q){
 		uint16_t new_seq = mblk_get_cseq(m);
 		//uint8_t marker = mblk_get_marker_info(m);
 	
-		if (!input_context->ignore_cseq && (new_seq != input_context->cur_seq + 1)){
+		/*if (!input_context->ignore_cseq && (new_seq != input_context->cur_seq + 1)){
 			ms_warning("MSVideoRouter: Sequence discontinuity detected on pin %i, key-frame requested", pin);
 			input_context->state = STOPPED;
 			//input_context->key_frame_requested = TRUE;
-		}
+		}*/
 		if (!input_context->seq_set || input_context->cur_ts != new_ts){
 			/* Possibly a beginning of frame ! */
 			//if (s->is_key_frame(m)){
@@ -298,9 +298,9 @@ static void router_process(MSFilter *f){
 				}
 			} else if (output_context->current_source != -1 && f->inputs[output_context->current_source]){
 				input_context = &s->input_contexts[output_context->current_source];
-				if (input_context->state == RUNNING){
+			//	if (input_context->state == RUNNING){
 					router_transfer(f, f->inputs[output_context->current_source], q, output_context, NULL);
-				}
+			//	}
 			}
 		}
 	}
