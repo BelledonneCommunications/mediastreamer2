@@ -890,14 +890,16 @@ static void on_volumes_received(void *data, MSFilter *f, unsigned int event_id, 
 				audio_stream_volumes_insert(as->participants_volumes, mtc_volumes[i].csrc, (int)ms_volume_dbov_to_dbm0(mtc_volumes[i].dbov));
 			}
 
-			uint32_t ssrc = audio_stream_volumes_get_best(as->participants_volumes);
-			if (as->speaking_ssrc != ssrc && as->soundread) {
-				if (as->eventcb != NULL){
-					as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_SPEAKING_DEVICE_CHANGED,&ssrc);
-				} else {
-					ms_warning("IsSpeaking: can not notify participant device because eventcb is null.");
+			if (audio_stream_volums_is_speaking(as->participants_volumes)) {
+				uint32_t ssrc = audio_stream_volumes_get_best(as->participants_volumes);
+				if (as->speaking_ssrc != ssrc && as->soundread) {
+					if (as->eventcb != NULL){
+						as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_SPEAKING_DEVICE_CHANGED,&ssrc);
+					} else {
+						ms_warning("IsSpeaking: can not notify participant device because eventcb is null.");
+					}
+					as->speaking_ssrc = ssrc;
 				}
-				as->speaking_ssrc = ssrc;
 			}
 
 			break;

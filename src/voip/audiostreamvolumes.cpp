@@ -81,3 +81,13 @@ uint32_t audio_stream_volumes_get_best(AudioStreamVolumes *volumes) {
 	return best;
 }
 
+bool_t audio_stream_volums_is_speaking(AudioStreamVolumes *volumes) {
+	auto map = (VolumeMap *) volumes;
+	for (auto &values : *(map)) {
+		if (values.second > audio_threshold_min_db) {
+			return true;
+		}
+	}
+	return false;
+}
+

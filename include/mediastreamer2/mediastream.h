@@ -887,6 +887,7 @@ MS2_PUBLIC int audio_stream_volumes_find(AudioStreamVolumes *volumes, uint32_t s
 
 MS2_PUBLIC void audio_stream_volumes_reset_values(AudioStreamVolumes *volumes);
 
+bool_t audio_stream_volums_is_speaking(AudioStreamVolumes *volumes);
 uint32_t audio_stream_volumes_get_best(AudioStreamVolumes *volumes);
 /**
  * @}
