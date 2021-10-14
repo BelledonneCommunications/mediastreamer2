@@ -896,6 +896,7 @@ static void on_volumes_received(void *data, MSFilter *f, unsigned int event_id, 
 					if (as->eventcb != NULL){
 						as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_DEVICE_START_SPEAKING,&ssrc);
 						as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_DEVICE_STOP_SPEAKING,&as->speaking_ssrc);
+						ms_message("IsSpeaking: notify participant device %ud start speaking and %ud stop speaking.", ssrc, as->speaking_ssrc);
 					} else {
 						ms_warning("IsSpeaking: can not notify participant device because eventcb is null.");
 					}
@@ -903,7 +904,10 @@ static void on_volumes_received(void *data, MSFilter *f, unsigned int event_id, 
 					as->is_speaking = TRUE;
 				}
 			} else if (as->is_speaking) {
-				as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_DEVICE_STOP_SPEAKING,&as->speaking_ssrc);
+				if (as->eventcb != NULL) {
+					as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_DEVICE_STOP_SPEAKING,&as->speaking_ssrc);
+					ms_message("IsSpeaking: notify participant device %ud stop speaking.", as->speaking_ssrc);
+				}
 				as->is_speaking = FALSE;
 			}
 
