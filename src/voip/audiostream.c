@@ -889,25 +889,24 @@ static void on_volumes_received(void *data, MSFilter *f, unsigned int event_id, 
 			for(i = 0; i < RTP_MAX_MIXER_TO_CLIENT_AUDIO_LEVEL && mtc_volumes[i].csrc != 0; i++) {
 				audio_stream_volumes_insert(as->participants_volumes, mtc_volumes[i].csrc, (int)ms_volume_dbov_to_dbm0(mtc_volumes[i].dbov));
 			}
+			if (!as->eventcb || !as->soundread)
+				break;
 
 			if (audio_stream_volums_is_speaking(as->participants_volumes)) {
 				uint32_t ssrc = audio_stream_volumes_get_best(as->participants_volumes);
-				if (as->speaking_ssrc != ssrc && as->soundread) {
-					if (as->eventcb != NULL){
-						as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_DEVICE_START_SPEAKING,&ssrc);
-						as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_DEVICE_STOP_SPEAKING,&as->speaking_ssrc);
-						ms_message("IsSpeaking: notify participant device %ud start speaking and %ud stop speaking.", ssrc, as->speaking_ssrc);
-					} else {
-						ms_warning("IsSpeaking: can not notify participant device because eventcb is null.");
-					}
-					as->speaking_ssrc = ssrc;
-					as->is_speaking = TRUE;
-				}
-			} else if (as->is_speaking) {
-				if (as->eventcb != NULL) {
+				if (as->speaking_ssrc != ssrc) {
+					as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_DEVICE_START_SPEAKING,&ssrc);
 					as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_DEVICE_STOP_SPEAKING,&as->speaking_ssrc);
-					ms_message("IsSpeaking: notify participant device %ud stop speaking.", as->speaking_ssrc);
+					ms_message("IsSpeaking: notify participant device %ud start speaking and %ud stop speaking.", ssrc, as->speaking_ssrc);
+					as->speaking_ssrc = ssrc;
+				} else if (!as->is_speaking) {
+					as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_DEVICE_START_SPEAKING,&ssrc);
+					ms_message("IsSpeaking: notify participant device %ud start speaking.", as->speaking_ssrc);
 				}
+				as->is_speaking = TRUE;
+			} else if (as->is_speaking) {
+				as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_DEVICE_STOP_SPEAKING,&as->speaking_ssrc);
+				ms_message("IsSpeaking: notify participant device %ud stop speaking.", as->speaking_ssrc);
 				as->is_speaking = FALSE;
 			}
 
