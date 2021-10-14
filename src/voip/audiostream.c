@@ -894,12 +894,17 @@ static void on_volumes_received(void *data, MSFilter *f, unsigned int event_id, 
 				uint32_t ssrc = audio_stream_volumes_get_best(as->participants_volumes);
 				if (as->speaking_ssrc != ssrc && as->soundread) {
 					if (as->eventcb != NULL){
-						as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_SPEAKING_DEVICE_CHANGED,&ssrc);
+						as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_DEVICE_START_SPEAKING,&ssrc);
+						as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_DEVICE_STOP_SPEAKING,&as->speaking_ssrc);
 					} else {
 						ms_warning("IsSpeaking: can not notify participant device because eventcb is null.");
 					}
 					as->speaking_ssrc = ssrc;
+					as->is_speaking = TRUE;
 				}
+			} else if (as->is_speaking) {
+				as->eventcb(as->event_pointer,as->soundread,MS_AUDIO_DEVICE_STOP_SPEAKING,&as->speaking_ssrc);
+				as->is_speaking = FALSE;
 			}
 
 			break;

@@ -320,8 +320,10 @@ typedef enum _MSRecorderState MSRecorderState;
 	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 5, bool_t)
 #define MS_AUDIO_CAPTURE_ENABLE_VOICE_REC \
 	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 6, bool_t)
-#define MS_AUDIO_SPEAKING_DEVICE_CHANGED \
+#define MS_AUDIO_DEVICE_START_SPEAKING \
 	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 7, uint32_t)
+#define MS_AUDIO_DEVICE_STOP_SPEAKING \
+	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 8, uint32_t)
 #define MS_AUDIO_CAPTURE_FORCE_SPEAKER_STATE \
 	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 255, bool_t)
 

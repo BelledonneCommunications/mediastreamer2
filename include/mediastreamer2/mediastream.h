@@ -452,6 +452,7 @@ struct _AudioStream
 	uint32_t speaking_ssrc;
 	AudioStreamEventCallback eventcb;
 	void *event_pointer;
+	bool_t is_speaking;
 };
 
 /**
