@@ -272,13 +272,13 @@ void ms_factory_init_voip(MSFactory *obj){
 #endif
 
 #if defined(__APPLE__) && defined(VIDEO_ENABLED)
-	_register_videotoolbox_if_supported(obj);
+       _register_videotoolbox_if_supported(obj);
 #endif
 
 #if defined(__ANDROID__) && defined(VIDEO_ENABLED)
 	if (AMediaImage_isAvailable()) {
 		if (AMediaCodec_checkCodecAvailability("video/avc")) {
-			ms_factory_register_filter(obj, &ms_MediaCodecH264Decoder_desc);
+		// 	ms_factory_register_filter(obj, &ms_MediaCodecH264Decoder_desc);
 			ms_factory_register_filter(obj, &ms_MediaCodecH264Encoder_desc);
 		}
 		if (AMediaCodec_checkCodecAvailability("video/hevc")) {

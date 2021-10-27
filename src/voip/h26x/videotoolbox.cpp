@@ -96,7 +96,7 @@ extern "C" void _register_videotoolbox_if_supported(MSFactory *factory) {
 		if (codecInfo->encoderIsAvailable()) {
 			ms_message("Registering VideoToolbox H264 codec");
 			ms_factory_register_filter(factory, &ms_VideoToolboxH264Encoder_desc);
-			ms_factory_register_filter(factory, &ms_VideoToolboxH264Decoder_desc);
+			// ms_factory_register_filter(factory, &ms_VideoToolboxH264Decoder_desc);
 		} else {
 			ms_message("No H264 encoder found on this device");
 		}
