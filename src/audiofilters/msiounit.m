@@ -218,6 +218,36 @@ static OSStatus au_write_cb (
 							  AudioBufferList             *ioData
 							 );
 
+
+static int apply_sound_card_to_audio_session(MSSndCard * newCard) {
+	AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+	AVAudioSessionRouteDescription *currentRoute = [audioSession currentRoute];
+	NSError *err=nil;
+	if (newCard->device_type == MS_SND_CARD_DEVICE_TYPE_SPEAKER)
+	{
+		bool_t currentOutputIsSpeaker = (strcmp(currentRoute.outputs[0].portType.UTF8String, AVAudioSessionPortBuiltInSpeaker.UTF8String) == 0);
+		if (!currentOutputIsSpeaker) {
+			// If we're switching to speaker and the route output isn't the speaker already
+			ms_message("set_audio_unit_sound_card(): change AVAudioSession output audio to speaker");
+			[audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&err];
+		}
+	}
+	else {
+		// As AudioSession do not allow a way to nicely change the output port except with the override to Speaker,
+		// we assume that input ports also come with a playback port (bluetooth earpiece, headset...) and change the input port.
+		NSString *newPortName = [NSString stringWithUTF8String:newCard->name];
+		NSArray *inputs = [audioSession availableInputs];
+		for (AVAudioSessionPortDescription *input in inputs) {
+			if ([input.portName isEqualToString:newPortName ]) {
+				ms_message("set_audio_unit_sound_card(): change AVAudioSession preferred input to %s.", [newPortName UTF8String]);
+				[audioSession setPreferredInput:input error:&err];
+				break;
+			}
+		}
+	}
+	return 0;
+}
+
 /**
  * AudioUnit helper functions, to associate the AudioUnit with the MSSndCard object used by mediastreamer2.
  */
@@ -526,7 +556,13 @@ ms_mutex_t mutex;
 		ms_error("Unable to change preferred sample rate because : %s", [err localizedDescription].UTF8String);
 		err = nil;
 	}
+
 	[audioSession setActive:TRUE error:&err];
+	if (_ms_snd_card) {
+		// Activating the audio session, by default, will change the audio route to iphone microphone/receiver
+		// To avoid this, we redirect the sound to the current snd card
+		apply_sound_card_to_audio_session(_ms_snd_card);
+	}
 	if(err){
 		ms_error("Unable to activate audio session because : %s", [err localizedDescription].UTF8String);
 		err = nil;
@@ -584,7 +620,6 @@ ms_mutex_t mutex;
 				}
 			} else {
 				ms_message("Configuring audio session for playback/record");
-		
 				[audioSession   setCategory:AVAudioSessionCategoryPlayAndRecord
 						withOptions:AVAudioSessionCategoryOptionAllowBluetooth| AVAudioSessionCategoryOptionAllowBluetoothA2DP
 							  error:&err];
@@ -607,6 +642,9 @@ ms_mutex_t mutex;
 			if (!_callkit_enabled || reactivate_audio_session){
 				if (reactivate_audio_session) ms_message("Configuring audio session now reactivated.");
 				[audioSession setActive:TRUE error:&err];
+				// Activating the audio session, by default, will change the audio route to iphone microphone/receiver
+				// To avoid this, we redirect the sound to the current snd card
+				apply_sound_card_to_audio_session(_ms_snd_card);
 				if(err){
 					ms_error("Unable to activate audio session because : %s", [err localizedDescription].UTF8String);
 					err = nil;
@@ -1149,39 +1187,6 @@ static int set_muted(MSFilter *f, void *data){
 	return 0;
 }
 
-static int set_audio_unit_sound_card(MSSndCard * newCard) {
-	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
-	update_audio_unit_holder_ms_snd_card(newCard);
-	
-	// Make sure the apple audio route matches this state
-	AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-	AVAudioSessionRouteDescription *currentRoute = [audioSession currentRoute];
-	NSError *err=nil;
-	if (newCard->device_type == MS_SND_CARD_DEVICE_TYPE_SPEAKER) // Only possible if called from audio_playback_set_internal_id
-	{
-		bool_t currentOutputIsSpeaker = (strcmp(currentRoute.outputs[0].portType.UTF8String, AVAudioSessionPortBuiltInSpeaker.UTF8String) == 0);
-		if (!currentOutputIsSpeaker) {
-			// If we're switching to speaker and the route output isn't the speaker already
-			ms_message("set_audio_unit_sound_card(): change AVAudioSession output audio to speaker");
-			[audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&err];
-		}
-	}
-	else {
-		// As AudioSession do not allow a way to nicely change the output port except with the override to Speaker,
-		// we assume that input ports also come with a playback port (bluetooth earpiece, headset...) and change the input port.
-		NSString *newPortName = [NSString stringWithUTF8String:newCard->name];
-		NSArray *inputs = [audioSession availableInputs];
-		for (AVAudioSessionPortDescription *input in inputs) {
-			if ([input.portName isEqualToString:newPortName ]) {
-				ms_message("set_audio_unit_sound_card(): change AVAudioSession preferred input to %s.", [newPortName UTF8String]);
-				[audioSession setPreferredInput:input error:&err];
-				break;
-			}
-		}
-	}
-	return 0;
-}
-
 static int audio_capture_set_internal_id(MSFilter *f, void * newSndCard)
 {
 	MSSndCard *oldCard = [[AudioUnitHolder sharedInstance] ms_snd_card];
@@ -1201,7 +1206,9 @@ static int audio_capture_set_internal_id(MSFilter *f, void * newSndCard)
 		return 0;
 	}
 	ms_message("audio_capture_set_internal_id(): Trying to change audio input route from %s to %s", oldCard->name, newCard->name);
-	set_audio_unit_sound_card(newCard);
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
+	update_audio_unit_holder_ms_snd_card(newCard);
+	apply_sound_card_to_audio_session(newCard);
 	return 0;
 }
 
@@ -1215,7 +1222,9 @@ static int audio_playback_set_internal_id(MSFilter *f, void * newSndCard)
 		return 0;
 	}
 	ms_message("audio_playback_set_internal_id(): Trying to change audio output route from %s to %s", oldCard->name, newCard->name);
-	set_audio_unit_sound_card(newCard);
+	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
+	update_audio_unit_holder_ms_snd_card(newCard);
+	apply_sound_card_to_audio_session(newCard);
 	return 0;
 }
 
@@ -1303,7 +1312,7 @@ MSFilterDesc au_write_desc={
 // This interface gives the impression that there will be 2 different MSSndCard for the Read filter and the Write filter.
 // In reality, we'll always be using a single same card for both.
 static MSFilter *ms_au_read_new(MSSndCard *mscard){
-	ms_message("ms_au_read_new, sound card : %p", mscard);
+	ms_message("ms_au_read_new, sound card : %s (%p)", mscard->name, mscard);
 	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
 	if ([au_holder read_filter] != NULL) {
 		ms_fatal("Trying to create a new au_read filter when there is already one existing");
@@ -1320,7 +1329,7 @@ static MSFilter *ms_au_read_new(MSSndCard *mscard){
 }
 
 static MSFilter *ms_au_write_new(MSSndCard *mscard){
-	ms_message("ms_au_write_new, sound card : %p", mscard);
+	ms_message("ms_au_write_new, sound card : %s (%p)", mscard->name, mscard);
 	AudioUnitHolder *au_holder = [AudioUnitHolder sharedInstance];
 	if ([au_holder write_filter] != NULL) {
 		ms_fatal("Trying to create a new au_write filter when there is already one existing");
