@@ -85,7 +85,16 @@ void BufferRenderer::render () {
 
 void BufferRenderer::synchronize (QQuickFramebufferObject *item) {
 	// No mutex needed here. It's a synchronized area.
-	mWindow = item->window();
+	auto new_win = item->window();
+	if (new_win == mWindow)
+		return;
+
+	if(mParent) {
+		ogl_display_uninit(mParent->display, TRUE);
+		mParent->update_context = TRUE;
+	}
+
+	mWindow = new_win;
 }
 
 // =============================================================================
@@ -129,7 +138,6 @@ static void qogl_uninit (MSFilter *f) {
 	}
 }
 
-static int qogl_call_render (MSFilter *f, void *arg);
 static void qogl_process (MSFilter *f) {
 	FilterData *data;
 	MSPicture src;
