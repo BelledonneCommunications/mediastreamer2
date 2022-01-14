@@ -245,7 +245,7 @@ static int dtmfgen_set_amp(MSFilter *f, void *arg){
 }
 
 
-static void write_dtmf(DtmfGenState *s , int16_t *sample, int nsamples){
+static void write_dtmf(MSFilter * f, DtmfGenState *s , int16_t *sample, int nsamples){
 	int i, j;
 	int16_t dtmf_sample;
 	for (i=0;i<nsamples && s->pos<s->dur;i++,s->pos++){
@@ -267,10 +267,12 @@ static void write_dtmf(DtmfGenState *s , int16_t *sample, int nsamples){
 			s->repeat_count++;
 			if (s->current_tone.repeat_count>0 && s->repeat_count>=s->current_tone.repeat_count){
 				s->playing=FALSE;
+				ms_filter_notify_no_arg(f,MS_DTMF_GEN_END);
 			}
 		} else {
 			s->playing=FALSE;
 			s->silence=TRAILLING_SILENCE;
+			ms_filter_notify_no_arg(f,MS_DTMF_GEN_END);
 		}
 	}
 }
@@ -295,7 +297,7 @@ static void dtmfgen_process(MSFilter *f){
 					strncpy(ev.tone_name,s->current_tone.tone_name,sizeof(ev.tone_name));
 					ms_filter_notify(f,MS_DTMF_GEN_EVENT,&ev);
 				}
-				write_dtmf(s,(int16_t*)m->b_wptr,nsamples);
+				write_dtmf(f,s,(int16_t*)m->b_wptr,nsamples);
 			}else{
 				memset(m->b_wptr,0,nsamples*s->nchannels*2);
 				s->silence-=f->ticker->interval;
@@ -319,12 +321,19 @@ static void dtmfgen_process(MSFilter *f){
 					ms_filter_notify(f,MS_DTMF_GEN_EVENT,&ev);
 				}
 				nsamples=(int)(m->b_wptr-m->b_rptr)/(2*s->nchannels);
-				write_dtmf(s, (int16_t*)m->b_rptr,nsamples);
+				write_dtmf(f,s, (int16_t*)m->b_rptr,nsamples);
 			}
 			ms_queue_put(f->outputs[0],m);
 		}
 	}
 	ms_filter_unlock(f);
+}
+
+static int dtmfgen_is_playing(MSFilter *f, void *data){
+	DtmfGenState *s=(DtmfGenState*)f->data;
+	bool_t *is_playing = (bool_t*)data;
+	*is_playing = s->playing;
+	return 0;
 }
 
 MSFilterMethod dtmfgen_methods[]={
@@ -337,6 +346,7 @@ MSFilterMethod dtmfgen_methods[]={
 	{	MS_DTMF_GEN_STOP		, 	dtmfgen_stop },
 	{	MS_DTMF_GEN_PLAY_CUSTOM, dtmfgen_play_tone },
 	{	MS_DTMF_GEN_SET_DEFAULT_AMPLITUDE, dtmfgen_set_amp },
+	{	MS_DTMF_GEN_IS_PLAYING		, dtmfgen_is_playing },
 	{	0				,	NULL			}
 };
 

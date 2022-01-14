@@ -464,17 +464,18 @@ static float audio_stream_get_rtcp_xr_average_lq_quality_rating(void *userdata) 
 	return audio_stream_get_average_lq_quality_rating(stream);
 }
 
-static bool_t ci_ends_with(const char *filename, const char*suffix){
-	size_t filename_len=strlen(filename);
+bool_t ms_path_ends_with(const char* path, const char* suffix){
+	size_t filename_len=strlen(path);
 	size_t suffix_len=strlen(suffix);
 	if (filename_len<suffix_len) return FALSE;
-	return strcasecmp(filename+filename_len-suffix_len,suffix)==0;
+	return strcasecmp(path+filename_len-suffix_len,suffix)==0;
 }
 
+
 MSFilter *_ms_create_av_player(const char *filename, MSFactory* factory){
-	if (ci_ends_with(filename,".mkv"))
+	if (ms_path_ends_with(filename,".mkv"))
 		return ms_factory_create_filter(factory, MS_MKV_PLAYER_ID);
-	else if (ci_ends_with(filename,".wav"))
+	else if (ms_path_ends_with(filename,".wav"))
 		return ms_factory_create_filter(factory, MS_FILE_PLAYER_ID);
 	else
 		ms_error("Cannot open %s, unsupported file extension", filename);
@@ -871,6 +872,11 @@ static void ms_audio_flow_control_event_handler(void *user_data, MSFilter *sourc
 	}
 }
 
+void audio_stream_set_is_speaking_callback (AudioStream *s, AudioStreamIsSpeakingCallback cb, void *user_pointer){
+	s->is_speaking_cb=cb;
+	s->user_pointer=user_pointer;
+}
+
 static void on_volumes_received(void *data, MSFilter *f, unsigned int event_id, void *event_arg) {
 	AudioStream *as=(AudioStream*)data;
 	rtp_audio_level_t *mtc_volumes;
@@ -883,6 +889,27 @@ static void on_volumes_received(void *data, MSFilter *f, unsigned int event_id, 
 			for(i = 0; i < RTP_MAX_MIXER_TO_CLIENT_AUDIO_LEVEL && mtc_volumes[i].csrc != 0; i++) {
 				audio_stream_volumes_insert(as->participants_volumes, mtc_volumes[i].csrc, (int)ms_volume_dbov_to_dbm0(mtc_volumes[i].dbov));
 			}
+			if (!as->is_speaking_cb)
+				break;
+
+			if (audio_stream_volumes_is_speaking(as->participants_volumes)) {
+				uint32_t ssrc = audio_stream_volumes_get_best(as->participants_volumes);
+				if (as->speaking_ssrc != ssrc) {
+					as->is_speaking_cb(as->user_pointer, ssrc, TRUE);
+					as->is_speaking_cb(as->user_pointer, as->speaking_ssrc, FALSE);
+					ms_debug("IsSpeaking: notify participant device %ud start speaking and %ud stop speaking.", ssrc, as->speaking_ssrc);
+					as->speaking_ssrc = ssrc;
+				} else if (!as->is_speaking) {
+					as->is_speaking_cb(as->user_pointer, ssrc, TRUE);
+					ms_debug("IsSpeaking: notify participant device %ud start speaking.", as->speaking_ssrc);
+				}
+				as->is_speaking = TRUE;
+			} else if (as->is_speaking) {
+				as->is_speaking_cb(as->user_pointer, as->speaking_ssrc, FALSE);
+				ms_debug("IsSpeaking: notify participant device %ud stop speaking.", as->speaking_ssrc);
+				as->is_speaking = FALSE;
+			}
+
 			break;
 		case MS_RTP_RECV_CLIENT_TO_MIXER_AUDIO_LEVEL_RECEIVED:
 			// Do nothing for now
@@ -927,7 +954,7 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 	ms_filter_call_method(stream->ms.rtpsend,MS_RTP_SEND_SET_SESSION,rtps);
 	stream->ms.rtprecv=ms_factory_create_filter(stream->ms.factory,MS_RTP_RECV_ID);
 	ms_filter_call_method(stream->ms.rtprecv,MS_RTP_RECV_SET_SESSION,rtps);
-	ms_filter_add_notify_callback(stream->ms.rtprecv, on_volumes_received, stream, TRUE);
+	ms_filter_add_notify_callback(stream->ms.rtprecv, on_volumes_received, stream, FALSE);
 	stream->ms.sessions.rtp_session=rtps;
 
 	// Set the header extension id for mixer to client audio level indication
@@ -1155,6 +1182,10 @@ int audio_stream_start_from_io(AudioStream *stream, RtpProfile *profile, const c
 	if (ms_filter_has_method(stream->soundread, MS_AUDIO_CAPTURE_ENABLE_AEC)) {
 		bool_t aec_enabled = TRUE;
 		ms_filter_call_method(stream->soundread, MS_AUDIO_CAPTURE_ENABLE_AEC, &aec_enabled);
+	}
+	if (ms_filter_has_method(stream->soundread, MS_AUDIO_CAPTURE_ENABLE_VOICE_REC)) {
+		bool_t voice_recognition = FALSE;
+		ms_filter_call_method(stream->soundread, MS_AUDIO_CAPTURE_ENABLE_VOICE_REC, &voice_recognition);
 	}
 
 	ms_filter_call_method(stream->soundwrite, MS_FILTER_SET_SAMPLE_RATE, &sample_rate);
@@ -1528,8 +1559,7 @@ void audio_stream_record(AudioStream *st, const char *name){
 	}
 }
 
-
-int audio_stream_mixed_record_open(AudioStream *st, const char* filename){
+int audio_stream_set_mixed_record_file(AudioStream *st, const char* filename){
 	if (!(st->features & AUDIO_STREAM_FEATURE_MIXED_RECORDING)){
 		if (audio_stream_started(st)){
 			ms_error("Too late - you cannot request a mixed recording when the stream is running because it did not have AUDIO_STREAM_FEATURE_MIXED_RECORDING feature.");
@@ -1884,13 +1914,9 @@ void audio_stream_stop(AudioStream * stream){
 			stream->ms.state=MSStreamStopped;
 			ms_ticker_detach(stream->ms.sessions.ticker,stream->soundread);
 			ms_ticker_detach(stream->ms.sessions.ticker,stream->ms.rtprecv);
-
-			if (stream->ms.ice_check_list != NULL) {
-				ice_check_list_print_route(stream->ms.ice_check_list, "Audio session's route");
-				stream->ms.ice_check_list = NULL;
-			}
-			rtp_stats_display(rtp_session_get_stats(stream->ms.sessions.rtp_session),
-				"             AUDIO SESSION'S RTP STATISTICS                ");
+			
+			ms_message("Stopping AudioStream.");
+			media_stream_print_summary(&stream->ms);
 
 			/*dismantle the outgoing graph*/
 			ms_connection_helper_start(&h);
@@ -2174,4 +2200,12 @@ void audio_stream_set_client_to_mixer_extension_id(AudioStream *stream, int exte
 
 int audio_stream_get_participant_volume(const AudioStream *stream, uint32_t participant_ssrc) {
 	return audio_stream_volumes_find(stream->participants_volumes, participant_ssrc);
+}
+
+uint32_t audio_stream_get_send_ssrc(const AudioStream *stream) {
+	return rtp_session_get_send_ssrc(stream->ms.sessions.rtp_session);
+}
+
+uint32_t audio_stream_get_recv_ssrc(const AudioStream *stream) {
+	return rtp_session_get_recv_ssrc(stream->ms.sessions.rtp_session);
 }

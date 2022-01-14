@@ -33,16 +33,25 @@
 // =============================================================================
 
 BufferRenderer::BufferRenderer () {
-	qInfo() << QStringLiteral("[MSQOGL] Create new Renderer");
+	qInfo() << QStringLiteral("[MSQOGL] Create new Renderer: ") << this;
+	mParent = nullptr;
 }
 
 BufferRenderer::~BufferRenderer () {
-	qInfo() << QStringLiteral("[MSQOGL] Delete Renderer");
-	if(mParent){
+	qInfo() << QStringLiteral("[MSQOGL] Delete Renderer: ") << this;
+	if(mParent && mParent->is_qt_linked){
 		ms_filter_lock(mParent->parent);
-		if( mParent->renderer == this)// Check if it is the same object. This deletion could be delayed for any reasons (Managed by Qt). We don't want to remove a new created object.
+		if( mParent->renderer == this){// Check if it is the same object. This deletion could be delayed for any reasons (Managed by Qt). We don't want to remove a new created object.
 			mParent->renderer = NULL;
-		ms_filter_unlock(mParent->parent);
+		}
+		mParent->is_qt_linked = FALSE;
+		if( !mParent->is_sdk_linked) {
+			ms_filter_unlock(mParent->parent);
+			qInfo() << QStringLiteral("[MSQOGL] Qt is freing data");
+			ms_free(mParent);
+		}else{
+			ms_filter_unlock(mParent->parent);
+		}
 	}
 }
 
@@ -85,6 +94,7 @@ void * getProcAddress(const char * name){
 }
 static void qogl_init (MSFilter *f) {
 	FilterData *data = ms_new0(FilterData, 1);
+	qInfo() << "[MSQOGL] init : " << data;
 	data->display = ogl_display_new();
 	data->show_video = TRUE;
 	data->mirroring = TRUE;
@@ -92,6 +102,9 @@ static void qogl_init (MSFilter *f) {
 	data->prev_inm = NULL;
 	data->renderer = NULL;
 	data->parent = f;
+	data->is_qt_linked = FALSE;
+	data->is_sdk_linked = TRUE;
+	data->mode = MSVideoDisplayBlackBars;
 	memset(&data->functions, 0, sizeof(data->functions));
 	data->functions.getProcAddress = getProcAddress;
 	
@@ -100,13 +113,23 @@ static void qogl_init (MSFilter *f) {
 
 static void qogl_uninit (MSFilter *f) {
 	FilterData *data = (FilterData *)f->data;
+	qInfo() << "[MSQOGL] uninit : " << data;
+	if( data->parent) ms_filter_lock(data->parent);
 	ogl_display_free(data->display);
-	if( data->renderer)
+	if( data->renderer) {
+		qInfo() << "[MSQOGL] unsetting renderer " << data->renderer;
 		data->renderer->mParent = NULL;
-	ms_free(data);
+	}
+	if(!data->is_qt_linked && data->is_sdk_linked){
+		if( data->parent) ms_filter_unlock(data->parent);
+		qInfo() << QStringLiteral("[MSQOGL] qogl is freing data");
+		ms_free(data);
+	}else{
+		data->is_sdk_linked = FALSE;
+		if( data->parent) ms_filter_unlock(data->parent);
+	}
 }
 
-static int qogl_call_render (MSFilter *f, void *arg);
 static void qogl_process (MSFilter *f) {
 	FilterData *data;
 	MSPicture src;
@@ -157,6 +180,14 @@ static int qogl_set_video_size (MSFilter *f, void *arg) {
 	return 0;
 }
 
+// Create a window id (BufferRenderer and return it)
+static int qogl_create_window_id(MSFilter *f, void *arg) {
+	BufferRenderer * renderer = new BufferRenderer();
+	qInfo() << "[MSQOGL] Creating requested renderer " << renderer;
+	*(QQuickFramebufferObject::Renderer**)arg=dynamic_cast<QQuickFramebufferObject::Renderer*>(renderer);
+	return 0;
+}
+
 // if arg is NULL, stop rendering by removing renderer
 static int qogl_set_native_window_id (MSFilter *f, void *arg) {
 	(void)f;
@@ -166,8 +197,15 @@ static int qogl_set_native_window_id (MSFilter *f, void *arg) {
 	
 	data = (FilterData *)f->data;
 	if( !arg || (arg && !(*(QQuickFramebufferObject::Renderer**)arg) )){
+		qInfo() << QStringLiteral("[MSQOGL] reset renderer");
 		data->renderer = NULL;
-	}
+	}else if(!data->renderer) {
+		data->renderer = (*(BufferRenderer**)arg);
+		qInfo() << "[MSQOGL] setting renderer " << data->renderer << " to " << data;
+		data->renderer->mParent = data;
+		data->update_context = TRUE;
+	}else if( data->renderer != (*(BufferRenderer**)arg))
+		qWarning() << "[MSQOGL] Trying to set another renderer that is different from old.";
 	ms_filter_unlock(f);
 	return 0;
 }
@@ -176,11 +214,10 @@ static int qogl_set_native_window_id (MSFilter *f, void *arg) {
 static int qogl_get_native_window_id (MSFilter *f, void *arg) {
 	FilterData *data=(FilterData*)f->data;
 	if( !data->renderer){
-		data->renderer = new BufferRenderer();
-		data->renderer->mParent = data;
-		data->update_context = TRUE;
+		return 0;
 	}else if( !data->renderer->mParent){
 		qInfo() << QStringLiteral("[MSQOGL] Framebuffer parent was unset : update context");
+		qInfo() << "[MSQOGL] setting renderer " << data->renderer << " to " << data;
 		data->renderer->mParent = data;
 		data->update_context = TRUE;
 	}
@@ -212,6 +249,13 @@ static int qogl_enable_mirroring (MSFilter *f, void *arg) {
 	return 0;
 }
 
+static int qogl_set_mode (MSFilter *f, void *arg) {
+	ms_filter_lock(f);
+	((FilterData *)f->data)->mode = *((MSVideoDisplayMode*)arg);
+	ms_filter_unlock(f);
+	return 0;
+}
+
 static int qogl_call_render (MSFilter *f, void *arg) {
 	
 	FilterData *data;
@@ -224,7 +268,7 @@ static int qogl_call_render (MSFilter *f, void *arg) {
 			ogl_display_init(data->display, &data->functions, data->renderer->mWidth , data->renderer->mHeight);
 			data->update_context = FALSE;
 		}
-		ogl_display_render(data->display, 0);
+		ogl_display_render(data->display, 0, data->mode);
 	}
 	
 	ms_filter_unlock(f);
@@ -243,6 +287,8 @@ static MSFilterMethod methods[] = {
 	{ MS_VIDEO_DISPLAY_SHOW_VIDEO, qogl_show_video },
 	{ MS_VIDEO_DISPLAY_ZOOM, qogl_zoom },
 	{ MS_VIDEO_DISPLAY_ENABLE_MIRRORING, qogl_enable_mirroring },
+	{ MS_VIDEO_DISPLAY_SET_MODE, qogl_set_mode },
+	{ MS_VIDEO_DISPLAY_CREATE_NATIVE_WINDOW_ID , qogl_create_window_id},
 	//{ MS_OGL_RENDER, qogl_call_render }, // qogl_call_render is autocalled by Qt, there is no need to put it in interface
 	{ 0, NULL }
 };

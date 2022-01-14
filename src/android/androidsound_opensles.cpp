@@ -212,6 +212,7 @@ struct OpenSLESInputContext {
 		currentBuffer = 0;
 		recBuffer[0] = NULL;
 		recBuffer[1] = NULL;
+		voiceRecognitionMode = false;
 	}
 
 	~OpenSLESInputContext() {
@@ -245,6 +246,7 @@ struct OpenSLESInputContext {
 	int inBufSize;
 	int currentBuffer;
 	double mAvSkew;
+	bool voiceRecognitionMode;
 };
 
 static SLuint32 convertSamplerate(int samplerate)
@@ -436,6 +438,11 @@ static SLresult opensles_recorder_init(OpenSLESInputContext *ictx) {
 		return result;
 	}
 
+	if (ictx->voiceRecognitionMode) {
+		// Voice recognition preset works better when recording voice message
+		ms_message("[OpenSLES] Using preset voice recognition (%i) instead of %i", SL_ANDROID_RECORDING_PRESET_VOICE_RECOGNITION, ictx->streamType);
+		ictx->streamType = SL_ANDROID_RECORDING_PRESET_VOICE_RECOGNITION;
+	}
 	result = (*ictx->recorderConfig)->SetConfiguration(ictx->recorderConfig, SL_ANDROID_KEY_RECORDING_PRESET, &ictx->streamType, sizeof(SLint32));
 	if (SL_RESULT_SUCCESS != result) {
 		opensles_reset_recorder(ictx);
@@ -712,7 +719,14 @@ static int android_snd_read_get_device_id(MSFilter *obj, void *data) {
 	return 0;
 }
 
-static int android_snd_read_hack_speaker_state(MSFilter *f, void *arg) {
+static int android_snd_read_hack_speaker_state(MSFilter *obj, void *data) {
+	return 0;
+}
+
+static int android_snd_read_enable_voice_rec(MSFilter *obj, void *data) {
+	bool *enabled = (bool*)data;
+	OpenSLESInputContext *ictx = (OpenSLESInputContext*)obj->data;
+	ictx->voiceRecognitionMode = !!(*enabled);
 	return 0;
 }
 
@@ -724,6 +738,7 @@ static MSFilterMethod android_snd_read_methods[] = {
 	{MS_AUDIO_CAPTURE_FORCE_SPEAKER_STATE, android_snd_read_hack_speaker_state},
 	{MS_AUDIO_CAPTURE_SET_INTERNAL_ID, android_snd_read_configure_soundcard},
 	{MS_AUDIO_CAPTURE_GET_INTERNAL_ID, android_snd_read_get_device_id},
+	{MS_AUDIO_CAPTURE_ENABLE_VOICE_REC, android_snd_read_enable_voice_rec},
 	{0,NULL}
 };
 
@@ -1082,7 +1097,6 @@ static void android_snd_write_postprocess(MSFilter *obj) {
 	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
 
 	if (octx->playerPlay){
-ms_message("%s - context %p  playerPlay %p\n", __func__, octx, octx->playerPlay);
 		result = (*octx->playerPlay)->SetPlayState(octx->playerPlay, SL_PLAYSTATE_STOPPED);
 		if (result != SL_RESULT_SUCCESS) {
 			ms_error("[OpenSLES] Error %u while stopping player", result);
@@ -1185,7 +1199,6 @@ static void snd_card_device_create_extra_fields(MSSndCardManager *m, MSSndCard *
 
 
 static void snd_card_device_create(int device_id, const char * name, MSSndCardDeviceType type, unsigned int capabilities, MSSndCardManager *m) {
-
 	MSSndCard *card = ms_snd_card_new(&android_native_snd_opensles_card_desc);
 
 	card->name = ms_strdup(name);
@@ -1223,11 +1236,10 @@ static void android_snd_card_device_create(JNIEnv *env, jobject deviceInfo, MSSn
 		(type == MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_GENERIC_USB)
 	) {
 
-		const char * name = ms_strdup(ms_android_get_device_product_name(env, deviceInfo));
+		char *name = ms_android_get_device_product_name(env, deviceInfo);
 		int device_id = ms_android_get_device_id(env, deviceInfo);
 		unsigned int capabilities = ms_android_get_device_capabilities(env, deviceInfo);
-
 		snd_card_device_create(device_id, name, type, capabilities, m);
-
+		ms_free(name);
 	}
 }

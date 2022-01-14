@@ -159,6 +159,7 @@ struct _MediaStream {
 	MSBandwidthController *bandwidth_controller;
 	MSVideoQualityController *video_quality_controller;
     MediaStreamDir direction;
+	bool_t is_thumbnail; /* if TRUE, the stream is generated from ItcResource and is SizeConverted */
 };
 
 MS2_PUBLIC void media_stream_init(MediaStream *stream, MSFactory *factory, const MSMediaStreamSessions *sessions);
@@ -339,7 +340,8 @@ typedef enum MSResourceType{
 	MSResourceRtp,
 	MSResourceCamera,
 	MSResourceSoundcard,
-	MSResourceVoid
+	MSResourceVoid,
+	MSResourceItc
 }MSResourceType;
 
 MS2_PUBLIC const char *ms_resource_type_to_string(MSResourceType type);
@@ -381,6 +383,7 @@ typedef struct _MSMediaStreamIO {
 
 MS2_PUBLIC bool_t ms_media_stream_io_is_consistent(const MSMediaStreamIO *io);
 
+typedef void (*AudioStreamIsSpeakingCallback)(void *user_pointer, uint32_t speaker_ssrc, bool_t is_speaking);
 struct _AudioStream
 {
 	MediaStream ms;
@@ -447,6 +450,10 @@ struct _AudioStream
 	struct _AudioStreamVolumes *participants_volumes;
 	int mixer_to_client_extension_id;
 	int client_to_mixer_extension_id;
+	uint32_t speaking_ssrc;
+	AudioStreamIsSpeakingCallback is_speaking_cb;
+	void *user_pointer;
+	bool_t is_speaking;
 };
 
 /**
@@ -777,7 +784,7 @@ MS2_PUBLIC int audio_stream_send_dtmf (AudioStream * stream, char dtmf);
 
 MS2_PUBLIC MSFilter *audio_stream_get_local_player(AudioStream *stream);
 
-MS2_PUBLIC int audio_stream_mixed_record_open(AudioStream *st, const char*filename);
+MS2_PUBLIC int audio_stream_set_mixed_record_file(AudioStream *st, const char*filename);
 
 MS2_PUBLIC int audio_stream_mixed_record_start(AudioStream *st);
 
@@ -855,6 +862,8 @@ MS2_PUBLIC void audio_stream_set_mixer_to_client_extension_id(AudioStream *strea
  */
 MS2_PUBLIC void audio_stream_set_client_to_mixer_extension_id(AudioStream *stream, int extension_id);
 
+MS2_PUBLIC void audio_stream_set_is_speaking_callback(AudioStream *s, AudioStreamIsSpeakingCallback cb, void *user_pointer);
+
 /**
  * Retrieve the volume of the given participant.
  *
@@ -863,6 +872,23 @@ MS2_PUBLIC void audio_stream_set_client_to_mixer_extension_id(AudioStream *strea
  * @return the volume of the participant in dbm0, if participant isn't found it will return the lowest volume.
  */
 MS2_PUBLIC int audio_stream_get_participant_volume(const AudioStream *stream, uint32_t participant_ssrc);
+
+/**
+ * Retrieve the receive ssrc of the stream
+ *
+ * @param stream the audio stream
+ * @return the receive ssrc of the stream
+ */
+MS2_PUBLIC uint32_t audio_stream_get_recv_ssrc(const AudioStream *stream);
+
+/**
+ * Retrieve the send ssrc of the stream
+ *
+ * @param stream the audio stream
+ * @return the send ssrc of the stream
+ */
+MS2_PUBLIC uint32_t audio_stream_get_send_ssrc(const AudioStream *stream);
+
 
 /* Map api to be able to keep participants volumes */
 typedef struct _AudioStreamVolumes AudioStreamVolumes;
@@ -881,6 +907,8 @@ MS2_PUBLIC int audio_stream_volumes_find(AudioStreamVolumes *volumes, uint32_t s
 
 MS2_PUBLIC void audio_stream_volumes_reset_values(AudioStreamVolumes *volumes);
 
+bool_t audio_stream_volumes_is_speaking(AudioStreamVolumes *volumes);
+uint32_t audio_stream_volumes_get_best(AudioStreamVolumes *volumes);
 /**
  * @}
 **/
@@ -922,6 +950,7 @@ struct _VideoStream
 	MSFilter *tee2;
 	MSFilter *tee3;
 	MSFilter *void_source;
+	MSFilter *itcsink;
 	MSVideoSize sent_vsize;
 	MSVideoSize preview_vsize;
 	float forced_fps; /*the target fps explicitely set by application, overrides internally selected fps*/
@@ -962,6 +991,7 @@ struct _VideoStream
 	bool_t output_performs_decoding;
 	bool_t player_active;
 	bool_t staticimage_webcam_fps_optimization; /* if TRUE, the StaticImage webcam will ignore the fps target in order to save CPU time. Default is TRUE */
+	char *label;
 };
 
 typedef struct _VideoStream VideoStream;
@@ -994,6 +1024,9 @@ MS2_PUBLIC void video_stream_set_render_callback(VideoStream *s, VideoStreamRend
 MS2_PUBLIC void video_stream_set_event_callback(VideoStream *s, VideoStreamEventCallback cb, void *user_pointer);
 MS2_PUBLIC void video_stream_set_camera_not_working_callback(VideoStream *s, VideoStreamCameraNotWorkingCallback cb, void *user_pointer);
 MS2_PUBLIC void video_stream_set_display_filter_name(VideoStream *s, const char *fname);
+MS2_PUBLIC void video_stream_set_label(VideoStream *s, const char *label);
+MS2_PUBLIC void video_stream_enable_thumbnail(VideoStream *s, bool_t enabled);
+MS2_PUBLIC bool_t video_stream_thumbnail_enabled(VideoStream *s);
 MS2_PUBLIC int video_stream_start_with_source(VideoStream *stream, RtpProfile *profile, const char *rem_rtp_ip, int rem_rtp_port,
 		const char *rem_rtcp_ip, int rem_rtcp_port, int payload, int jitt_comp, MSWebCam* cam, MSFilter* source);
 MS2_PUBLIC int video_stream_start(VideoStream * stream, RtpProfile *profile, const char *rem_rtp_ip, int rem_rtp_port, const char *rem_rtcp_ip,
@@ -1015,6 +1048,29 @@ MS2_PUBLIC int video_stream_start_with_files(VideoStream *stream, RtpProfile *pr
  */
 MS2_PUBLIC int video_stream_start_from_io(VideoStream *stream, RtpProfile *profile, const char *rem_rtp_ip, int rem_rtp_port,
 	const char *rem_rtcp_ip, int rem_rtcp_port, int payload_type, const MSMediaStreamIO *io);
+
+/**
+ * Link a video stream with ItcSink filter. Used for starting another video stream.
+ *
+ * @param[in] stream VideoStream object previously created with video_stream_new().
+ */
+MS2_PUBLIC void link_video_stream_with_itc_sink(VideoStream *stream);
+
+/**
+ * Start a video stream according to the specified VideoStreamIO and use Itc source.
+ *
+ * @param[in] stream VideoStream object previously created with video_stream_new().
+ * @param[in] profile RtpProfile object holding the PayloadType that can be used during the video session.
+ * @param[in] rem_rtp_ip The remote IP address where to send the encoded video to.
+ * @param[in] rem_rtp_port The remote port where to send the encoded video to.
+ * @param[in] rem_rtcp_ip The remote IP address for RTCP.
+ * @param[in] rem_rtcp_port The remote port for RTCP.
+ * @param[in] payload_type The payload type number used to send the video stream. A valid PayloadType must be available at this index in the profile.
+ * @param[in] io A VideoStreamIO describing the input/output of the video stream.
+ * @param[in] itc_sink A ItcSink filter used to be connected with ItcSource.
+ */
+MS2_PUBLIC int video_stream_start_from_io_and_itc_sink(VideoStream *stream, RtpProfile *profile, const char *rem_rtp_ip, int rem_rtp_port,
+	const char *rem_rtcp_ip, int rem_rtcp_port, int payload_type, const MSMediaStreamIO *io, MSFilter *itc_sink);
 
 MS2_PUBLIC void video_stream_prepare_video(VideoStream *stream);
 MS2_PUBLIC void video_stream_unprepare_video(VideoStream *stream);
@@ -1163,8 +1219,10 @@ MS2_PUBLIC float video_stream_get_sent_framerate(const VideoStream *stream);
 MS2_PUBLIC float video_stream_get_received_framerate(const VideoStream *stream);
 
 MS2_PUBLIC void video_stream_enable_self_view(VideoStream *stream, bool_t val);
+MS2_PUBLIC void * video_stream_create_native_window_id(VideoStream *stream);
 MS2_PUBLIC void * video_stream_get_native_window_id(VideoStream *stream);
 MS2_PUBLIC void video_stream_set_native_window_id(VideoStream *stream, void *id);
+MS2_PUBLIC void * video_stream_create_native_preview_window_id(VideoStream *stream);
 MS2_PUBLIC void video_stream_set_native_preview_window_id(VideoStream *stream, void *id);
 MS2_PUBLIC void * video_stream_get_native_preview_window_id(VideoStream *stream);
 MS2_PUBLIC void video_stream_use_preview_video_window(VideoStream *stream, bool_t yesno);
@@ -1313,6 +1371,7 @@ MS2_PUBLIC VideoPreview * video_preview_new(MSFactory *factory);
 #define video_preview_set_event_callback(p,c,u) video_stream_set_event_callback(p,c,u)
 #define video_preview_set_size(p,s) video_stream_set_sent_video_size(p,s)
 #define video_preview_set_display_filter_name(p,dt) video_stream_set_display_filter_name(p,dt)
+#define video_preview_create_native_window_id(p) video_stream_create_native_preview_window_id(p)
 #define video_preview_set_native_window_id(p,id) video_stream_set_native_preview_window_id(p,id)
 #define video_preview_get_native_window_id(p) video_stream_get_native_preview_window_id(p)
 #define video_preview_set_fps(p,fps) video_stream_set_fps((VideoStream*)p,fps)

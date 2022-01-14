@@ -44,6 +44,14 @@ struct _MSVideoEncoderPixFmt {
 	bool_t supported;
 };
 
+enum _MSVideoDisplayMode {
+	MSVideoDisplayBlackBars = 0,
+	MSVideoDisplayOccupyAllSpace = 1,
+	MSVideoDisplayHybrid = 2,
+};
+
+typedef enum _MSVideoDisplayMode MSVideoDisplayMode;
+
 /**
  * Interface definition for video display filters.
 **/
@@ -95,6 +103,14 @@ struct _MSVideoDisplayDecodingSupport {
 /**Specifiy device orientation from portrait */
 #define MS_VIDEO_DISPLAY_SET_DEVICE_ORIENTATION \
    MS_FILTER_METHOD(MSFilterVideoDisplayInterface,11,int)
+
+/**Specify the display mode */
+#define MS_VIDEO_DISPLAY_SET_MODE \
+   MS_FILTER_METHOD(MSFilterVideoDisplayInterface,12,MSVideoDisplayMode)
+   
+/**Create a platform dependant window id where the video can be drawn */
+#define MS_VIDEO_DISPLAY_CREATE_NATIVE_WINDOW_ID \
+	MS_FILTER_METHOD(MSFilterVideoDisplayInterface,13,void*)
 
 /**
   * Interface definitions for players
@@ -306,6 +322,8 @@ typedef enum _MSRecorderState MSRecorderState;
 	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 4, int)
 #define MS_AUDIO_CAPTURE_ENABLE_AEC \
 	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 5, bool_t)
+#define MS_AUDIO_CAPTURE_ENABLE_VOICE_REC \
+	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 6, bool_t)
 #define MS_AUDIO_CAPTURE_FORCE_SPEAKER_STATE \
 	MS_FILTER_METHOD(MSFilterAudioCaptureInterface, 255, bool_t)
 

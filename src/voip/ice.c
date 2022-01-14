@@ -654,7 +654,10 @@ bool_t ice_check_list_selected_valid_remote_candidate(const IceCheckList *cl, Ic
 	if (rtp_candidate != NULL) {
 		componentID = 1;
 		elem = bctbx_list_find_custom(cl->valid_list, (bctbx_compare_func)ice_find_selected_valid_pair_from_componentID, &componentID);
-		if (elem == NULL) return FALSE;
+		if (elem == NULL) {
+			ms_error("There are no selected valid remote candidates for RTP.");
+			return FALSE;
+		}
 		valid_pair = (IceValidCandidatePair *)elem->data;
 		*rtp_candidate = valid_pair->valid->remote;
 	}
@@ -664,7 +667,10 @@ bool_t ice_check_list_selected_valid_remote_candidate(const IceCheckList *cl, Ic
 		} else {
 			componentID = 2;
 			elem = bctbx_list_find_custom(cl->valid_list, (bctbx_compare_func)ice_find_selected_valid_pair_from_componentID, &componentID);
-			if (elem == NULL) return FALSE;
+			if (elem == NULL) {
+				ms_error("Rtcp-mux is not used but there are no selected valid remote candidates for RTCP.");
+				return FALSE;
+			}
 			valid_pair = (IceValidCandidatePair *)elem->data;
 			*rtcp_candidate = valid_pair->valid->remote;
 		}
@@ -2088,8 +2094,12 @@ static void ice_transport_address_to_printable_ip_address(const IceTransportAddr
 		*printable_ip = '\0';
 	} else {
 		ai = bctbx_ip_address_to_addrinfo(taddr->family, SOCK_DGRAM, taddr->ip, taddr->port);
-		bctbx_addrinfo_to_printable_ip_address(ai, printable_ip, printable_ip_size);
-		bctbx_freeaddrinfo(ai);
+		if (ai) {
+			bctbx_addrinfo_to_printable_ip_address(ai, printable_ip, printable_ip_size);
+			bctbx_freeaddrinfo(ai);
+		} else {
+			*printable_ip = '\0';
+		}
 	}
 }
 
@@ -4438,12 +4448,60 @@ static int ice_find_candidate_with_componentID(const IceCandidate *candidate, co
 	else return 1;
 }
 
+/* same as bctbx_list_remove() but without warning if the element is not found */
+static bctbx_list_t * remove_from_list(bctbx_list_t *l, void *data){
+	bctbx_list_t *elem = bctbx_list_find(l, data);
+	return elem ? bctbx_list_erase_link(l, elem) : l;
+}
+
+static void ice_remove_transaction_with_pair(IceCheckList *cl, IceCandidatePair *pair){
+	bctbx_list_t *elem;
+	bctbx_list_t *next_elem;
+	
+	for (elem = cl->transaction_list; elem != NULL; ){
+		IceTransaction *tr = (IceTransaction*) elem->data;
+		next_elem = elem->next;
+		if (tr->pair == pair){
+			ice_free_transaction(tr);
+			cl->transaction_list = bctbx_list_erase_link(cl->transaction_list, elem);
+		}
+		elem = next_elem;
+	}
+}
+
+static void ice_clean_rtcp_candidate_pairs(IceCheckList *cl){
+	bctbx_list_t *elem;
+	bctbx_list_t *next_elem;
+	
+	for (elem = cl->pairs; elem != NULL; ){
+		IceCandidatePair *pair = (IceCandidatePair*) elem->data;
+		next_elem = elem->next;
+		if (pair->local->componentID == ICE_RTCP_COMPONENT_ID){
+			/* remove possible transaction using this pair*/
+			ice_remove_transaction_with_pair(cl, pair);
+			/* remove pair from triggered check queue */
+			cl->triggered_checks_queue = remove_from_list(cl->triggered_checks_queue, pair);
+			/* remove from losing pair */
+			cl->losing_pairs = remove_from_list(cl->losing_pairs, pair);
+			/* 
+			 * ice_free_candidate_pair() will also remove pair from check list and valid list.
+			 */
+			ice_free_candidate_pair(pair, cl);
+			cl->pairs = bctbx_list_erase_link(cl->pairs, elem);
+		}
+		elem = next_elem;
+	}
+}
+
 void ice_check_list_remove_rtcp_candidates(IceCheckList *cl)
 {
 	bctbx_list_t *elem;
 	uint16_t rtcp_componentID = ICE_RTCP_COMPONENT_ID;
 
 	ice_remove_componentID(&cl->local_componentIDs, rtcp_componentID);
+	
+	/* Remove pairs with rtcp component ID*/
+	ice_clean_rtcp_candidate_pairs(cl);
 
 	while ((elem = bctbx_list_find_custom(cl->local_candidates, (bctbx_compare_func)ice_find_candidate_with_componentID, &rtcp_componentID)) != NULL) {
 		IceCandidate *candidate = (IceCandidate *)elem->data;

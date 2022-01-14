@@ -215,17 +215,17 @@ MS2_PUBLIC void ms_audio_endpoint_release_from_stream(MSAudioEndpoint *obj);
 /**
  * Creates an audio endpoint (or virtual participant) to record the conference into a wav file.
  * @param factory The factory used by the linphone core.
+ * @param path path for the wav file where to record samples.
 **/
-MS2_PUBLIC MSAudioEndpoint * ms_audio_endpoint_new_recorder(MSFactory* factory);
+MS2_PUBLIC MSAudioEndpoint * ms_audio_endpoint_new_recorder(MSFactory* factory, const char *path);
 
 /**
  * Start audio recording.
  * The endpoint must have been created by ms_audio_endpoint_new_recorder().
  * @param ep the endpoint
- * @param path path for the wav file where to record samples.
  * @return 0 if successful, -1 if the path is invalid.
 **/
-MS2_PUBLIC int ms_audio_recorder_endpoint_start(MSAudioEndpoint *ep, const char *path);
+MS2_PUBLIC int ms_audio_recorder_endpoint_start(MSAudioEndpoint *ep);
 
 /**
  * Stop audio recording.
@@ -249,6 +249,7 @@ MS2_PUBLIC void ms_audio_endpoint_destroy(MSAudioEndpoint *ep);
  * @}
  */
 
+#ifdef VIDEO_ENABLED
 /**
  * @addtogroup mediastreamer2_video_conference
  * @{
@@ -266,6 +267,12 @@ struct _MSVideoConferenceParams{
  * Typedef to structure that holds conference parameters
 **/
 typedef struct _MSVideoConferenceParams MSVideoConferenceParams;
+
+#ifdef __cplusplus
+
+extern "C" {
+
+#endif
 
 /**
  * The MSVideoConference is the object representing a video conference.
@@ -286,12 +293,6 @@ typedef struct _MSVideoConference MSVideoConference;
 **/
 typedef struct _MSVideoEndpoint MSVideoEndpoint;
 
-
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /**
  * Creates a conference.
@@ -320,7 +321,6 @@ MS2_PUBLIC void ms_video_conference_add_member(MSVideoConference *obj, MSVideoEn
  * @param ep the participant, represented as a MSVideoEndpoint object
 **/
 MS2_PUBLIC void ms_video_conference_remove_member(MSVideoConference *obj, MSVideoEndpoint *ep);
-
 
 /**
  * Switch the focus of the video conf on a given member.
@@ -431,6 +431,6 @@ MS2_PUBLIC void ms_video_endpoint_release_from_stream(MSVideoEndpoint *obj);
 /**
  * @}
  */
+#endif // VIDEO_ENABLED
 
 #endif
-

@@ -33,6 +33,7 @@
 /**Stop currently played dtmf*/
 #define MS_DTMF_GEN_STOP		MS_FILTER_METHOD_NO_ARG(MS_DTMF_GEN_ID,2)
 
+
 /**
  * Structure describing a custom tone.
 **/
@@ -53,6 +54,7 @@ typedef struct _MSDtmfGenCustomTone MSDtmfGenCustomTone;
 /**Sets default amplitude for dtmfs, expressed in the 0..1 range*/
 #define MS_DTMF_GEN_SET_DEFAULT_AMPLITUDE MS_FILTER_METHOD(MS_DTMF_GEN_ID,4,float)
 
+#define MS_DTMF_GEN_IS_PLAYING		MS_FILTER_METHOD(MS_DTMF_GEN_ID,5, bool_t)
 
 /**
  * Structure carried by MS_DTMF_GEN_EVENT
@@ -68,6 +70,7 @@ typedef struct _MSDtmfGenEvent MSDtmfGenEvent;
  * Event sent by the filter each time a tone or dtmf is generated.
 **/
 #define MS_DTMF_GEN_EVENT		MS_FILTER_EVENT(MS_DTMF_GEN_ID,0,MSDtmfGenEvent)
+#define MS_DTMF_GEN_END			MS_FILTER_EVENT_NO_ARG(MS_DTMF_GEN_ID,0)
 
 extern MSFilterDesc ms_dtmf_gen_desc;
 

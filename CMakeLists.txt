@@ -1,6 +1,6 @@
 ############################################################################
 # CMakeLists.txt
-# Copyright (C) 2010-2019  Belledonne Communications, Grenoble France
+# Copyright (C) 2010-2021 Belledonne Communications, Grenoble France
 #
 ############################################################################
 #
@@ -21,7 +21,14 @@
 ############################################################################
 
 cmake_minimum_required(VERSION 3.1)
-project(mediastreamer2 VERSION 5.1.0 LANGUAGES C CXX)
+
+# CMP0077 policy is required by Flexisip build. Remove it once the CMake required
+# version is higer or equal to 3.13.
+if(NOT CMAKE_VERSION VERSION_LESS 3.13)
+    cmake_policy(SET CMP0077 NEW)
+endif()
+
+project(mediastreamer2 VERSION 5.2.0 LANGUAGES C CXX)
 
 if(WIN32)
     if( NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
@@ -116,10 +123,16 @@ cmake_dependent_option(ENABLE_X11 "Enable X11 support." ${ENABLE_X11_DEFAULT_VAL
 cmake_dependent_option(ENABLE_XV "Enable XV support." ${ENABLE_X11_DEFAULT_VALUE} "ENABLE_VIDEO;UNIX" NO)
 cmake_dependent_option(ENABLE_THEORA "Enable theora video codec support." YES "ENABLE_VIDEO" NO)
 cmake_dependent_option(ENABLE_VPX "Build mediastreamer2 with VPX codec." YES "ENABLE_VIDEO" NO)
+cmake_dependent_option(ENABLE_LIBYUV "Build mediastreamer2 with LibYUV support." YES "ENABLE_VIDEO" NO)
 option(ENABLE_MKV "Enable support of MKV files reading and writing." YES)
 cmake_dependent_option(ENABLE_QNX "Build medistreamer2 with BB10 filters." NO "ENABLE_VIDEO" NO)
 option(ENABLE_JPEG "Enable JPEG support" YES)
 cmake_dependent_option(ENABLE_QRCODE "Enable QRCode support" YES "ENABLE_VIDEO" NO)
+
+# Hidden non-cache options:
+# * DISABLE_BC_PACKAGE_SEARCH: skip find_package() for every BC package (bctoolbox, ortp, etc.)
+# * DISABLE_SRTP_SEARCH: skip find_package() for SRTP.
+
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS NO)
@@ -162,25 +175,23 @@ check_library_exists("dl" "dlopen" "" HAVE_DLOPEN)
 include(TestBigEndian)
 test_big_endian(WORDS_BIGENDIAN)
 
-find_package(ortp REQUIRED CONFIG)
+if(NOT DISABLE_BC_PACKAGE_SEARCH)
+	find_package(ortp REQUIRED CONFIG)
+endif()
 
 if(ENABLE_PCAP)
 	find_package(PCAP QUIET)
 endif()
-
 if(ENABLE_SRTP)
-	find_package(SRTP)
-	if(NOT SRTP_FOUND)
-		message(WARNING "Could not find SRTP library, Mediastreamer2 will be compiled without SRTP support.")
-		set(ENABLE_SRTP OFF CACHE BOOL "Build with the SRTP transport support." FORCE)
+	if(NOT DISABLE_SRTP_SEARCH)
+		find_package(SRTP "2" REQUIRED)
+	else()
+		set(SRTP_FOUND YES)
+		set(SRTP_VERSION 2)
 	endif()
 endif()
-if(ENABLE_ZRTP)
+if(ENABLE_ZRTP AND NOT DISABLE_BC_PACKAGE_SEARCH)
 	find_package(bzrtp REQUIRED CONFIG)
-	if(NOT BZRTP_FOUND)
-		message(WARNING "Could not find bzrtp library, mediastreamer2 will be compiled without ZRTP support.")
-		set(ENABLE_ZRTP OFF CACHE BOOL "Build mediastreamer2 with ZRTP support." FORCE)
-	endif()
 endif()
 if(ENABLE_G726)
 	find_package(SpanDSP REQUIRED)
@@ -368,6 +379,13 @@ if(ENABLE_JPEG)
 		set(ENABLE_JPEG OFF CACHE BOOL "Enable JPEG support" FORCE)
 	endif()
 endif()
+if(ENABLE_LIBYUV)
+	find_package(LibYUV)
+	if( NOT LIBYUV_FOUND)
+		message(WARNING "Could not find libyuv, mediastreamer2 will be compiled without LibYUV support.")
+		set(ENABLE_LIBYUV OFF CACHE BOOL "Enable LibYUV support" FORCE)
+	endif()
+endif()
 if(ENABLE_QRCODE)
 	find_package(Zxing)
 	if(NOT ZXING_FOUND)
@@ -385,7 +403,9 @@ if(ANDROID)
 endif()
 
 
-find_package(bctoolbox 0.0.3 REQUIRED OPTIONAL_COMPONENTS tester CONFIG)
+if(NOT DISABLE_BC_PACKAGE_SEARCH)
+	find_package(bctoolbox 0.0.3 REQUIRED OPTIONAL_COMPONENTS tester CONFIG)
+endif()
 
 include_directories(
 	include
@@ -522,8 +542,7 @@ if(BZRTP_FOUND)
 endif()
 
 if(SRTP_FOUND)
-	list(APPEND LINK_LIBS ${SRTP_LIBRARIES})
-	list(APPEND MEDIASTREAMER2_INCLUDE_DIRS ${SRTP_INCLUDE_DIRS})
+	list(APPEND LINK_LIBS "SRTP")
 	set(HAVE_SRTP 1)
 endif()
 if(SPANDSP_FOUND)
@@ -591,18 +610,29 @@ if(ENABLE_MACAQSND)
 endif()
 
 if(ENABLE_QT_GL)#Only add headers and lib to Qt plugins
-	set(QT5_PACKAGES Core Gui Quick QmlModels Qml Network)
-	find_package(Qt5 COMPONENTS ${QT5_PACKAGES} QUIET)
+	set(QT5_PACKAGES Core Gui Quick)
+	set(QT5_ALL_PACKAGES ${QT5_PACKAGES} QmlModels Qml Network)
+# Setting Qt5_DIR is not enough as it needs Qt5<package>_DIR for each packages
+	if(DEFINED ENV{Qt5_DIR} AND NOT DEFINED ${Qt5_DIR})
+		set(Qt5_DIR "$ENV{Qt5_DIR}")
+	endif()
+	set(Qt5_base "${Qt5_DIR}/../")
+	foreach (package ${QT5_ALL_PACKAGES})
+		if( NOT DEFINED ${Qt5${package}_DIR})
+			set(Qt5${package}_DIR "${Qt5_base}/Qt5${package}")
+		endif()
+	endforeach ()
+
+	find_package(Qt5 COMPONENTS ${QT5_PACKAGES} REQUIRED)
 	foreach (package ${QT5_PACKAGES})
 		if(Qt5${package}_FOUND)
 			get_target_property(Qt${package}_location Qt5::${package} LOCATION)
 			string(REPLACE "Qt${package}.framework/Qt${package}" "" Qt${package}_ROOT_LOCATION ${Qt${package}_location})
-			list(APPEND MEDIASTREAMER2_QT_INCLUDE_DIRS "${Qt5${package}_INCLUDE_DIRS}")
+			list(APPEND MEDIASTREAMER2_INCLUDE_DIRS "${Qt5${package}_INCLUDE_DIRS}")
 			list(APPEND QT_LINK_LIBS ${Qt5${package}_LIBRARIES})
 		endif()
 	endforeach ()
 endif()
-
 set(LINK_FLAGS )
 if(APPLE)
 	list(APPEND LINK_FLAGS "-framework CoreFoundation" "-framework AudioToolbox" "-framework CoreAudio")
@@ -750,9 +780,11 @@ write_basic_package_version_file(
 	VERSION ${MEDIASTREAMER_VERSION}
 	COMPATIBILITY AnyNewerVersion
 )
-export(EXPORT ${EXPORT_TARGETS_NAME}Targets
-	FILE "${CMAKE_CURRENT_BINARY_DIR}/Mediastreamer2Targets.cmake"
-)
+if(LINPHONE_BUILDER_GROUP_EXTERNAL_SOURCE_PATH_BUILDERS)
+	export(EXPORT ${EXPORT_TARGETS_NAME}Targets
+		FILE "${CMAKE_CURRENT_BINARY_DIR}/Mediastreamer2Targets.cmake"
+	)
+endif()
 configure_package_config_file(cmake/Mediastreamer2Config.cmake.in
 	"${CMAKE_CURRENT_BINARY_DIR}/Mediastreamer2Config.cmake"
 	INSTALL_DESTINATION ${CONFIG_PACKAGE_LOCATION}
