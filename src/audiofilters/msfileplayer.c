@@ -25,6 +25,7 @@
 #include "waveheader.h"
 #include "mediastreamer2/msticker.h"
 #include "asyncrw.h"
+#include "g711.h"
 
 #ifdef HAVE_PCAP
 #include <pcap/pcap.h>
@@ -39,6 +40,7 @@ struct _PlayerData{
 	int fd;
 	MSAsyncReader *reader;
 	MSPlayerState state;
+	int type;
 	int rate;
 	int nchannels;
 	int hsize;
@@ -71,6 +73,7 @@ static void player_init(MSFilter *f){
 	d->fd=-1;
 	d->state=MSPlayerClosed;
 	d->swap=FALSE;
+	d->type=WAVE_FORMAT_PCM;
 	d->rate=8000;
 	d->nchannels=1;
 	d->samplesize=2;
@@ -157,6 +160,7 @@ static int read_wav_header(PlayerData *d){
 	
 	if (ret==-1) goto not_a_wav;
 	
+	d->type=le_uint16(format_chunk->type);
 	d->rate=le_uint32(format_chunk->rate);
 	d->nchannels=le_uint16(format_chunk->channel);
 	if (d->nchannels==0) goto not_a_wav;
@@ -222,7 +226,7 @@ static int player_open(MSFilter *f, void *arg){
 	}
 	d->current_pos_bytes = 0;
 	ms_filter_notify_no_arg(f,MS_FILTER_OUTPUT_FMT_CHANGED);
-	ms_message("MSFilePlayer[%p]: %s opened: rate=%i,channel=%i, length=%i ms",f,file,d->rate,d->nchannels, d->duration);
+	ms_message("MSFilePlayer[%p]: %s opened: type=%i,rate=%i,channel=%i, length=%i ms",f,file,d->type,d->rate,d->nchannels, d->duration);
 	return 0;
 }
 
@@ -363,8 +367,30 @@ static void player_process(MSFilter *f){
 								mblk_set_cseq(om, pcap_seq);
 								mblk_set_timestamp_info(om, f->ticker->time);
 								mblk_set_marker_info(om,markbit);
-								ms_queue_put(f->outputs[0], om);
-								ms_message("Outputting RTP packet of size %i, seq=%u markbit=%i", bytes, pcap_seq, (int)markbit);
+								if (d->type == WAVE_FORMAT_MULAW) {
+									int dbytes = 2/d->samplesize*bytes;
+									mblk_t *dm=allocb(dbytes,0);
+									for(;om->b_rptr<om->b_wptr;om->b_rptr++,dm->b_wptr+=2){
+										*((int16_t*)(dm->b_wptr))=Snack_Mulaw2Lin(*om->b_rptr);
+									}
+									freemsg(om);
+									ms_queue_put(f->outputs[0],dm);
+									ms_message("Outputting RTP packet of size %i, seq=%u markbit=%i", dbytes, pcap_seq, (int)markbit);
+								}
+								else if (d->type == WAVE_FORMAT_ALAW) {
+									int dbytes = 2/d->samplesize*bytes;
+									mblk_t *dm=allocb(dbytes,0);
+									for(;om->b_rptr<om->b_wptr;om->b_rptr++,dm->b_wptr+=2){
+										*((int16_t*)(dm->b_wptr))=Snack_Alaw2Lin(*om->b_rptr);
+									}
+									freemsg(om);
+									ms_queue_put(f->outputs[0],dm);
+									ms_message("Outputting RTP packet of size %i, seq=%u markbit=%i", dbytes, pcap_seq, (int)markbit);
+								}
+								else {
+									ms_queue_put(f->outputs[0],om);
+									ms_message("Outputting RTP packet of size %i, seq=%u markbit=%i", bytes, pcap_seq, (int)markbit);
+								}
 							}
 							d->pcap_seq = pcap_seq;
 							d->pcap_hdr = NULL;
@@ -400,7 +426,27 @@ static void player_process(MSFilter *f){
 					mblk_set_timestamp_info(om,d->ts);
 					d->ts+=nsamples;
 					d->current_pos_bytes += bytes;
-					ms_queue_put(f->outputs[0],om);
+					if (d->type == WAVE_FORMAT_MULAW) {
+						int dbytes = 2/d->samplesize*bytes;
+						mblk_t *dm=allocb(dbytes,0);
+						for(;om->b_rptr<om->b_wptr;om->b_rptr++,dm->b_wptr+=2){
+							*((int16_t*)(dm->b_wptr))=Snack_Mulaw2Lin(*om->b_rptr);
+						}
+						freemsg(om);
+						ms_queue_put(f->outputs[0],dm);
+					}
+					else if (d->type == WAVE_FORMAT_ALAW) {
+						int dbytes = 2/d->samplesize*bytes;
+						mblk_t *dm=allocb(dbytes,0);
+						for(;om->b_rptr<om->b_wptr;om->b_rptr++,dm->b_wptr+=2){
+							*((int16_t*)(dm->b_wptr))=Snack_Alaw2Lin(*om->b_rptr);
+						}
+						freemsg(om);
+						ms_queue_put(f->outputs[0],dm);
+					}
+					else {
+						ms_queue_put(f->outputs[0],om);
+					}
 				}else freemsg(om);
 				if (err<bytes){
 					ms_async_reader_seek(d->reader, d->hsize);
