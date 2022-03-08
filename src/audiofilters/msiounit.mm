@@ -236,7 +236,7 @@ static int apply_sound_card_to_audio_session(MSSndCard * newCard) {
 	NSError *err=nil;
 	if (newCard->device_type == MS_SND_CARD_DEVICE_TYPE_SPEAKER)
 	{
-		bool_t currentOutputIsSpeaker = (strcmp(currentRoute.outputs[0].portType.UTF8String, AVAudioSessionPortBuiltInSpeaker.UTF8String) == 0);
+		bool_t currentOutputIsSpeaker = (currentRoute.outputs.count > 0 && strcmp(currentRoute.outputs[0].portType.UTF8String, AVAudioSessionPortBuiltInSpeaker.UTF8String) == 0);
 		if (!currentOutputIsSpeaker) {
 			// If we're switching to speaker and the route output isn't the speaker already
 			ms_message("set_audio_unit_sound_card(): change AVAudioSession output audio to speaker");
