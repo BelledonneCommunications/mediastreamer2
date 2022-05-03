@@ -293,6 +293,12 @@ static int rec_set_max_size(MSFilter *f, void *arg) {
 	return 0;
 }
 
+static int rec_force_wav(MSFilter *f, void *arg) {
+        RecState *d=(RecState*)f->data;
+        d->is_wav = TRUE;
+        return 0;
+}
+
 static MSFilterMethod rec_methods[]={
 	{	MS_FILTER_SET_SAMPLE_RATE,	rec_set_sr	},
 	{	MS_FILTER_SET_NCHANNELS	,	rec_set_nchannels	},
@@ -310,6 +316,7 @@ static MSFilterMethod rec_methods[]={
 	{ 	MS_FILTER_GET_OUTPUT_FMT, 	rec_get_fmtp },
 	{ 	MS_FILTER_SET_OUTPUT_FMT, 	rec_set_fmtp },
 	{	MS_RECORDER_SET_MAX_SIZE,	rec_set_max_size },
+	{	MS_FILE_REC_FORCE_WAV   ,       rec_force_wav	},
 	{	0			,	NULL		}
 };
 
