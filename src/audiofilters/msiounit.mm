@@ -1046,6 +1046,9 @@ static void au_detect(MSSndCardManager *m){
 		}
 		MSSndCard *card = au_card_new([input.portName UTF8String]);
 		card->device_type = deduceDeviceTypeFromAudioPortType(input.portType);
+		if (card->device_type == MS_SND_CARD_DEVICE_TYPE_UNKNOWN)
+			continue;
+		
 		ms_snd_card_set_internal_id(card, internal_id++);
 		ms_snd_card_manager_add_card(m, card);
 		ms_debug("au_detect, creating snd card %p", card);
