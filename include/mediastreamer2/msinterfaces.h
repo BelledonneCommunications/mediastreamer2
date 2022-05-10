@@ -307,9 +307,9 @@ typedef enum _MSRecorderState MSRecorderState;
 typedef struct _MSAudioRouteChangedEvent{
 	bool_t need_update_device_list;
 	bool_t has_new_input;
-	char new_input[256];
+	char new_input[100];
 	bool_t has_new_output;
-	char new_output[256];
+	char new_output[100];
 	
 } MSAudioRouteChangedEvent;
 
