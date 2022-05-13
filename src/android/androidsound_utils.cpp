@@ -85,7 +85,6 @@ jobjectArray ms_android_get_all_devices(JNIEnv *env, const char * dir) {
 }
 
 unsigned int ms_android_get_device_id(JNIEnv *env, jobject deviceInfo) {
-
 	unsigned int id = 0;
 
 	jclass audioDeviceInfoClass = env->FindClass("android/media/AudioDeviceInfo");
@@ -98,11 +97,9 @@ unsigned int ms_android_get_device_id(JNIEnv *env, jobject deviceInfo) {
 	}
 
 	return id;
-
 }
 
 int ms_android_getJVIntField(JNIEnv *env, const char * className, const char * fieldName) {
-
 	int value = -1;
 	jclass JVClass = env->FindClass(className);
 	if (JVClass != NULL) {
@@ -116,7 +113,23 @@ int ms_android_getJVIntField(JNIEnv *env, const char * className, const char * f
 	return value;
 }
 
+bool ms_android_is_audio_route_changes_disabled(JNIEnv *env) {
+	bool disabled = false;
+
+	jclass mediastreamerAndroidContextClass = env->FindClass("org/linphone/mediastream/MediastreamerAndroidContext");
+	if (mediastreamerAndroidContextClass != NULL) {
+		jmethodID audioRouteChangesDisabled = env->GetStaticMethodID(mediastreamerAndroidContextClass, "isAudioRouteChangesDisabled", "()Z");
+		if (audioRouteChangesDisabled != NULL) {
+				disabled = (bool)env->CallStaticBooleanMethod(mediastreamerAndroidContextClass, audioRouteChangesDisabled);
+		}
+		env->DeleteLocalRef(mediastreamerAndroidContextClass);
+	}
+	
+	return disabled;
+}
+
 void ms_android_change_device(JNIEnv *env, MSSndCardDeviceType type) {
+	if (ms_android_is_audio_route_changes_disabled(env)) return;
 
 	std::string methodName;
 	if (type == MSSndCardDeviceType::MS_SND_CARD_DEVICE_TYPE_SPEAKER) {
@@ -146,6 +159,7 @@ void ms_android_change_device(JNIEnv *env, MSSndCardDeviceType type) {
 }
 
 void ms_android_set_bt_enable(JNIEnv *env, const bool_t enable) {
+	if (ms_android_is_audio_route_changes_disabled(env)) return;
 
 	std::string methodName;
 	if (enable) {
@@ -170,6 +184,8 @@ void ms_android_set_bt_enable(JNIEnv *env, const bool_t enable) {
 }
 
 void ms_android_hack_volume(JNIEnv *env) {
+	if (ms_android_is_audio_route_changes_disabled(env)) return;
+	
 	jclass mediastreamerAndroidContextClass = env->FindClass("org/linphone/mediastream/MediastreamerAndroidContext");
 	if (mediastreamerAndroidContextClass != NULL) {
 		jmethodID hackVolume = env->GetStaticMethodID(mediastreamerAndroidContextClass, "hackVolume", "()V");
@@ -181,9 +197,7 @@ void ms_android_hack_volume(JNIEnv *env) {
 }
 
 MSSndCardDeviceType ms_android_get_device_type(JNIEnv *env, jobject deviceInfo) {
-
 	int typeID = -1;
-
 	const char * audioDeviceInfoClassName = "android/media/AudioDeviceInfo";
 
 	jclass audioDeviceInfoClass = env->FindClass(audioDeviceInfoClassName);
@@ -227,7 +241,6 @@ MSSndCardDeviceType ms_android_get_device_type(JNIEnv *env, jobject deviceInfo) 
 }
 
 unsigned int ms_android_get_device_capabilities(JNIEnv *env, jobject deviceInfo) {
-
 	unsigned int cap = MS_SND_CARD_CAP_DISABLED;
 
 	jclass audioDeviceInfoClass = env->FindClass("android/media/AudioDeviceInfo");
@@ -283,15 +296,14 @@ char * ms_android_get_device_product_name(JNIEnv *env, jobject deviceInfo) {
 }
 
 int ms_android_get_sdk_version(JNIEnv *env) {
-
 	int sdkVersion = -1;
 
 	jclass versionClass = env->FindClass("android/os/Build$VERSION");
 	if (versionClass != NULL) {
 		jfieldID fid = env->GetStaticFieldID(versionClass, "SDK_INT", "I");
 		if (fid != NULL) {
-			sdkVersion=env->GetStaticIntField(versionClass, fid);
-			ms_message("SDK version [%i] detected",sdkVersion);
+			sdkVersion = env->GetStaticIntField(versionClass, fid);
+			ms_debug("SDK version [%i] detected",sdkVersion);
 		}
 		env->DeleteLocalRef(versionClass);
 	}
