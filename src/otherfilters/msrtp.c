@@ -408,7 +408,10 @@ static int send_dtmf(MSFilter * f, uint32_t timestamp_start)
 	
 	m1=rtp_session_create_telephone_event_packet(d->session,timestamp_start==d->dtmf_ts_cur);
 	
-	if (m1==NULL) return -1;
+	if (m1==NULL) {
+		ms_warning("There is no usable telephone-event payload type configured in the RTP session. The DTMF cannot be sent.");
+		return -1;
+	}
 
 	d->dtmf_ts_cur+=d->dtmf_ts_step;
 	if (RTP_TIMESTAMP_IS_NEWER_THAN(d->dtmf_ts_cur, d->skip_until)) {
@@ -524,7 +527,11 @@ static void _sender_process(MSFilter * f)
 			uint32_t origin_ts=d->skip_until-d->dtmf_duration;
 			if (RTP_TIMESTAMP_IS_NEWER_THAN(timestamp,d->dtmf_ts_cur)){
 				ms_debug("Sending RFC2833 packet, start_timestamp=%u, dtmf_ts_cur=%u",origin_ts,d->dtmf_ts_cur);
-				send_dtmf(f, origin_ts);
+				if (send_dtmf(f, origin_ts) == -1){
+					/* Abort the sending of dtmf if an error occured */
+					d->dtmf = 0;
+					d->skip = FALSE;
+				}
 			}
 		}
 		if (im){
