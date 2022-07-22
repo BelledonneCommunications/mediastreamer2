@@ -59,14 +59,16 @@ plc_context_t *generic_plc_create_context(int sample_rate) {
 }
 
 void generic_plc_destroy_context(plc_context_t *context) {
-	ms_free(context->continuity_buffer);
-	ms_free(context->plc_buffer);
-	ms_free(context->hamming_window);
-	ms_free(context->plc_out_buffer);
-	ms_fft_destroy(context->fft_to_frequency_context);
-	ms_fft_destroy(context->fft_to_time_context);
+	if (context) {
+		ms_free(context->continuity_buffer);
+		ms_free(context->plc_buffer);
+		ms_free(context->hamming_window);
+		ms_free(context->plc_out_buffer);
+		ms_fft_destroy(context->fft_to_frequency_context);
+		ms_fft_destroy(context->fft_to_time_context);
 
-	ms_free(context);
+		ms_free(context);
+	}
 }
 
 void generic_plc_fftbf(plc_context_t *context, int16_t *input_buffer, int16_t *output_buffer, size_t input_buffer_len) {
