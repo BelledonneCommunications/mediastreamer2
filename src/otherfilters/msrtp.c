@@ -168,6 +168,11 @@ static void sender_uninit(MSFilter * f)
 	ms_free(d);
 }
 
+static int sender_telephone_event_supported(MSFilter *f, BCTBX_UNUSED(void *arg)) {
+	SenderData *d = (SenderData *)f->data;
+	return -1 < rtp_profile_find_payload_number(d->session->snd.profile, "telephone-event", d->rate, 1);
+};
+
 static int sender_send_dtmf(MSFilter * f, void *arg)
 {
 	const char *dtmf = (const char *) arg;
@@ -757,8 +762,8 @@ static MSFilterMethod sender_methods[] = {
 	{ MS_RTP_SEND_ENABLE_STUN_FORCED, sender_enable_stun_forced },
 	{ MS_RTP_SEND_ENABLE_RTP_TRANSFER_MODE, sender_enable_rtp_transfer_mode },
 	{ MS_RTP_SEND_SET_ACTIVE_SPEAKER_SSRC, sender_set_active_speaker_ssrc },
-	{0, NULL}
-};
+	{ MS_RTP_SEND_TELEPHONE_EVENT_SUPPORTED, sender_telephone_event_supported },
+	{0, NULL}};
 
 #ifdef _MSC_VER
 

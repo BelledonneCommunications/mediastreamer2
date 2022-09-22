@@ -2132,6 +2132,17 @@ int audio_stream_send_dtmf(AudioStream *stream, char dtmf)
 	return 0;
 }
 
+bool_t audio_stream_supports_telephone_events(AudioStream *stream) {
+	if (!stream->ms.rtpsend)
+		return FALSE;
+
+	int result = ms_filter_call_method_noarg(stream->ms.rtpsend, MS_RTP_SEND_TELEPHONE_EVENT_SUPPORTED);
+	if (result < 0)
+		return FALSE;
+
+	return result;
+}
+
 static void audio_stream_set_rtp_output_gain_db(AudioStream *stream, float gain_db) {
 	float gain = gain_db;
 #ifdef __ANDROID__

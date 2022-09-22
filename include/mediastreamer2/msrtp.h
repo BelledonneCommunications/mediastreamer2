@@ -106,6 +106,11 @@ typedef struct _MSFilterRequestClientToMixerDataCb MSFilterRequestClientToMixerD
 #define MS_RTP_SEND_SET_ACTIVE_SPEAKER_SSRC	MS_FILTER_METHOD(MS_RTP_SEND_ID, 17, uint32_t)
 
 
+/**
+ * Used to determine if DTMFs can be sent out-of-band
+ */
+#define MS_RTP_SEND_TELEPHONE_EVENT_SUPPORTED MS_FILTER_METHOD_NO_ARG(MS_RTP_SEND_ID, 18)
+
 extern MSFilterDesc ms_rtp_send_desc;
 extern MSFilterDesc ms_rtp_recv_desc;
 
