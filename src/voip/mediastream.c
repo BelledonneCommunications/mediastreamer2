@@ -28,6 +28,7 @@
 #include "mediastreamer2/msrtp.h"
 #include "private.h"
 #include <ctype.h>
+#include <limits.h>
 
 #if __APPLE__
 #include "TargetConditionals.h"
@@ -797,11 +798,17 @@ static int update_bitrate_limit_from_tmmbr(MediaStream *obj, int br_limit){
 	return br_limit;
 }
 
-void media_stream_process_tmmbr(MediaStream *ms, int tmmbr_mxtbr){
-	ms_message("MediaStream[%p]: received a TMMBR for bitrate %i kbits/s"
-				, ms, (int)(tmmbr_mxtbr/1000));
-	tmmbr_mxtbr = update_bitrate_limit_from_tmmbr(ms, tmmbr_mxtbr);
-	if (tmmbr_mxtbr < 0) return;
+void media_stream_process_tmmbr(MediaStream *ms, uint64_t tmmbr_mxtbr){
+	int br_int;
+	ms_message("MediaStream[%p]: received a TMMBR for bitrate %llu kbits/s"
+				, ms, (unsigned long long)(tmmbr_mxtbr/1000));
+	if (tmmbr_mxtbr < (uint64_t)INT_MAX){
+		br_int = (int)tmmbr_mxtbr;
+	}else{
+		br_int = INT_MAX;
+	}
+	br_int = update_bitrate_limit_from_tmmbr(ms, br_int);
+
 
 #ifdef VIDEO_ENABLED
 	if (ms->type == MSVideo) {
@@ -817,9 +824,9 @@ void media_stream_process_tmmbr(MediaStream *ms, int tmmbr_mxtbr){
 			if (vconf_list != NULL) {
 				ms_filter_call_method(ms->encoder, MS_VIDEO_ENCODER_GET_CONFIGURATION, &current_vconf);
 
-				vconf = ms_video_find_best_configuration_for_size_and_bitrate(vconf_list, current_vconf.vsize, ms_factory_get_cpu_count(ms->factory), tmmbr_mxtbr);
+				vconf = ms_video_find_best_configuration_for_size_and_bitrate(vconf_list, current_vconf.vsize, ms_factory_get_cpu_count(ms->factory), br_int);
 
-				new_bitrate_limit = tmmbr_mxtbr < vconf.bitrate_limit ? tmmbr_mxtbr : vconf.bitrate_limit;
+				new_bitrate_limit = br_int < vconf.bitrate_limit ? br_int : vconf.bitrate_limit;
 				ms_message("Changing video encoder's output bitrate to %i", new_bitrate_limit);
 				current_vconf.required_bitrate = new_bitrate_limit;
 
@@ -844,7 +851,7 @@ void media_stream_tmmbr_received(const OrtpEventData *evd, void *user_pointer) {
 	MediaStream *ms = (MediaStream *)user_pointer;
 	switch (rtcp_RTPFB_get_type(evd->packet)) {
 		case RTCP_RTPFB_TMMBR: {
-			int tmmbr_mxtbr = (int)rtcp_RTPFB_tmmbr_get_max_bitrate(evd->packet);
+			uint64_t tmmbr_mxtbr = rtcp_RTPFB_tmmbr_get_max_bitrate(evd->packet);
 			media_stream_process_tmmbr(ms, tmmbr_mxtbr);
 			break;
 		}
