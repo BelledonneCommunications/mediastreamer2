@@ -842,7 +842,7 @@ void media_stream_process_tmmbr(MediaStream *ms, uint64_t tmmbr_mxtbr){
 			ms->video_quality_controller = ms_video_quality_controller_new((VideoStream*) ms);
 		}
 
-		ms_video_quality_controller_update_from_tmmbr(ms->video_quality_controller, tmmbr_mxtbr);
+		ms_video_quality_controller_update_from_tmmbr(ms->video_quality_controller, br_int);
 	}
 #endif
 }
