@@ -808,7 +808,7 @@ void media_stream_process_tmmbr(MediaStream *ms, uint64_t tmmbr_mxtbr){
 		br_int = INT_MAX;
 	}
 	br_int = update_bitrate_limit_from_tmmbr(ms, br_int);
-
+	if (br_int == -1) return;
 
 #ifdef VIDEO_ENABLED
 	if (ms->type == MSVideo) {
