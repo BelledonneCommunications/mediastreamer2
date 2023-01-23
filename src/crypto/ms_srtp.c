@@ -511,7 +511,7 @@ static int ms_media_stream_sessions_set_srtp_key(MSMediaStreamSessions *sessions
 	// RTP stream
 	if (stream_type == MSSRTP_ALL_STREAMS || stream_type == MSSRTP_RTP_STREAM) {
 		size_t cipher_key_length = 0;
-		if ((suite == MS_AES_128_SHA1_80_NO_CIPHER) || (suite == MS_AES_128_SHA1_80_SRTP_NO_CIPHER)) {
+		if ((suite == MS_AES_128_SHA1_80_NO_CIPHER) || (suite == MS_AES_128_SHA1_80_SRTP_NO_CIPHER) || (suite == MS_AES_128_SHA1_80_SRTCP_NO_CIPHER)) {
 			// SRTP is unencrypted therefore cipher key length is 0
 			cipher_key_length = 0;
 		} else {
