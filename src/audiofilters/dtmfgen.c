@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/dtmfgen.h"
 #include "mediastreamer2/msticker.h"
 
@@ -202,7 +204,7 @@ static int dtmfgen_start(MSFilter *f, void *arg){
 	return -1;
 }
 
-static int dtmfgen_stop(MSFilter *f, void *arg){
+static int dtmfgen_stop(MSFilter *f, UNUSED(void *arg)){
 	DtmfGenState *s=(DtmfGenState*)f->data;
 	int min_duration=(100*s->rate)/1000; /*wait at least 100 ms*/
 	ms_filter_lock(f);

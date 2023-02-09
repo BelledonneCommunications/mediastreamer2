@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/msticker.h"
 
 #ifndef _WIN32
@@ -317,7 +319,7 @@ static void remove_tasks_for_filter(MSTicker *ticker, MSFilter *f){
 	}
 }
 
-static uint64_t get_cur_time_ms(void *unused){
+static uint64_t get_cur_time_ms(UNUSED(void * unused)){
 	return ms_get_cur_time_ms();
 }
 
@@ -395,6 +397,10 @@ static int set_high_prio(MSTicker *obj){
 	return precision;
 }
 
+#ifndef _MSC_VER
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif // _MSC_VER
 static void unset_high_prio(int precision){
 #ifdef _WIN32
 #if defined(MS2_WINDOWS_DESKTOP) && !defined(MS2_WINDOWS_UWP)
@@ -405,8 +411,11 @@ static void unset_high_prio(int precision){
 #endif
 #endif
 }
+#ifndef _MSC_VER
+#pragma GCC diagnostic pop
+#endif // _MSC_VER
 
-static int wait_next_tick(void *data, uint64_t virt_ticker_time){
+static int wait_next_tick(void *data, UNUSED(uint64_t virt_ticker_time)){
 	MSTicker *s=(MSTicker*)data;
 	uint64_t realtime;
 	int64_t diff;

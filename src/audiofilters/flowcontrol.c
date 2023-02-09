@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/mscommon.h"
 #include "mediastreamer2/msfilter.h"
 #include "mediastreamer2/msticker.h"
@@ -180,7 +182,7 @@ static void ms_audio_flow_control_process(MSFilter *f) {
 	ms_filter_unlock(f);
 }
 
-static void ms_audio_flow_control_postprocess(MSFilter *f) {
+static void ms_audio_flow_control_postprocess(UNUSED(MSFilter *f)) {
 
 }
 

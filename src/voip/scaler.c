@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/msvideo.h"
 #if MS_HAS_ARM_NEON
 #include <arm_neon.h>
@@ -346,7 +348,7 @@ static void img_yuv2rgb565_scale(AndroidScalerCtx *ctx, uint8_t *src[], int src_
 	}
 }
 
-static MSScalerContext *android_create_scaler_context(int src_w, int src_h, MSPixFmt src_fmt, int dst_w, int dst_h, MSPixFmt dst_fmt, int flags){
+static MSScalerContext *android_create_scaler_context(int src_w, int src_h, MSPixFmt src_fmt, int dst_w, int dst_h, MSPixFmt dst_fmt, UNUSED(int flags)){
 	AndroidScalerCtx *ctx=ms_new0(AndroidScalerCtx,1);
 	int i;
 	int tmp,prev;

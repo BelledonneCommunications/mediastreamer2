@@ -48,7 +48,6 @@
 #define MS2_DEPRECATED __attribute__ ((deprecated))
 #endif
 #endif
-#define MS_UNUSED(x) ((void)(x))
 
 #define ms_malloc	ortp_malloc
 #define ms_malloc0	ortp_malloc0

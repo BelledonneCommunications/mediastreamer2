@@ -18,9 +18,9 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 /* mtu.c : discover the mtu automatically */
 
+#include <bctoolbox/defs.h>
 
 #include "mediastreamer2/mscommon.h"
 
@@ -270,7 +270,7 @@ int ms_discover_mtu(const char *host){
 
 #else
 
-int ms_discover_mtu(const char*host){
+int ms_discover_mtu(UNUSED(const char*host)){
 	ms_warning("mtu discovery not implemented.");
 	return -1;
 }

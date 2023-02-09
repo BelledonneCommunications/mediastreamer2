@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #ifdef HAVE_CONFIG_H
 #include "mediastreamer-config.h"
 #endif
@@ -74,7 +76,7 @@ static void qrcode_uninit(MSFilter *f) {
 	ms_free(qrc);
 }
 
-static int reset_search(MSFilter *f, void *arg) {
+static int reset_search(MSFilter *f, UNUSED(void *arg)) {
 	QRCodeReaderStruct *qrc = (QRCodeReaderStruct *)f->data;
 	qrc->searchQRCode = TRUE;
 	return 0;

@@ -20,6 +20,8 @@
 
 #include <jni.h>
 
+#include <bctoolbox/defs.h>
+
 #include <mediastreamer2/msfactory.h>
 #include <mediastreamer2/devices.h>
 
@@ -34,7 +36,7 @@ static void ReleaseStringUTFChars(JNIEnv *env, jstring string, const char *cstri
 	if (string) env->ReleaseStringUTFChars(string, cstring);
 }
 
-JNIEXPORT void JNICALL Java_org_linphone_mediastream_Factory_setDeviceInfo(JNIEnv *env, jobject obj,
+JNIEXPORT void JNICALL Java_org_linphone_mediastream_Factory_setDeviceInfo(JNIEnv *env, UNUSED(jobject obj),
 		jlong factoryPtr, jstring jmanufacturer, jstring jmodel, jstring jplatform, jint flags, jint delay, jint recommended_rate) {
 	const char *manufacturer = GetStringUTFChars(env, jmanufacturer);
 	const char *model = GetStringUTFChars(env, jmodel);
@@ -48,7 +50,7 @@ JNIEXPORT void JNICALL Java_org_linphone_mediastream_Factory_setDeviceInfo(JNIEn
 	ReleaseStringUTFChars(env, jplatform, platform);
 }
 
-JNIEXPORT jint JNICALL Java_org_linphone_mediastream_Factory_getDeviceFlags(JNIEnv *env, jobject obj, jlong factoryPtr) {
+JNIEXPORT jint JNICALL Java_org_linphone_mediastream_Factory_getDeviceFlags(UNUSED(JNIEnv *env), UNUSED(jobject obj), jlong factoryPtr) {
 	return ms_devices_info_get_sound_device_description(((MSFactory *) factoryPtr)->devices_info)->flags;
 }
 

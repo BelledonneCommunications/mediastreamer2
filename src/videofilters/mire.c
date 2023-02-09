@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #ifdef HAVE_CONFIG_H
 #include "mediastreamer-config.h"
 #endif
@@ -31,7 +33,6 @@
 #include "mediastreamer2/msmire.h"
 
 #include <math.h>
-
 
 typedef struct _MireData{
 	MSVideoSize vsize;
@@ -133,7 +134,7 @@ static int mire_set_fps(MSFilter *f, void* data){
 	return 0;
 }
 
-static int mire_get_fmt(MSFilter *f, void* data){
+static int mire_get_fmt(UNUSED(MSFilter *f), void* data){
 	*(MSPixFmt*)data=MS_YUV420P;
 	return 0;
 }

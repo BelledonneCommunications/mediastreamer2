@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "pcap_sender.h"
 
 #include "mediastreamer2/msudp.h"
@@ -44,7 +46,7 @@ static void ms_pcap_stop(MSPCAPSender *s) {
 	ms_message("Done");
 }
 
-static void reader_notify_cb(void *user_data, MSFilter *f, unsigned int event, void *eventdata)
+static void reader_notify_cb(void *user_data, UNUSED(MSFilter *f), unsigned int event, UNUSED(void *eventdata))
 {
 	if (event == MS_PLAYER_EOF) {
 		ms_message("Reached end of file, stopping PCAP Sender");

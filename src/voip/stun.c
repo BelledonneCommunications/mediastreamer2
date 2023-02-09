@@ -18,12 +18,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
 
 #include <mediastreamer2/stun.h>
 #include <bctoolbox/compiler.h>
 #include <bctoolbox/crypto.h>
 #include <bctoolbox/port.h>
-
 
 #define IANA_PROTOCOL_NUMBERS_UDP 17
 
@@ -36,7 +36,6 @@
 #define STUN_MAX_SOFTWARE_LENGTH   763 /* Length in bytes, it is supposed to be less than 128 UTF-8 characters (TODO) */
 #define STUN_MAX_REALM_LENGTH      127
 #define STUN_MAX_NONCE_LENGTH      127
-
 
 #define STUN_STR_SETTER(field, value) \
 	if ((field) != NULL) ms_free(field); \
@@ -1615,7 +1614,7 @@ static bool_t ms_turn_rtp_endpoint_send_via_turn_relay(MSTurnContext *context, c
 	return FALSE;
 }
 
-static bool_t ms_turn_rtp_endpoint_should_be_sent_to_turn_server(MSTurnContext *context, const struct sockaddr *from, socklen_t fromlen) {
+static bool_t ms_turn_rtp_endpoint_should_be_sent_to_turn_server(MSTurnContext *context, const struct sockaddr *from, UNUSED(socklen_t fromlen)) {
 	struct sockaddr *turn_server_sa = (struct sockaddr *)&context->turn_server_addr;
 
 	if (turn_server_sa->sa_family != from->sa_family) return FALSE;

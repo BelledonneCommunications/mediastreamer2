@@ -18,16 +18,18 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #if defined(HAVE_CONFIG_H)
 #include "mediastreamer-config.h"
 #endif
 
 #include "mediastreamer2/msextdisplay.h"
 
-static void ext_display_init(MSFilter *f){
+static void ext_display_init(UNUSED(MSFilter *f)){
 }
 
-static void ext_display_uninit(MSFilter *f){
+static void ext_display_uninit(UNUSED(MSFilter *f)){
 }
 
 static void ext_display_process(MSFilter *f){

@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/msfilter.h"
 #include "mediastreamer2/msticker.h"
 #include "mediastreamer2/mscodecutils.h"
@@ -29,7 +31,6 @@
 #include <bv16-floatingpoint/bv16/bitpack.h>
 #include <bv16-floatingpoint/bv16/bv16.h>
 
-
 #ifdef _MSC_VER
 #include <malloc.h>
 #include <stdint.h>
@@ -39,7 +40,6 @@
 /* signal and bitstream frame size in byte */
 #define SIGNAL_FRAME_SIZE 80
 #define BITSTREAM_FRAME_SIZE 10
-
 
 typedef struct EncState{
 	struct BV16_Encoder_State state;
@@ -102,13 +102,12 @@ static int enc_add_attr(MSFilter *f, void *arg){
 	return 0;
 }
 
-static int enc_get_sample_rate(MSFilter *f, void *arg) {
-	MS_UNUSED(f);
+static int enc_get_sample_rate(UNUSED(MSFilter *f), void *arg) {
 	*((int *)arg) = 8000;
 	return 0;
 }
 
-static int get_channels(MSFilter *f, void *arg) {
+static int get_channels(UNUSED(MSFilter *f), void *arg) {
 	*((int *)arg) = 1;
 	return 0;
 }
@@ -303,18 +302,15 @@ static int dec_enable_plc(MSFilter *f, void* arg ){
 	return 0;
 }
 
-static int dec_have_plc(MSFilter *f, void *arg){
+static int dec_have_plc(UNUSED(MSFilter *f), void *arg){
 	*((int *)arg) = 1;
 	return 0;
 }
 
-static int dec_get_sample_rate(MSFilter *f, void *arg) {
-	MS_UNUSED(f);
+static int dec_get_sample_rate(UNUSED(MSFilter *f), void *arg) {
 	*((int *)arg) = 8000;
 	return 0;
 }
-
-
 
 static MSFilterMethod dec_methods[] = {
 	{ MS_FILTER_GET_SAMPLE_RATE, 	dec_get_sample_rate },

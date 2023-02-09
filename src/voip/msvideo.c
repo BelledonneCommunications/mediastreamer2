@@ -18,6 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
 
 #include "mediastreamer2/msvideo.h"
 #if !defined(NO_FFMPEG)
@@ -468,7 +469,7 @@ struct _MSYuvScalerContext{
 typedef struct _MSYuvScalerContext MSYuvScalerContext;
 
 static MSScalerContext *yuv_create_scale_context(int src_w, int src_h, MSPixFmt src_fmt,
-										  int dst_w, int dst_h, MSPixFmt dst_fmt, int flags){
+										  int dst_w, int dst_h, UNUSED(MSPixFmt dst_fmt), UNUSED(int flags)){
 	MSYuvScalerContext *ctx=ms_new0(MSYuvScalerContext,1);
 	ctx->source.width = src_w;
 	ctx->source.height = src_h;

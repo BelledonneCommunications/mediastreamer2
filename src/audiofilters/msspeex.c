@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/msfilter.h"
 #include "mediastreamer2/msticker.h"
 
@@ -429,7 +431,7 @@ static int enc_add_attr(MSFilter *f, void *arg){
 	return 0;
 }
 
-static int get_channels(MSFilter *f, void *arg) {
+static int get_channels(UNUSED(MSFilter *f), void *arg) {
 	*((int *)arg) = 1;
 	return 0;
 }
@@ -635,7 +637,7 @@ static void dec_process(MSFilter *f){
 	if (bits_initd) speex_bits_destroy(&bits);
 }
 
-static int dec_have_plc(MSFilter *f, void *arg)
+static int dec_have_plc(UNUSED(MSFilter *f), void *arg)
 {
 	*((int *)arg) = 1;
 	return 0;

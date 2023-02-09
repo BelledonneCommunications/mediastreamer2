@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/msfilter.h"
 #include "mediastreamer2/msvideo.h"
 #include "mediastreamer2/msjava.h"
@@ -75,7 +77,7 @@ static void android_display_uninit(MSFilter *f){
 	ms_free(ad);
 }
 
-static void android_display_preprocess(MSFilter *f){
+static void android_display_preprocess(UNUSED(MSFilter *f)){
 
 }
 

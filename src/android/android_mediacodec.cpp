@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+#include <bctoolbox/defs.h>
 
 #include "mediastreamer2/mscommon.h"
 #include "mediastreamer2/msjava.h"
@@ -243,7 +244,7 @@ AMediaCodec* AMediaCodec_createEncoderByType(const char *mime_type) {
 	return codec;
 }
 
-media_status_t AMediaCodec_configure(AMediaCodec *codec, const AMediaFormat* format, ANativeWindow* surface, AMediaCrypto *crypto, uint32_t flags) {
+media_status_t AMediaCodec_configure(AMediaCodec *codec, const AMediaFormat* format, UNUSED(ANativeWindow* surface), UNUSED(AMediaCrypto *crypto), uint32_t flags) {
 	JNIEnv *env = ms_get_jni_env();
 
 	env->CallVoidMethod(codec->jcodec, codec->configure, format->jformat, NULL, NULL, flags);
@@ -393,7 +394,7 @@ AMediaFormat* AMediaCodec_getOutputFormat(AMediaCodec *codec) {
 	return format;
 }
 
-media_status_t AMediaCodec_releaseOutputBuffer(AMediaCodec *codec, size_t idx, bool render) {
+media_status_t AMediaCodec_releaseOutputBuffer(AMediaCodec *codec, size_t idx, UNUSED(bool render)) {
 	JNIEnv *env = ms_get_jni_env();
 	env->CallVoidMethod(codec->jcodec, codec->releaseOutputBuffer, (int)idx, FALSE);
 	return (handle_java_exception() == -1) ? AMEDIA_ERROR_BASE : AMEDIA_OK;

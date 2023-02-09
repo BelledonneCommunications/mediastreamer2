@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 #ifdef HAVE_CONFIG_H
 #include "mediastreamer-config.h"
 #endif
@@ -28,8 +29,9 @@
 #include <unistd.h>
 #endif
 
+#include <bctoolbox/defs.h>
 
-int main(int argc, char *argv[]){
+int main(UNUSED(int argc), UNUSED(char *argv[])){
 #ifdef HAVE_X11_XLIB_H
 	Display *display=XOpenDisplay(getenv("DISPLAY"));
 	XSetWindowAttributes wa;

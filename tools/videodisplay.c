@@ -18,6 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
 
 #include <signal.h>
 
@@ -27,11 +28,11 @@
 
 static int stopped=FALSE;
 
-static void stop(int signum){
+static void stop(UNUSED(int signum)){
 	stopped=TRUE;
 }
 
-int main(int argc, char *argv[]){
+int main(UNUSED(int argc), UNUSED(char *argv[])){
 	VideoStream *vs;
 	MSWebCam *cam;
 	MSVideoSize vsize;

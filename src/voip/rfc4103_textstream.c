@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+#include <bctoolbox/defs.h>
 
 #include "mediastreamer2/mediastream.h"
 #include "mediastreamer2/msrtt4103.h"
@@ -37,7 +38,7 @@ static void text_stream_free(TextStream *stream) {
 	ms_free(stream);
 }
 
-static void text_stream_process_rtcp(MediaStream *media_stream, mblk_t *m) {
+static void text_stream_process_rtcp(UNUSED(MediaStream *media_stream), UNUSED(mblk_t *m)) {
 }
 
 static void text_stream_payload_type_changed(RtpSession *session, void *data)
@@ -59,7 +60,7 @@ static void text_stream_payload_type_changed(RtpSession *session, void *data)
 	}
 }
 
-static void text_stream_ssrc_changed(RtpSession *session, void *data){
+static void text_stream_ssrc_changed(UNUSED(RtpSession *session), void *data){
 	TextStream *stream = (TextStream *)data;
 	ms_warning("SSRC changed on text stream, resync RED/T140 contexts.");
 	if (!stream->rttsink){

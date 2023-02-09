@@ -18,6 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
 
 #include "mediastreamer2/msfilter.h"
 #include "g711.h"
@@ -140,17 +141,18 @@ static int enc_add_attr(MSFilter *f, void *arg){
 	}
 	return 0;
 }
-static int get_sample_rate(MSFilter *f, void *arg) {
+
+static int get_sample_rate(UNUSED(MSFilter *f), void *arg) {
 	*((int *)arg) = 8000;
 	return 0;
 }
 
-static int dec_have_plc(MSFilter *f, void *arg) {
+static int dec_have_plc(UNUSED(MSFilter *f), void *arg) {
 	*((int *)arg) = 0;
 	return 0;
 }
 
-static int get_channels(MSFilter *f, void *arg) {
+static int get_channels(UNUSED(MSFilter *f), void *arg) {
 	*((int *)arg) = 1;
 	return 0;
 }
@@ -160,6 +162,7 @@ static int get_ptime(MSFilter *f, void * arg){
 	*((int *)arg) = s->ptime;
 	return 0;
 }
+
 static MSFilterMethod enc_methods[]={
 	{	MS_FILTER_ADD_ATTR			,	enc_add_attr},
 	{	MS_FILTER_ADD_FMTP			,	enc_add_fmtp},

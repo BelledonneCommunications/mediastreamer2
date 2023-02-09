@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/mediastream.h"
 #include "mediastreamer2/msrtt4103.h"
 #include "mediastreamer2_tester.h"
@@ -115,7 +117,7 @@ static void destroy_text_stream(text_stream_tester_t *tst) {
 	text_stream_stop(tst->ts);
 }
 
-static void real_time_text_character_received(void *userdata, struct _MSFilter *f, unsigned int id, void *arg) {
+static void real_time_text_character_received(void *userdata, UNUSED(MSFilter *f), unsigned int id, void *arg) {
 	if (id == MS_RTT_4103_RECEIVED_CHAR) {
 		text_stream_tester_t *tst = (text_stream_tester_t *)userdata;
 		if (tst->stats.q != NULL) {
@@ -131,7 +133,7 @@ static void real_time_text_character_received(void *userdata, struct _MSFilter *
 	}
 }
 
-static void init_text_streams(text_stream_tester_t *tst1, text_stream_tester_t *tst2, bool_t avpf, bool_t one_way, OrtpNetworkSimulatorParams *params, int payload_type) {
+static void init_text_streams(text_stream_tester_t *tst1, text_stream_tester_t *tst2, UNUSED(bool_t avpf), UNUSED(bool_t one_way), OrtpNetworkSimulatorParams *params, int payload_type) {
 	create_text_stream(tst1, payload_type);
 	create_text_stream(tst2, payload_type);
 

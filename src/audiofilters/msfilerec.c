@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #if defined(HAVE_CONFIG_H)
 #include "mediastreamer-config.h"
 #endif
@@ -28,7 +30,6 @@
 #include <bctoolbox/vfs.h>
 
 #include "fd_portab.h" // keep this include at the last of the inclusion sequence!
-
 
 static int rec_close(MSFilter *f, void *arg);
 static void write_wav_header(bctbx_vfs_file_t *fp, int rate, int nchannels, int size);
@@ -163,7 +164,7 @@ static int rec_open(MSFilter *f, void *arg){
 	return 0;
 }
 
-static int rec_start(MSFilter *f, void *arg){
+static int rec_start(MSFilter *f, UNUSED(void *arg)){
 	RecState *s=(RecState*)f->data;
 	if (s->state!=MSRecorderPaused){
 		ms_error("MSFileRec: cannot start, state=%i",s->state);
@@ -175,7 +176,7 @@ static int rec_start(MSFilter *f, void *arg){
 	return 0;
 }
 
-static int rec_stop(MSFilter *f, void *arg){
+static int rec_stop(MSFilter *f, UNUSED(void *arg)){
 	RecState *s=(RecState*)f->data;
 	ms_mutex_lock(&f->lock);
 	s->state=MSRecorderPaused;
@@ -220,7 +221,7 @@ static void _rec_close(RecState *s){
 	}
 }
 
-static int rec_close(MSFilter *f, void *arg){
+static int rec_close(MSFilter *f, UNUSED(void *arg)){
 	RecState *s=(RecState*)f->data;
 	ms_mutex_lock(&f->lock);
 	_rec_close(s);

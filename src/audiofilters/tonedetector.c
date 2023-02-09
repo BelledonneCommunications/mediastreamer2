@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #ifdef HAVE_CONFIG_H
 #include "mediastreamer-config.h"
 #endif
@@ -124,7 +126,7 @@ static int detector_add_scan(MSFilter *f, void *arg){
 	return -1;
 }
 
-static int detector_clear_scans(MSFilter *f, void *arg){
+static int detector_clear_scans(MSFilter *f, UNUSED(void *arg)){
 	DetectorState *s=(DetectorState *)f->data;
 	memset(&s->tone_def,0,sizeof(s->tone_def));
 	s->nscans=0;

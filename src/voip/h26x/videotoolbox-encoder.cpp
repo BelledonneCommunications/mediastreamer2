@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "h26x/h26x-utils.h"
 #include "videotoolbox-utils.h"
 
@@ -244,7 +246,7 @@ void VideoToolboxEncoder::applyBitrate() {
 	}
 }
 
-void VideoToolboxEncoder::outputCb(void *outputCallbackRefCon, void *sourceFrameRefCon, OSStatus status, VTEncodeInfoFlags infoFlags, CMSampleBufferRef sampleBuffer) {
+void VideoToolboxEncoder::outputCb(void *outputCallbackRefCon, UNUSED(void *sourceFrameRefCon), OSStatus status, UNUSED(VTEncodeInfoFlags infoFlags), CMSampleBufferRef sampleBuffer) {
 	VideoToolboxEncoder *ctx = static_cast<VideoToolboxEncoder *>(outputCallbackRefCon);
 
 	try {

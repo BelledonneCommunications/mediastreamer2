@@ -19,6 +19,8 @@
  */
 
 #ifdef VIDEO_ENABLED
+#include <bctoolbox/defs.h>
+
 #include "video-conference.h"
 #include "mediastreamer2/msconference.h"
 #include "mediastreamer2/msrtp.h"
@@ -144,7 +146,7 @@ void unplumb_from_conf(VideoEndpoint *ep) {
 	}
 }
 
-void on_filter_event(void *data, MSFilter *f, unsigned int event_id, void *event_data) {
+void on_filter_event(void *data, UNUSED(MSFilter *f), unsigned int event_id, void *event_data) {
 	VideoConferenceGeneric *obj = (VideoConferenceGeneric *) data;
 	int pin;
 	VideoEndpoint *ep;
@@ -198,7 +200,7 @@ void on_filter_event(void *data, MSFilter *f, unsigned int event_id, void *event
 	}
 }
 
-void ms_video_conference_process_encoder_control(VideoStream *vs, unsigned int method_id, void *arg, void *user_data) {
+void ms_video_conference_process_encoder_control(UNUSED(VideoStream *vs), unsigned int method_id, void *, void *user_data) {
 	VideoEndpoint *ep = (VideoEndpoint*) user_data;
 	VideoConferenceGeneric *conf = (VideoConferenceGeneric *)ep->mConference;
 	switch(method_id){

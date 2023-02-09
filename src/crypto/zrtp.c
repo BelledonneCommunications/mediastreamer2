@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/zrtp.h"
 #include "mediastreamer2/mediastream.h"
 
@@ -431,10 +433,10 @@ static int ms_zrtp_addExportedKeysInZidCache(void *clientData, int zuid, uint8_t
 /*******************************************************/
 /**** Transport Modifier Sender/Receiver functions  ****/
 
-static int ms_zrtp_rtp_process_on_send(RtpTransportModifier *t, mblk_t *msg){
+static int ms_zrtp_rtp_process_on_send(UNUSED(RtpTransportModifier *t), mblk_t *msg){
 	return (int)msgdsize(msg);
 }
-static int ms_zrtp_rtcp_process_on_send(RtpTransportModifier *t, mblk_t *msg)  {
+static int ms_zrtp_rtcp_process_on_send(UNUSED(RtpTransportModifier *t), mblk_t *msg)  {
 	return (int)msgdsize(msg);
 }
 
@@ -490,7 +492,7 @@ static int ms_zrtp_rtp_process_on_receive(RtpTransportModifier *t, mblk_t *msg){
 }
 
 /* Nothing to do on rtcp packets, just return packet length */
-static int ms_zrtp_rtcp_process_on_receive(RtpTransportModifier *t, mblk_t *msg)  {
+static int ms_zrtp_rtcp_process_on_receive(UNUSED(RtpTransportModifier *t), mblk_t *msg)  {
 	return (int)msgdsize(msg);
 }
 

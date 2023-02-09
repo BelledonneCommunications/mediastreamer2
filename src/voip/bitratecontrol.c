@@ -18,9 +18,9 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mediastreamer2/bitratecontrol.h"
-
 #include <bctoolbox/defs.h>
+
+#include "mediastreamer2/bitratecontrol.h"
 
 static const int probing_up_interval=10;
 
@@ -139,7 +139,7 @@ void ms_bitrate_controller_destroy(MSBitrateController *obj){
 	ms_free(obj);
 }
 
-MSBitrateController *ms_audio_bitrate_controller_new(RtpSession *session, MSFilter *encoder, unsigned int flags){
+MSBitrateController *ms_audio_bitrate_controller_new(RtpSession *session, MSFilter *encoder, UNUSED(unsigned int flags)){
 	return ms_bitrate_controller_new(
 	                                 ms_simple_qos_analyzer_new(session),
 	                                 ms_audio_bitrate_driver_new(session, encoder));

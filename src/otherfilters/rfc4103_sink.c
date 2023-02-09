@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+#include <bctoolbox/defs.h>
 
 #include "mediastreamer2/mediastream.h"
 #include "mediastreamer2/msfilter.h"
@@ -281,7 +282,7 @@ static void ms_rtt_4103_sink_init(MSFilter *f) {
 	f->data = s;
 }
 
-static void ms_rtt_4103_sink_preprocess(MSFilter *f) {
+static void ms_rtt_4103_sink_preprocess(UNUSED(MSFilter *f)) {
 
 }
 
@@ -310,7 +311,7 @@ static void ms_rtt_4103_sink_process(MSFilter *f) {
 	ms_filter_unlock(f);
 }
 
-static void ms_rtt_4103_sink_postprocess(MSFilter *f) {
+static void ms_rtt_4103_sink_postprocess(UNUSED(MSFilter *f)) {
 
 }
 
@@ -336,7 +337,7 @@ static int ms_rtt_4103_sink_set_red_payload(MSFilter *f, void *red) {
 	return 0;
 }
 
-static int ms_rtt_4103_resync(MSFilter *f, void *arg){
+static int ms_rtt_4103_resync(MSFilter *f, UNUSED(void *arg)){
 	RealTimeTextSinkData *s = (RealTimeTextSinkData *)f->data;
 	ms_filter_lock(f);
 	s->flags = 0;

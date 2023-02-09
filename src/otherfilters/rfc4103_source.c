@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/mediastream.h"
 #include "mediastreamer2/msfilter.h"
 #include "mediastreamer2/msticker.h"
@@ -186,7 +188,7 @@ static void ms_rtt_4103_source_init(MSFilter *f) {
 	f->data = s;
 }
 
-static void ms_rtt_4103_source_preprocess(MSFilter *f) {
+static void ms_rtt_4103_source_preprocess(UNUSED(MSFilter *f)) {
 	
 }
 
@@ -203,7 +205,7 @@ static void ms_rtt_4103_source_process(MSFilter *f) {
 	ms_filter_unlock(f);
 }
 
-static void ms_rtt_4103_source_postprocess(MSFilter *f) {
+static void ms_rtt_4103_source_postprocess(UNUSED(MSFilter *f)) {
 	
 }
 

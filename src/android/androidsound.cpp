@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include <mediastreamer2/msfilter.h>
 #include <mediastreamer2/msjava.h>
 #include <mediastreamer2/msticker.h>
@@ -288,8 +290,8 @@ static void android_snd_card_detect(MSSndCardManager *m) {
 	ms_message("Native android sound support is NOT available.");
 }
 
-static void android_native_snd_card_init(MSSndCard *card) {
-	
+static void android_native_snd_card_init(UNUSED(MSSndCard *card)) {
+
 }
 
 static void android_native_snd_card_uninit(MSSndCard *card){
@@ -480,6 +482,10 @@ static void android_snd_read_process(MSFilter *obj){
 	ms_mutex_unlock(&ad->mutex);
 }
 
+#ifndef _MSC_VER
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif // _MSC_VER
 static int android_snd_read_set_sample_rate(MSFilter *obj, void *param){
 #ifndef NATIVE_USE_HARDWARE_RATE
 	AndroidSndReadData *ad=(AndroidSndReadData*)obj->data;
@@ -489,6 +495,9 @@ static int android_snd_read_set_sample_rate(MSFilter *obj, void *param){
 	return -1;
 #endif
 }
+#ifndef _MSC_VER
+#pragma GCC diagnostic pop
+#endif // _MSC_VER
 
 static int android_snd_read_get_sample_rate(MSFilter *obj, void *param){
 	AndroidSndReadData *ad=(AndroidSndReadData*)obj->data;
@@ -583,6 +592,10 @@ static void android_snd_write_uninit(MSFilter *obj){
 	delete ad;
 }
 
+#ifndef _MSC_VER
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif // _MSC_VER
 static int android_snd_write_set_sample_rate(MSFilter *obj, void *data){
 #ifndef NATIVE_USE_HARDWARE_RATE
 	int *rate=(int*)data;
@@ -593,6 +606,9 @@ static int android_snd_write_set_sample_rate(MSFilter *obj, void *data){
 	return -1;
 #endif
 }
+#ifndef _MSC_VER
+#pragma GCC diagnostic pop
+#endif // _MSC_VER
 
 static int android_snd_write_get_sample_rate(MSFilter *obj, void *data){
 	AndroidSndWriteData *ad=(AndroidSndWriteData*)obj->data;

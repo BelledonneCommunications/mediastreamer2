@@ -18,14 +18,14 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-
+#include <bctoolbox/defs.h>
 
 #include "mediastreamer2/mediastream.h"
 #include "mediastreamer2/dtmfgen.h"
 #include "mediastreamer2/msfileplayer.h"
 #include "private.h"
 
-static void ring_player_event_handler(void *ud, MSFilter *f, unsigned int evid, void *arg){
+static void ring_player_event_handler(void *ud, UNUSED(MSFilter *f), unsigned int evid, UNUSED(void *arg)){
 	RingStream *stream=(RingStream*)ud;
 
 	if (evid==MS_FILTER_OUTPUT_FMT_CHANGED){

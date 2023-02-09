@@ -18,10 +18,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/mscommon.h"
 #include "mediastreamer2/msutils.h"
 
-static void completion_cb(void *user_data, int percentage){
+static void completion_cb(UNUSED(void *user_data), int percentage){
 	fprintf(stdout,"%i %% completed\r",percentage);
 	fflush(stdout);
 }

@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #ifdef HAVE_CONFIG_H
 #include "mediastreamer-config.h"
 #endif
@@ -59,7 +61,7 @@ static void set_random_ports(void){
 	RECEIVER_RTP_PORT = rand()%(0xffff - 1024) + 1024;
 }
 
-int drifting_ticker(void *data, uint64_t virt_ticker_time){
+int drifting_ticker(UNUSED(void *data), UNUSED(uint64_t virt_ticker_time)){
 	ortpTimeSpec ts;
 	ortp_get_cur_time(&ts);
 	return (int)(1 * ((ts.tv_sec * 1000LL) + ((ts.tv_nsec + 500000LL) / 1000000LL)));
@@ -86,7 +88,7 @@ static int tester_after_all(void) {
 	return 0;
 }
 
-void iterate_stats_logger(MediaStream *ms, void *user_pointer) {
+void iterate_stats_logger(MediaStream *ms, UNUSED(void * user_pointer)) {
 	ms_message("count=%u cum_loss=%ld late=%ld discarded=%lu"
 			, ms->sessions.rtp_session->rtp.jittctl.count
 			, (unsigned long)rtp_session_get_stats(ms->sessions.rtp_session)->cum_packet_loss

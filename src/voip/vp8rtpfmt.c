@@ -18,6 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
 
 #include "vp8rtpfmt.h"
 
@@ -516,7 +517,7 @@ static void mark_frame_as_invalid(Vp8RtpFmtUnpackerCtx *ctx, Vp8RtpFmtFrame *fra
 	}
 }
 
-static void mark_frame_as_incomplete(Vp8RtpFmtUnpackerCtx *ctx, Vp8RtpFmtFrame *frame, uint8_t idx) {
+static void mark_frame_as_incomplete(Vp8RtpFmtUnpackerCtx *ctx, Vp8RtpFmtFrame *frame, UNUSED(uint8_t idx)) {
 	frame->error = Vp8RtpFmtIncompleteFrame;
 	if (ctx->freeze_on_error == TRUE) {
 		ctx->waiting_for_reference_frame = TRUE;
@@ -718,7 +719,7 @@ static void output_partition(MSQueue *out, Vp8RtpFmtPartition **partition, bool_
 	(*partition)->outputted = TRUE;
 }
 
-static void output_partitions_of_frame(Vp8RtpFmtUnpackerCtx *ctx, MSQueue *out, Vp8RtpFmtFrame *frame) {
+static void output_partitions_of_frame(UNUSED(Vp8RtpFmtUnpackerCtx *ctx), MSQueue *out, Vp8RtpFmtFrame *frame) {
 	int i;
 	if (frame->unnumbered_partitions == TRUE) {
 		output_frame(out, frame);
@@ -1150,7 +1151,7 @@ void vp8rtpfmt_packer_init(Vp8RtpFmtPackerCtx *ctx) {
     ctx->_refCSeq = 0;
 }
 
-void vp8rtpfmt_packer_uninit(Vp8RtpFmtPackerCtx *ctx) {
+void vp8rtpfmt_packer_uninit(UNUSED(Vp8RtpFmtPackerCtx *ctx)) {
 }
 
 void vp8rtpfmt_packer_process(Vp8RtpFmtPackerCtx *ctx, bctbx_list_t *in, MSQueue *out, MSFactory *f) {

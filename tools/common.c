@@ -18,9 +18,11 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "common.h"
 
-static PayloadType* create_custom_payload_type(const char *type, const char *subtype, const char *rate, const char *channels, int number){
+static PayloadType* create_custom_payload_type(const char *type, const char *subtype, const char *rate, const char *channels, UNUSED(int number)){
 	PayloadType *pt=payload_type_new();
 	if (strcasecmp(type,"audio")==0){
 		pt->type=PAYLOAD_AUDIO_PACKETIZED;

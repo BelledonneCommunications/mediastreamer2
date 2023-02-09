@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/mediastream.h"
 #include "mediastreamer2/msrtp.h"
 #include "mediastreamer2_tester.h"
@@ -239,7 +241,8 @@ void video_stream_tester_destroy(video_stream_tester_t* obj) {
 static void reset_stats(video_stream_tester_stats_t *s) {
 	memset(s, 0, sizeof(video_stream_tester_stats_t));
 }
-static void video_stream_event_cb(void *user_pointer, const MSFilter *f, const unsigned int event_id, const void *args){
+
+static void video_stream_event_cb(void *user_pointer, UNUSED(const MSFilter *f), const unsigned int event_id, UNUSED(const void *args)){
 	video_stream_tester_t* vs_tester = (video_stream_tester_t*) user_pointer;
 	const char* event_name;
 	switch (event_id) {
@@ -273,7 +276,7 @@ static void video_stream_event_cb(void *user_pointer, const MSFilter *f, const u
 
 }
 
-static void event_queue_cb(MediaStream *ms, void *user_pointer) {
+static void event_queue_cb(UNUSED(MediaStream *ms), void *user_pointer) {
 	video_stream_tester_stats_t *st = (video_stream_tester_stats_t *)user_pointer;
 	OrtpEvent *ev = NULL;
 
@@ -872,7 +875,7 @@ static void avpf_high_loss_video_stream_all_h264_codec_conbinations(void) {
 	codecs_manager_test_all_combinations(_h264_codecs_manager, avpf_high_loss_video_stream_h264);
 }
 
-static void video_configuration_stream_base(MSVideoConfiguration* asked, MSVideoConfiguration* expected_result, int payload_type) {
+static void video_configuration_stream_base(MSVideoConfiguration* asked, UNUSED(MSVideoConfiguration* expected_result), int payload_type) {
 	video_stream_tester_t* marielle=video_stream_tester_new();
 	video_stream_tester_t* margaux=video_stream_tester_new();
 	PayloadType* pt = rtp_profile_get_payload(&rtp_profile, payload_type);
@@ -1413,7 +1416,7 @@ static void fec_video_stream_h264(void) {
 
 }
 
-static void frame_marker_received(MSFilter *f, uint8_t marker, void* user_data) {
+static void frame_marker_received(UNUSED(MSFilter *f), uint8_t marker, void* user_data) {
 	video_stream_tester_stats_t *stats = (video_stream_tester_stats_t *) user_data;
 	if (marker & RTP_FRAME_MARKER_START) {
 		stats->number_of_framemarking_start++;

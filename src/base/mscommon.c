@@ -18,8 +18,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-
-
 #include "mediastreamer2/mscommon.h"
 #include "mediastreamer2/mscodecutils.h"
 #include "mediastreamer2/msfilter.h"
@@ -284,6 +282,10 @@ void ms_set_payload_max_size(int size){
 
 extern void _android_key_cleanup(void*);
 
+#ifndef _MSC_VER
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif // _MSC_VER
 void ms_thread_exit(void* ref_val) {
 #ifdef __ANDROID__
 	// due to a bug in old Bionic version
@@ -295,7 +297,9 @@ void ms_thread_exit(void* ref_val) {
 	ortp_thread_exit(ref_val); // pthread_exit futex issue: http://lkml.indiana.edu/hypermail/linux/kernel/0902.0/00153.html
 #endif
 }
-
+#ifndef _MSC_VER
+#pragma GCC diagnostic pop
+#endif // _MSC_VER
 
 struct _MSConcealerContext {
 	int64_t sample_time;

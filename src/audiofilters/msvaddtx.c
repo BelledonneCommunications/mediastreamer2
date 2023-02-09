@@ -18,7 +18,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #include "mediastreamer2/msfilter.h"
 #include "mediastreamer2/msticker.h"
 #include "mediastreamer2/msutils.h"
@@ -152,14 +151,20 @@ static void vad_dtx_process(MSFilter *f){
 
 }
 
+#ifndef _MSC_VER
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif // _MSC_VER
 static void vad_dtx_postprocess(MSFilter *f){
 #ifdef HAVE_G729B
 	VadDtxContext *ctx=(VadDtxContext*)f->data;
 	ms_bufferizer_destroy(ctx->bufferizer);
 	closeBcg729EncoderChannel(ctx->encoderChannelContext);
 #endif
-
 }
+#ifndef _MSC_VER
+#pragma GCC diagnostic pop
+#endif // _MSC_VER
 
 static void vad_dtx_uninit(MSFilter *f){
 	VadDtxContext *ctx=(VadDtxContext*)f->data;

@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "encoding-filter-wrapper.h"
 
 using namespace std;
@@ -63,7 +65,7 @@ int EncodingFilterWrapper::onEnableAvpfCall(MSFilter *f, void *arg) {
 	}
 }
 
-int EncodingFilterWrapper::onRequestVfuCall(MSFilter *f, void *arg) {
+int EncodingFilterWrapper::onRequestVfuCall(MSFilter *f, UNUSED(void *arg)) {
 	try {
 		static_cast<EncoderFilter *>(f->data)->requestVfu();
 		return 0;
@@ -72,7 +74,7 @@ int EncodingFilterWrapper::onRequestVfuCall(MSFilter *f, void *arg) {
 	}
 }
 
-int EncodingFilterWrapper::onNotifyPliCall(MSFilter *f, void *arg) {
+int EncodingFilterWrapper::onNotifyPliCall(MSFilter *f, UNUSED(void *arg)) {
 	try {
 		static_cast<EncoderFilter *>(f->data)->notifyPli();
 		return 0;
@@ -81,7 +83,7 @@ int EncodingFilterWrapper::onNotifyPliCall(MSFilter *f, void *arg) {
 	}
 }
 
-int EncodingFilterWrapper::onNotifyFirCall(MSFilter *f, void *arg) {
+int EncodingFilterWrapper::onNotifyFirCall(MSFilter *f, UNUSED(void *arg)) {
 	try {
 		static_cast<EncoderFilter *>(f->data)->notifyFir();
 		return 0;
@@ -90,7 +92,7 @@ int EncodingFilterWrapper::onNotifyFirCall(MSFilter *f, void *arg) {
 	}
 }
 
-int EncodingFilterWrapper::onNotifySliCall(MSFilter *f, void *arg) {
+int EncodingFilterWrapper::onNotifySliCall(MSFilter *f, void *) {
 	try {
 		static_cast<EncoderFilter *>(f->data)->notifySli();
 		return 0;

@@ -18,10 +18,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/bitratecontrol.h"
 #include "qosanalyzer.h"
-
-#include <bctoolbox/defs.h>
 
 #include <math.h>
 
@@ -627,7 +627,7 @@ static void stateful_analyzer_suggest_action(MSQosAnalyzer *objbase, MSRateContr
 	}
 }
 
-static bool_t stateful_analyzer_has_improved(MSQosAnalyzer *objbase){
+static bool_t stateful_analyzer_has_improved(UNUSED(MSQosAnalyzer *objbase)){
 	/*never tell the controller that situation has improved to avoid 'Stable' state
 	which is not necessary for this analyzer*/
 	return FALSE;

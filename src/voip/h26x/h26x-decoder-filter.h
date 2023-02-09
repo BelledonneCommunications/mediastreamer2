@@ -22,6 +22,8 @@
 
 #include <memory>
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/msvideo.h"
 
 #include "h26x-decoder.h"
@@ -42,7 +44,7 @@ public:
 	MSVideoSize getVideoSize() const override;
 	float getFps() const override;
 	const MSFmtDescriptor *getOutputFmt() const override;
-	void addFmtp(const char *fmtp)  override {}
+	void addFmtp(UNUSED(const char *fmtp))  override {}
 
 	void enableAvpf(bool enable) override;
 

@@ -22,6 +22,8 @@
 #ifndef MS_VIDEO_CONFERENCE_H
 #define MS_VIDEO_CONFERENCE_H
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/msconference.h"
 #include "mediastreamer2/msvideoswitcher.h"
 #include "mediastreamer2/msvideorouter.h"
@@ -69,7 +71,7 @@ public:
 	virtual void removeMember(VideoEndpoint *ep) = 0;
 	virtual void addMember(VideoEndpoint *ep) = 0;
 	virtual VideoEndpoint *getVideoPlaceholderMember() const;
-	virtual void setFocus(VideoEndpoint *ep) {};
+	virtual void setFocus(UNUSED(VideoEndpoint* ep)) {};
 	virtual void setProfile(RtpProfile *prof) {mLocalDummyProfile=prof;};
 
 	virtual MSFilter *getMixer() const;
@@ -79,13 +81,13 @@ public:
 	virtual void notifySli(int pin) = 0;
 	virtual VideoEndpoint *getMemberAtInputPin(int pin) const;
 	virtual VideoEndpoint *getMemberAtOutputPin(int pin) const;
-	virtual void unconfigureOutput(int pin) {};
+	virtual void unconfigureOutput(UNUSED(int pin)) {};
 	virtual bool allToAllEnabled() const = 0;
 
 protected:
 	virtual void addVideoPlaceholderMember() {};
-	virtual void setPin(VideoEndpoint *ep) {};
-	virtual void configureOutput(VideoEndpoint *ep) {};
+	virtual void setPin(UNUSED(VideoEndpoint * ep)) {};
+	virtual void configureOutput(UNUSED(VideoEndpoint * ep)) {};
 	virtual void applyNewBitrateRequest();
 
 	MSVideoConferenceParams mCfparams;

@@ -23,10 +23,11 @@
 #endif
 #include <stdint.h>
 
+#include <bctoolbox/defs.h>
+
 #include <mediastreamer2/msfilter.h>
 #include <mediastreamer2/msticker.h>
 #include "genericplc.h"
-
 
 #ifdef HAVE_SPANDSP
 /*use the G722 version from spandsp, LGPL */
@@ -156,7 +157,7 @@ static int enc_add_fmtp(MSFilter *f, void *arg){
 	return 0;
 }
 
-static int get_sr(MSFilter *f, void *arg){
+static int get_sr(UNUSED(MSFilter *f), void *arg){
 	*(int*)arg=16000;
 	return 0;
 }
@@ -315,7 +316,7 @@ static void dec_process(MSFilter *f) {
 	}
 };
 
-static int ms_g722_dec_have_plc(MSFilter *f, void *arg) {
+static int ms_g722_dec_have_plc(UNUSED(MSFilter *f), void *arg) {
 	*((int *)arg) = 1;
 	return 0;
 }

@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "AudioSystem.h"
 #include "mediastreamer2/mscommon.h"
 
@@ -68,12 +70,12 @@ int AudioSystem::newAudioSessionId(){
 	}
 }
 
-audio_io_handle_t AudioSystem::getInput(audio_source_t inputSource,
-                                    uint32_t samplingRate,
-                                    audio_format_t format,
-                                    uint32_t channels,
-                                    audio_in_acoustics_t acoustics,
-                                    int sessionId){
+audio_io_handle_t AudioSystem::getInput(UNUSED(audio_source_t inputSource),
+                                    UNUSED(uint32_t samplingRate),
+                                    UNUSED(audio_format_t format),
+                                    UNUSED(uint32_t channels),
+                                    UNUSED(audio_in_acoustics_t acoustics),
+                                    UNUSED(int sessionId)){
 	ms_error("AudioSystem::getInput() not implemented.");
 	return 0;
 	//return AudioSystemImpl::get()->mGetInput.invoke(inputSource,samplingRate,format,channels,acoustics,sessionId);
@@ -203,7 +205,7 @@ RefBase::RefBase(){
 RefBase::~RefBase(){
 }
 
-void RefBase::incStrong(const void* id) const{
+void RefBase::incStrong(UNUSED(const void* id)) const{
 	mCnt++;
 	if (isRefCounted()) {
 		ms_message("incStrong(%p)",getRealThis());
@@ -211,7 +213,7 @@ void RefBase::incStrong(const void* id) const{
 	}
 }
 
-void RefBase::decStrong(const void* id) const{
+void RefBase::decStrong(UNUSED(const void* id)) const{
 	if (isRefCounted()) {
 		ms_message("decStrong(%p)",getRealThis());
 		mImpl->mDecStrong.invoke(getRealThis(),this);

@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/mediastream.h"
 #include "mediastreamer2/dtmfgen.h"
 #include "mediastreamer2/msfileplayer.h"
@@ -83,8 +85,7 @@ static void reset_stats(stats_t* s) {
 	memset(s,0,sizeof(stats_t));
 }
 
-
-static void notify_cb(void *user_data, MSFilter *f, unsigned int event, void *eventdata) {
+static void notify_cb(void *user_data, UNUSED(MSFilter *f), unsigned int event, UNUSED(void *eventdata)) {
 	stats_t* stats = (stats_t*)user_data;
 	switch (event) {
 		case MS_FILE_PLAYER_EOF: {
@@ -96,7 +97,7 @@ static void notify_cb(void *user_data, MSFilter *f, unsigned int event, void *ev
 	}
 }
 
-static void event_queue_cb(MediaStream *ms, void *user_pointer) {
+static void event_queue_cb(UNUSED(MediaStream *ms), void *user_pointer) {
 	stats_t *st = (stats_t *)user_pointer;
 	OrtpEvent *ev = NULL;
 
@@ -661,7 +662,7 @@ static void symetric_rtp_with_wrong_rtcp_port(void)  {
 							  ,5);
 }
 
-static int request_volumes(MSFilter *filter, rtp_audio_level_t **audio_levels, void *user_data) {
+static int request_volumes(UNUSED(MSFilter *filter), rtp_audio_level_t **audio_levels, UNUSED(void *user_data)) {
 	// Adding some test values
 	*audio_levels = (rtp_audio_level_t *) ms_malloc0(20 * sizeof(rtp_audio_level_t));
 

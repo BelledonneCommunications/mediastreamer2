@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #ifdef HAVE_CONFIG_H
 #include "mediastreamer-config.h"
 #endif
@@ -27,15 +29,15 @@
 #include "mediastreamer2/dtmfgen.h"
 #include "mediastreamer2/msticker.h"
 
-static void tone_detected_cb(void *data, MSFilter *f, unsigned int event_id, MSToneDetectorEvent *ev){
+static void tone_detected_cb(UNUSED(void *data), UNUSED(MSFilter *f), UNUSED(unsigned int event_id), MSToneDetectorEvent *ev){
 	ms_message("Tone detected  at time %u",(unsigned int)ev->tone_start_time);
 }
 
-static void tone_sent_cb(void *data, MSFilter *f, unsigned int event_id, MSDtmfGenEvent *ev){
+static void tone_sent_cb(UNUSED(void *data), UNUSED(MSFilter *f), UNUSED(unsigned int event_id), MSDtmfGenEvent *ev){
 	ms_message("Tone sent at time %u",(unsigned int)ev->tone_start_time);
 }
 
-int main(int argc, char *argv[]){
+int main(UNUSED(int argc), UNUSED(char *argv[])){
 	MSFilter *src, *gen, *det, *rec;
 	MSTicker *ticker;
 	MSFactory *factory ;

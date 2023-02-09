@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/msvideo.h"
 #include "mediastreamer2/msfilter.h"
 #include "mediastreamer2/mswebcam.h"
@@ -102,7 +104,7 @@ static int video_capture_set_fps(MSFilter *f, void *arg){
 	return 0;
 }
 
-static int video_capture_set_autofocus(MSFilter *f, void* data){
+static int video_capture_set_autofocus(MSFilter *f, UNUSED(void* data)){
 	JNIEnv *env = ms_get_jni_env();
 	AndroidReaderContext* d = (AndroidReaderContext*) f->data;
 	jmethodID method = env->GetStaticMethodID(d->helperClass,"activateAutoFocus", "(Ljava/lang/Object;)V");
@@ -219,7 +221,7 @@ static int video_capture_get_vsize(MSFilter *f, void* data){
 	return 0;
 }
 
-static int video_capture_get_pix_fmt(MSFilter *f, void *data){
+static int video_capture_get_pix_fmt(UNUSED(MSFilter *f), void *data){
 	*(MSPixFmt*)data=MS_YUV420P;
 	return 0;
 }
@@ -416,7 +418,7 @@ MS_FILTER_DESC_EXPORT(ms_video_capture_desc)
 
 /* Webcam methods */
 static void video_capture_detect(MSWebCamManager *obj);
-static void video_capture_cam_init(MSWebCam *cam){
+static void video_capture_cam_init(UNUSED(MSWebCam *cam)){
 	ms_message("[Legacy Capture] Android VIDEO capture filter cam init");
 }
 
@@ -530,7 +532,7 @@ extern "C" {
 #endif
 
 JNIEXPORT void JNICALL Java_org_linphone_mediastream_video_capture_AndroidVideoApi5JniWrapper_putImage(JNIEnv*  env,
-		jclass  thiz,jlong nativePtr,jbyteArray frame) {
+		UNUSED(jclass  thiz),jlong nativePtr,jbyteArray frame) {
 	AndroidReaderContext* d = (AndroidReaderContext*) nativePtr;
 
 	ms_mutex_lock(&d->mutex);

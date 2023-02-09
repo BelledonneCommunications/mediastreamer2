@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "decoding-filter-wrapper.h"
 
 using namespace std;
@@ -34,7 +36,7 @@ int DecodingFilterWrapper::onAddFmtpCall(MSFilter *f, void *arg) {
 	}
 }
 
-int DecodingFilterWrapper::onResetFirstImageCall(MSFilter *f, void *arg) {
+int DecodingFilterWrapper::onResetFirstImageCall(MSFilter *f, UNUSED(void *arg)) {
 	try {
 		static_cast<DecoderFilter *>(f->data)->resetFirstImage();
 		return 0;

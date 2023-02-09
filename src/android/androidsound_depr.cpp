@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/mssndcard.h"
 #include "mediastreamer2/msfilter.h"
 #include "mediastreamer2/msticker.h"
@@ -42,7 +44,7 @@ static void sound_read_setup(MSFilter *f);
 #ifdef __cplusplus
 extern "C" {
 #endif
-JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasNeon(JNIEnv *env, jclass c) {
+JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasNeon(UNUSED(JNIEnv *env), UNUSED(jclass c)) {
 	if (android_getCpuFamily() == ANDROID_CPU_FAMILY_ARM && (android_getCpuFeatures() & ANDROID_CPU_ARM_FEATURE_NEON) != 0)
 	{
 		return 1;
@@ -50,11 +52,11 @@ JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasNeon(J
 	return 0;
 }
 
-JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasZrtp(JNIEnv *env, jclass c) {
+JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasZrtp(UNUSED(JNIEnv *env), UNUSED(jclass c)) {
 	return ms_zrtp_available();
 }
 
-JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasVideo(JNIEnv *env, jclass c) {
+JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasVideo(UNUSED(JNIEnv *env), UNUSED(jclass c)) {
 #ifdef VIDEO_ENABLED
 	return JNI_TRUE;
 #else
@@ -93,22 +95,22 @@ static void set_high_prio(void){
  mediastreamer2 sound card functions
  */
 
-void msandroid_sound_set_level(MSSndCard *card, MSSndCardMixerElem e, int percent)
+void msandroid_sound_set_level(UNUSED(MSSndCard *card), UNUSED(MSSndCardMixerElem e), UNUSED(int percent))
 {
 }
 
-int msandroid_sound_get_level(MSSndCard *card, MSSndCardMixerElem e)
+int msandroid_sound_get_level(UNUSED(MSSndCard *card), UNUSED(MSSndCardMixerElem e))
 {
 	return 0;
 }
 
-void msandroid_sound_set_source(MSSndCard *card, MSSndCardCapture source)
+void msandroid_sound_set_source(UNUSED(MSSndCard *card), UNUSED(MSSndCardCapture source))
 {
 }
 
 static int sdk_version=0;
 
-void msandroid_sound_init(MSSndCard *card){
+void msandroid_sound_init(UNUSED(MSSndCard *card)){
 	/*get running sdk version*/
 	JNIEnv *jni_env = ms_get_jni_env();
 	jclass version_class = jni_env->FindClass("android/os/Build$VERSION");
@@ -118,7 +120,7 @@ void msandroid_sound_init(MSSndCard *card){
 	jni_env->DeleteLocalRef(version_class);
 }
 
-void msandroid_sound_uninit(MSSndCard *card){
+void msandroid_sound_uninit(UNUSED(MSSndCard *card)){
 }
 
 void msandroid_sound_detect(MSSndCardManager *m);
@@ -601,6 +603,10 @@ MSFilter *msandroid_sound_read_new(MSSndCard *card){
 }
 
 /***********************************write filter********************/
+#ifndef _MSC_VER
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif // _MSC_VER
 static int set_write_rate(MSFilter *f, void *arg){
 #ifndef USE_HARDWARE_RATE
 	msandroid_sound_data *d=(msandroid_sound_data*)f->data;
@@ -619,6 +625,9 @@ we prefer do resampling by ourselves if cpu allows it*/
 	return -1;
 #endif
 }
+#ifndef _MSC_VER
+#pragma GCC diagnostic pop
+#endif // _MSC_VER
 
 MSFilterMethod msandroid_sound_write_methods[]={
 	{	MS_FILTER_SET_SAMPLE_RATE	, set_write_rate	},

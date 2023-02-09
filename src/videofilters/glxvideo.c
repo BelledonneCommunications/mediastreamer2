@@ -40,6 +40,8 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
+#include <bctoolbox/defs.h>
+
 #ifdef HAVE_CONFIG_H
 #include "mediastreamer-config.h"
 #endif
@@ -81,7 +83,7 @@ typedef struct GLXVideo
 
 static bool_t x11_error = FALSE;
 
-static int x11error_handler(Display *d, XErrorEvent*ev) {
+static int x11error_handler(UNUSED(Display* d), UNUSED(XErrorEvent* ev)) {
 	ms_error("X11 error reported.");
 	x11_error = TRUE;
 	return 0;

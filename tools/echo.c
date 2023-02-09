@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #ifdef HAVE_CONFIG_H
 #include "mediastreamer-config.h"
 #endif
@@ -35,7 +37,7 @@
 
 static int run=1;
 
-static void stop(int signum){
+static void stop(UNUSED(int signum)){
 	run=0;
 }
 

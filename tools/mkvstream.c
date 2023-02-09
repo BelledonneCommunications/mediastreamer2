@@ -18,7 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-
+#include <bctoolbox/defs.h>
 
 #include "mediastreamer2/mediastream.h"
 #include "mediastreamer2/mseventqueue.h"
@@ -27,7 +27,7 @@
 static int active = 1;
 
 /*handler called when pressing C-c*/
-static void stop_handler(int signum){
+static void stop_handler(UNUSED(int signum)){
 	active--;
 	if (active<0) {
 		ms_error("Brutal exit (%d)\n", active);
@@ -51,7 +51,7 @@ typedef enum {
 const int payload_type_number = 114;
 
 /*callback function in which we are notified of end of file when playing an mkvfile to rtp*/
-static void on_end_of_play(void *user_data, MSFilter *player, unsigned int event_id, void *event_arg){
+static void on_end_of_play(UNUSED(void *user_data), UNUSED(MSFilter *player), unsigned int event_id, UNUSED(void *event_arg)){
 	switch(event_id){
 		case MS_PLAYER_EOF:
 			fprintf(stdout, "End of file reached.\n");

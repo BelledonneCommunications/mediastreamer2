@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #ifdef HAVE_CONFIG_H
 #include "mediastreamer-config.h"
 #endif
@@ -169,7 +171,7 @@ static float volume_agc_process(MSFilter *f, mblk_t *om){
 }
 #else
 
-static float volume_agc_process(MSFilter *f, mblk_t *om) {
+static float volume_agc_process(MSFilter *f, UNUSED(mblk_t *om)) {
 	Volume *v = (Volume*) f->data;
 	static int counter;
 	// target is: 1

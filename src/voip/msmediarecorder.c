@@ -17,6 +17,9 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/msmediarecorder.h"
 #include "mediastreamer2/msfilter.h"
 #include "mediastreamer2/msticker.h"
@@ -35,7 +38,6 @@
 
 //TODO: check if mkv is available. If not, we just do wav files. Check if video is available. if not, we just do sound files (wav or mvk).
 // Check given file extension. If not wav nor mkv, do nothing. Make those things work together.
-
 
 
 #define ms_filter_destroy_and_reset(obj) \
@@ -232,7 +234,7 @@ MSFileFormat ms_media_recorder_get_file_format(const MSMediaRecorder *obj) {
 	return obj->format;
 }
 
-void ms_media_recorder_remove_file(MSMediaRecorder *obj, const char *filepath) {
+void ms_media_recorder_remove_file(UNUSED(MSMediaRecorder *obj), const char *filepath) {
 	ms_message("Removing %s.", filepath);
 	if(access(filepath, F_OK | W_OK) == 0) {
 		remove(filepath);
@@ -443,7 +445,7 @@ static void _unlink_all(MSMediaRecorder *obj) {
 	}
 }
 
-static void _recorder_callback(void *ud, MSFilter *f, unsigned int id, void *arg) {
+static void _recorder_callback(void *ud, UNUSED(MSFilter *f), UNUSED(unsigned int id), UNUSED(void *arg)) {
 	MSMediaRecorder *obj = (MSMediaRecorder *)ud;
 	ms_filter_call_method_noarg(obj->video_encoder, MS_VIDEO_ENCODER_REQ_VFU);
 }

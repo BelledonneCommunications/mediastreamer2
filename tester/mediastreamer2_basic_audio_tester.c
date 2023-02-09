@@ -18,6 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
 
 #include "mediastreamer2/mediastream.h"
 #include "mediastreamer2/dtmfgen.h"
@@ -48,8 +49,7 @@ static int basic_audio_tester_after_all(void) {
 	return 0;
 }
 
-static void tone_detected_cb(void *data, MSFilter *f, unsigned int event_id, MSToneDetectorEvent *ev) {
-	MS_UNUSED(data), MS_UNUSED(f), MS_UNUSED(event_id), MS_UNUSED(ev);
+static void tone_detected_cb(UNUSED(void *data), UNUSED(MSFilter *f), UNUSED(unsigned int event_id), UNUSED(MSToneDetectorEvent *ev)) {
 	ms_tester_tone_detected = TRUE;
 }
 
@@ -65,7 +65,7 @@ typedef struct struct_silence_callback_data {
 	uint64_t silence_duration[10];
 } silence_callback_data;
 
-static void silence_detected_cb(void *data, MSFilter *f, unsigned int event_id, void *arg) {
+static void silence_detected_cb(void *data, UNUSED(MSFilter *f), unsigned int event_id, void *arg) {
 	silence_callback_data *silence = (silence_callback_data *)data;
 	if (event_id == MS_VAD_EVENT_SILENCE_DETECTED) {
 		silence->voice_detected_number++;
@@ -78,7 +78,7 @@ typedef struct struct_player_callback_data {
 	int end_of_file;
 } player_callback_data;
 
-static void player_cb(void *data, MSFilter *f, unsigned int event_id, void *arg) {
+static void player_cb(void *data, UNUSED(MSFilter *f), unsigned int event_id, UNUSED(void *arg)) {
 	if (event_id == MS_FILE_PLAYER_EOF) {
 		player_callback_data *player = (player_callback_data *)data;
 		player->end_of_file = TRUE;

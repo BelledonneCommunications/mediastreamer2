@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #ifdef HAVE_CONFIG_H
 #include "mediastreamer-config.h"
 #endif
@@ -28,7 +30,6 @@
 #include "mediastreamer2/msticker.h"
 #include "mediastreamer2/mswebcam.h"
 #include "../voip/nowebcam.h"
-
 
 #if __clang__
 #pragma clang diagnostic push
@@ -290,7 +291,7 @@ int static_image_get_vsize(MSFilter *f, void* data) {
 	return 0;
 }
 
-int static_image_get_pix_fmt(MSFilter *f, void *data) {
+int static_image_get_pix_fmt(UNUSED(MSFilter *f), void *data) {
 	*(MSPixFmt*)data = MS_YUV420P;
 	return 0;
 }

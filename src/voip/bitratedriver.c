@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/bitratecontrol.h"
 
 static const int max_ptime=100;
@@ -179,7 +181,7 @@ static int audio_bitrate_driver_execute_action(MSBitrateDriver *objbase, const M
 	return 0;
 }
 
-static void audio_bitrate_driver_uninit(MSBitrateDriver *objbase){
+static void audio_bitrate_driver_uninit(UNUSED(MSBitrateDriver *objbase)){
 	//MSAudioBitrateDriver *obj=(MSBitrateDriver*)objbase;
 
 }
@@ -392,7 +394,7 @@ static int bandwidth_driver_execute_action(MSBitrateDriver *objbase, const MSRat
 	return ret;
 }
 
-static void bandwidth_bitrate_driver_uninit(MSBitrateDriver *objbase){
+static void bandwidth_bitrate_driver_uninit(UNUSED(MSBitrateDriver *objbase)){
 }
 
 static MSBitrateDriverDesc bandwidth_bitrate_driver={

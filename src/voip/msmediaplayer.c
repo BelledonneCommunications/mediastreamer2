@@ -17,6 +17,9 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/msmediaplayer.h"
 #include "mediastreamer2/msfilter.h"
 #include "mediastreamer2/msticker.h"
@@ -578,7 +581,7 @@ static void _unlink_all(MSMediaPlayer *obj) {
 	}
 }
 
-static void _eof_filter_notify_cb(void *userdata, struct _MSFilter *f, unsigned int id, void *arg) {
+static void _eof_filter_notify_cb(void *userdata, struct _MSFilter *f, unsigned int id, UNUSED(void *arg)) {
 	MSMediaPlayer *obj = (MSMediaPlayer *)userdata;
 	ms_mutex_lock(&obj->cb_access);
 	if(f == obj->player && id == MS_PLAYER_EOF && obj->eof_cb != NULL) {

@@ -18,10 +18,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <math.h>
+
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/bits_rw.h"
 #include "mediastreamer2/mscommon.h"
-
-#include <math.h>
 
 void ms_bits_reader_init(MSBitsReader *reader, const uint8_t *buffer, size_t bufsize){
 	reader->buffer=buffer;
@@ -123,7 +125,7 @@ void ms_bits_writer_init(MSBitsWriter *writer, size_t initialbufsize) {
 	memset(writer->buffer, 0, writer->buf_size);
 }
 
-int ms_bits_writer_n_bits(MSBitsWriter *writer, int count, unsigned int value, const char* symbol_name) {
+int ms_bits_writer_n_bits(MSBitsWriter *writer, int count, unsigned int value, UNUSED(const char* symbol_name)) {
 	uint8_t swap[4];
 	int i;
 	int byte_index;
@@ -175,7 +177,7 @@ int ms_bits_writer_n_bits(MSBitsWriter *writer, int count, unsigned int value, c
 	return 0;
 }
 
-int ms_bits_writer_ue(MSBitsWriter *writer, unsigned int value, const char* symbol_name) {
+int ms_bits_writer_ue(MSBitsWriter *writer, unsigned int value, UNUSED(const char* symbol_name)) {
 	int size_in_bits = 0;
 	int tmp_val = value + 1;
 

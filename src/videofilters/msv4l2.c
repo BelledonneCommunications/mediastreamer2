@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #ifdef HAVE_CONFIG_H
 #include "mediastreamer-config.h"
 #endif
@@ -948,7 +950,7 @@ static MSFilter *msv4l2_create_reader(MSWebCam *obj){
 
 static void msv4l2_detect(MSWebCamManager *obj);
 
-static void msv4l2_cam_init(MSWebCam *cam){
+static void msv4l2_cam_init(UNUSED(MSWebCam *cam)){
 }
 
 MSWebCamDesc v4l2_card_desc={

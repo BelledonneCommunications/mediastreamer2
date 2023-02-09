@@ -18,8 +18,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-
-
 #include "mediastreamer2/msvideoswitcher.h"
 #include "mediastreamer2/msticker.h"
 #include "vp8rtpfmt.h"
@@ -43,12 +41,12 @@ static bool_t is_vp8_key_frame(mblk_t *m){
 	return !(p[0] & 1);
 }
 
-static bool_t is_h264_key_frame(mblk_t *frame){
+static bool_t is_h264_key_frame(UNUSED(mblk_t *frame)){
 	/*TODO*/
 	return FALSE;
 }
 
-static bool_t is_key_frame_dummy(mblk_t *frame){
+static bool_t is_key_frame_dummy(UNUSED(mblk_t *frame)){
 	return TRUE;
 }
 
@@ -139,7 +137,7 @@ static void switcher_preprocess(MSFilter *f){
 	}
 }
 
-static void switcher_postprocess(MSFilter *f){
+static void switcher_postprocess(UNUSED(MSFilter *f)){
 }
 
 static void switcher_channel_update_input(SwitcherState *s, int pin, MSQueue *q){

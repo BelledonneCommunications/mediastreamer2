@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "mediastreamer2/msfilter.h"
 #include <gsm/gsm.h>
 
@@ -66,8 +68,7 @@ static int enc_add_attr(MSFilter *f, void *arg){
 	return 0;
 }
 
-static int enc_get_sample_rate(MSFilter *f, void *arg) {
-	MS_UNUSED(f);
+static int enc_get_sample_rate(UNUSED(MSFilter *f), void *arg) {
 	*((int *)arg) = 8000;
 	return 0;
 }
@@ -200,8 +201,7 @@ static void dec_process(MSFilter *f){
 	}
 }
 
-static int dec_get_sample_rate(MSFilter *f, void *arg) {
-	MS_UNUSED(f);
+static int dec_get_sample_rate(UNUSED(MSFilter *f), void *arg) {
 	*((int *)arg) = 8000;
 	return 0;
 }

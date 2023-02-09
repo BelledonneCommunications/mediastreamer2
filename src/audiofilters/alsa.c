@@ -18,11 +18,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <alsa/asoundlib.h>
+
+#include <bctoolbox/defs.h>
+
 #if defined(HAVE_CONFIG_H)
 #include "mediastreamer-config.h"
 #endif
-
-#include <alsa/asoundlib.h>
 
 
 #include "mediastreamer2/msfilter.h"
@@ -84,7 +86,7 @@ static void alsa_resume(snd_pcm_t *handle){
 	}
 }
 
-static int alsa_set_params(snd_pcm_t *pcm_handle, int rw, int bits, int stereo, int rate)
+static int alsa_set_params(snd_pcm_t *pcm_handle, int rw, UNUSED(int bits), int stereo, int rate)
 {
 	snd_pcm_hw_params_t *hwparams=NULL;
 	snd_pcm_sw_params_t *swparams=NULL;
@@ -628,7 +630,7 @@ static MSFilter *alsa_card_create_writer(MSSndCard *card)
 }
 
 
-void alsa_error_log_handler(const char *file, int line, const char *function, int err, const char *fmt, ...) {
+void alsa_error_log_handler(const char *file, int line, UNUSED(const char *function), UNUSED(int err), const char *fmt, ...) {
 	char * format = ms_strdup_printf("alsa error in %s:%d - %s", file, line, fmt);
 	va_list args;
 	va_start (args, fmt);
@@ -916,13 +918,19 @@ static void alsa_stop_r(AlsaReadData *d){
 }
 #endif
 
+#ifndef _MSC_VER
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif // _MSC_VER
 void alsa_read_preprocess(MSFilter *obj){
 #ifdef THREADED_VERSION
 	AlsaReadData *ad=(AlsaReadData*)obj->data;
 	alsa_start_r(ad);
 #endif
 }
-
+#ifndef _MSC_VER
+#pragma GCC diagnostic pop
+#endif // _MSC_VER
 
 void alsa_read_postprocess(MSFilter *obj){
 	AlsaReadData *ad=(AlsaReadData*)obj->data;

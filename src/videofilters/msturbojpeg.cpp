@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #ifdef HAVE_CONFIG_H
 #include "mediastreamer-config.h"
 #endif
@@ -105,7 +107,7 @@ static void ms_turbojpeg_dec_process(MSFilter *filter) {
 	}
 }
 
-static void ms_turbojpeg_dec_postprocess(MSFilter *filter) {
+static void ms_turbojpeg_dec_postprocess(UNUSED(MSFilter *filter)) {
 }
 
 static void ms_turbojpeg_dec_uninit(MSFilter *filter) {

@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #ifdef HAVE_CONFIG_H
 #include "mediastreamer-config.h"
 #endif
@@ -39,7 +41,7 @@
 
 static bool_t x11_error=FALSE;
 
-static int x11error_handler(Display *d, XErrorEvent*ev){
+static int x11error_handler(UNUSED(Display* d), UNUSED(XErrorEvent* ev)){
 	ms_error("X11 error reported.");
 	x11_error=TRUE;
 	return 0;

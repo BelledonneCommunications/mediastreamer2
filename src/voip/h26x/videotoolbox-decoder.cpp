@@ -221,9 +221,9 @@ void VideoToolboxDecoder::formatDescFromSpsPps() {
 	}
 }
 
-void VideoToolboxDecoder::outputCb(void *decompressionOutputRefCon, void *sourceFrameRefCon, OSStatus status,
-								   VTDecodeInfoFlags infoFlags, CVImageBufferRef imageBuffer,
-								   CMTime presentationTimeStamp, CMTime presentationDuration) {
+void VideoToolboxDecoder::outputCb(void *decompressionOutputRefCon, UNUSED(void *sourceFrameRefCon), OSStatus status,
+								   UNUSED(VTDecodeInfoFlags infoFlags), CVImageBufferRef imageBuffer,
+								   UNUSED(CMTime presentationTimeStamp), UNUSED(CMTime presentationDuration)) {
 	auto ctx = static_cast<VideoToolboxDecoder *>(decompressionOutputRefCon);
 
 	std::lock_guard<std::mutex> lck (ctx->_mutex);
