@@ -23,6 +23,8 @@
 #include "bcg729/decoder.h"
 #include "bcg729/encoder.h"
 
+#include <bctoolbox/defs.h>
+
 /* signal and bitstream frame size in byte */
 #define SIGNAL_FRAME_SIZE 160
 #define BITSTREAM_FRAME_SIZE 10
@@ -83,7 +85,7 @@ static void msbcg729_decoder_uninit(MSFilter *f){
 	ms_free(f->data);
 }
 
-static int msbcg729_decoder_have_plc(MSFilter *f, void *arg){
+static int msbcg729_decoder_have_plc(UNUSED(MSFilter *f), void *arg){
 	*((int *)arg) = 1;
 	return 0;
 }
