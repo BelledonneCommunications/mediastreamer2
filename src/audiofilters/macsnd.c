@@ -84,7 +84,7 @@ static const int flow_control_threshold = 40; // ms
 #define CHECK_AURESULT(call)	do{ int _err; if ((_err=(call))!=noErr) ms_error( #call ": error [%i] %s %s",_err,GetMacOSStatusErrorString(_err),GetMacOSStatusCommentString(_err)); }while(0)
 /*#undef ms_debug
 #define ms_debug ms_message*/
-static void show_format(UNUSED(const char *name), AudioStreamBasicDescription * deviceFormat)
+static void show_format(BCTBX_UNUSED(const char *name), AudioStreamBasicDescription * deviceFormat)
 {
 	ms_debug("Format for %s", name);
 	ms_debug("mSampleRate = %g", deviceFormat->mSampleRate);
@@ -135,16 +135,16 @@ typedef struct AuCard {
 	int rate; /*the nominal rate of the device*/
 } AuCard;
 
-static void au_card_set_level(UNUSED(MSSndCard *card), UNUSED(MSSndCardMixerElem e), UNUSED(int percent))
+static void au_card_set_level(BCTBX_UNUSED(MSSndCard *card), BCTBX_UNUSED(MSSndCardMixerElem e), BCTBX_UNUSED(int percent))
 {
 }
 
-static int au_card_get_level(UNUSED(MSSndCard *card), UNUSED(MSSndCardMixerElem e))
+static int au_card_get_level(BCTBX_UNUSED(MSSndCard *card), BCTBX_UNUSED(MSSndCardMixerElem e))
 {
 	return -1;
 }
 
-static void au_card_set_source(UNUSED(MSSndCard *card), UNUSED(MSSndCardCapture source))
+static void au_card_set_source(BCTBX_UNUSED(MSSndCard *card), BCTBX_UNUSED(MSSndCardCapture source))
 {
 }
 
@@ -437,7 +437,7 @@ static OSStatus readRenderProc(void *inRefCon,
 						const AudioTimeStamp *inTimeStamp, 
 						UInt32 inBusNumber,
 						UInt32 inNumFrames, 
-						UNUSED(AudioBufferList *ioData))
+						BCTBX_UNUSED(AudioBufferList *ioData))
 {
 	AURead *d=(AURead*)inRefCon;
 	AudioBufferList lreadAudioBufferList={0};
@@ -475,10 +475,10 @@ static OSStatus readRenderProc(void *inRefCon,
 }
 
 static OSStatus writeRenderProc(void *inRefCon, 
-						 UNUSED(AudioUnitRenderActionFlags *inActionFlags),
-						 UNUSED(const AudioTimeStamp *inTimeStamp),
-						 UNUSED(UInt32 inBusNumber),
-						 UNUSED(UInt32 inNumFrames),
+						 BCTBX_UNUSED(AudioUnitRenderActionFlags *inActionFlags),
+						 BCTBX_UNUSED(const AudioTimeStamp *inTimeStamp),
+						 BCTBX_UNUSED(UInt32 inBusNumber),
+						 BCTBX_UNUSED(UInt32 inNumFrames),
 						 AudioBufferList *ioData)
 {
 	AUWrite *d=(AUWrite*)inRefCon;

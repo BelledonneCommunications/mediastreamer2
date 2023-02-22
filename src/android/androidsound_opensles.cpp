@@ -279,7 +279,7 @@ static SLuint32 convertSamplerate(int samplerate)
     }
 }
 
-static void android_snd_card_add_devices(UNUSED(MSDevicesInfo *devices), SoundDeviceDescription* deviceDescription, MSSndCardManager *m) {
+static void android_snd_card_add_devices(BCTBX_UNUSED(MSDevicesInfo *devices), SoundDeviceDescription* deviceDescription, MSSndCardManager *m) {
 	JNIEnv *env = ms_get_jni_env();
 	int sdkVersion = ms_android_get_sdk_version(env);
 
@@ -484,7 +484,7 @@ static SLresult opensles_recorder_init(OpenSLESInputContext *ictx) {
  * We must not output a single log within this callback in the event that the application is using LinphoneCoreFactory.setLogHandler(), in which case
  * the log would be upcalled to java, which will attach the thread to the jvm.
 **/
-static void opensles_recorder_callback(UNUSED(SLAndroidSimpleBufferQueueItf bq), void *context) {
+static void opensles_recorder_callback(BCTBX_UNUSED(SLAndroidSimpleBufferQueueItf bq), void *context) {
 	SLresult result;
 	OpenSLESInputContext *ictx = (OpenSLESInputContext *)context;
 	ictx->read_samples += ictx->inBufSize / sizeof(int16_t);
@@ -672,7 +672,7 @@ static void android_snd_read_uninit(MSFilter *obj) {
 	delete ictx;
 }
 
-static int android_snd_read_set_sample_rate(UNUSED(MSFilter *obj), UNUSED(void *data)) {
+static int android_snd_read_set_sample_rate(BCTBX_UNUSED(MSFilter *obj), BCTBX_UNUSED(void *data)) {
 #if 0
 	int *n = (int*)data;
 	OpenSLESInputContext *ictx = (OpenSLESInputContext*)obj->data;
@@ -734,7 +734,7 @@ static int android_snd_read_get_device_id(MSFilter *obj, void *data) {
 	return 0;
 }
 
-static int android_snd_read_hack_speaker_state(UNUSED(MSFilter *obj), UNUSED(void *data)) {
+static int android_snd_read_hack_speaker_state(BCTBX_UNUSED(MSFilter *obj), BCTBX_UNUSED(void *data)) {
 	return 0;
 }
 
@@ -914,7 +914,7 @@ static SLresult opensles_sink_init(OpenSLESOutputContext *octx) {
  * the log would be upcalled to java, which will attach the thread to the jvm.
 **/
 
-static void opensles_player_callback(UNUSED(SLAndroidSimpleBufferQueueItf bq), void* context) {
+static void opensles_player_callback(BCTBX_UNUSED(SLAndroidSimpleBufferQueueItf bq), void* context) {
 	SLresult result;
 	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)context;
 
@@ -1004,7 +1004,7 @@ static void android_snd_write_uninit(MSFilter *obj){
 	delete octx;
 }
 
-static int android_snd_write_set_sample_rate(UNUSED(MSFilter *obj), UNUSED(void *data)) {
+static int android_snd_write_set_sample_rate(BCTBX_UNUSED(MSFilter *obj), BCTBX_UNUSED(void *data)) {
 #if 0
 	int *n = (int*)data;
 	OpenSLESOutputContext *octx = (OpenSLESOutputContext*)obj->data;
@@ -1191,7 +1191,7 @@ MSSndCardDesc android_native_snd_opensles_card_desc = {
 	android_native_snd_card_uninit
 };
 
-static void snd_card_device_create_extra_fields(UNUSED(MSSndCardManager *m), MSSndCard *card, SoundDeviceDescription *deviceDescription) {
+static void snd_card_device_create_extra_fields(BCTBX_UNUSED(MSSndCardManager *m), MSSndCard *card, SoundDeviceDescription *deviceDescription) {
 	OpenSLESContext *card_data = (OpenSLESContext*)card->data;
 	
 	if ((card->capabilities & MS_SND_CARD_CAP_CAPTURE) == MS_SND_CARD_CAP_CAPTURE) {

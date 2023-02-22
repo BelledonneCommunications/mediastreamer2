@@ -950,7 +950,7 @@ static MSFilter *msv4l2_create_reader(MSWebCam *obj){
 
 static void msv4l2_detect(MSWebCamManager *obj);
 
-static void msv4l2_cam_init(UNUSED(MSWebCam *cam)){
+static void msv4l2_cam_init(BCTBX_UNUSED(MSWebCam *cam)){
 }
 
 MSWebCamDesc v4l2_card_desc={

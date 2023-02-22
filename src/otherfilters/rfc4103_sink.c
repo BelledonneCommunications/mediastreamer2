@@ -282,7 +282,7 @@ static void ms_rtt_4103_sink_init(MSFilter *f) {
 	f->data = s;
 }
 
-static void ms_rtt_4103_sink_preprocess(UNUSED(MSFilter *f)) {
+static void ms_rtt_4103_sink_preprocess(BCTBX_UNUSED(MSFilter *f)) {
 
 }
 
@@ -311,7 +311,7 @@ static void ms_rtt_4103_sink_process(MSFilter *f) {
 	ms_filter_unlock(f);
 }
 
-static void ms_rtt_4103_sink_postprocess(UNUSED(MSFilter *f)) {
+static void ms_rtt_4103_sink_postprocess(BCTBX_UNUSED(MSFilter *f)) {
 
 }
 
@@ -337,7 +337,7 @@ static int ms_rtt_4103_sink_set_red_payload(MSFilter *f, void *red) {
 	return 0;
 }
 
-static int ms_rtt_4103_resync(MSFilter *f, UNUSED(void *arg)){
+static int ms_rtt_4103_resync(MSFilter *f, BCTBX_UNUSED(void *arg)){
 	RealTimeTextSinkData *s = (RealTimeTextSinkData *)f->data;
 	ms_filter_lock(f);
 	s->flags = 0;

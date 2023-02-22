@@ -431,7 +431,7 @@ static int enc_add_attr(MSFilter *f, void *arg){
 	return 0;
 }
 
-static int get_channels(UNUSED(MSFilter *f), void *arg) {
+static int get_channels(BCTBX_UNUSED(MSFilter *f), void *arg) {
 	*((int *)arg) = 1;
 	return 0;
 }
@@ -637,7 +637,7 @@ static void dec_process(MSFilter *f){
 	if (bits_initd) speex_bits_destroy(&bits);
 }
 
-static int dec_have_plc(UNUSED(MSFilter *f), void *arg)
+static int dec_have_plc(BCTBX_UNUSED(MSFilter *f), void *arg)
 {
 	*((int *)arg) = 1;
 	return 0;

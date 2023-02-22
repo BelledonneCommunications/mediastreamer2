@@ -204,7 +204,7 @@ static int dtmfgen_start(MSFilter *f, void *arg){
 	return -1;
 }
 
-static int dtmfgen_stop(MSFilter *f, UNUSED(void *arg)){
+static int dtmfgen_stop(MSFilter *f, BCTBX_UNUSED(void *arg)){
 	DtmfGenState *s=(DtmfGenState*)f->data;
 	int min_duration=(100*s->rate)/1000; /*wait at least 100 ms*/
 	ms_filter_lock(f);

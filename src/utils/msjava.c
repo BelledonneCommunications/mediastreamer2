@@ -171,25 +171,25 @@ bctbx_list_t *ms_get_android_plugins_list(void) {
 	return plugins;
 }
 
-JNIEXPORT void JNICALL Java_org_linphone_mediastream_Log_d(JNIEnv* env, UNUSED(jobject thiz), jstring jmsg) {
+JNIEXPORT void JNICALL Java_org_linphone_mediastream_Log_d(JNIEnv* env, BCTBX_UNUSED(jobject thiz), jstring jmsg) {
 	const char* msg = jmsg ? (*env)->GetStringUTFChars(env, jmsg, NULL) : NULL;
 	ms_debug("%s", msg);
 	if (msg) (*env)->ReleaseStringUTFChars(env, jmsg, msg);
 }
 
-JNIEXPORT void JNICALL Java_org_linphone_mediastream_Log_i(JNIEnv* env, UNUSED(jobject thiz), jstring jmsg) {
+JNIEXPORT void JNICALL Java_org_linphone_mediastream_Log_i(JNIEnv* env, BCTBX_UNUSED(jobject thiz), jstring jmsg) {
 	const char* msg = jmsg ? (*env)->GetStringUTFChars(env, jmsg, NULL) : NULL;
 	ms_message("%s", msg);
 	if (msg) (*env)->ReleaseStringUTFChars(env, jmsg, msg);
 }
 
-JNIEXPORT void JNICALL Java_org_linphone_mediastream_Log_w(JNIEnv* env, UNUSED(jobject thiz), jstring jmsg) {
+JNIEXPORT void JNICALL Java_org_linphone_mediastream_Log_w(JNIEnv* env, BCTBX_UNUSED(jobject thiz), jstring jmsg) {
 	const char* msg = jmsg ? (*env)->GetStringUTFChars(env, jmsg, NULL) : NULL;
 	ms_warning("%s", msg);
 	if (msg) (*env)->ReleaseStringUTFChars(env, jmsg, msg);
 }
 
-JNIEXPORT void JNICALL Java_org_linphone_mediastream_Log_e(JNIEnv* env, UNUSED(jobject thiz), jstring jmsg) {
+JNIEXPORT void JNICALL Java_org_linphone_mediastream_Log_e(JNIEnv* env, BCTBX_UNUSED(jobject thiz), jstring jmsg) {
 	const char* msg = jmsg ? (*env)->GetStringUTFChars(env, jmsg, NULL) : NULL;
 	ms_error("%s", msg);
 	if (msg) (*env)->ReleaseStringUTFChars(env, jmsg, msg);

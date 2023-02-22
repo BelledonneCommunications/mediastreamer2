@@ -33,7 +33,7 @@
 
 static int run=1;
 
-static void stop(UNUSED(int signum)){
+static void stop(BCTBX_UNUSED(int signum)){
 	run=0;
 }
 
@@ -94,7 +94,7 @@ struct bench_config cfg[] = {
 	{	0,0,0,"",0,0,0,0,NULL,NULL,NULL,NULL	},
 };
 
-static void _rtp_session_resync_cb(RtpSession *s, UNUSED(void *arg1), UNUSED(void *arg2), UNUSED(void *arg3)) {
+static void _rtp_session_resync_cb(RtpSession *s, BCTBX_UNUSED(void *arg1), BCTBX_UNUSED(void *arg2), BCTBX_UNUSED(void *arg3)) {
 	rtp_session_resync(s);
 }
 
@@ -351,7 +351,7 @@ static int uninit_bench(struct bench_config *bench)
 }
 
 
-int main(UNUSED(int argc), UNUSED(char *argv[])){
+int main(BCTBX_UNUSED(int argc), BCTBX_UNUSED(char *argv[])){
 	int pos;
 	int count;
 	ortp_init();

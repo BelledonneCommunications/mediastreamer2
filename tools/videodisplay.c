@@ -28,11 +28,11 @@
 
 static int stopped=FALSE;
 
-static void stop(UNUSED(int signum)){
+static void stop(BCTBX_UNUSED(int signum)){
 	stopped=TRUE;
 }
 
-int main(UNUSED(int argc), UNUSED(char *argv[])){
+int main(BCTBX_UNUSED(int argc), BCTBX_UNUSED(char *argv[])){
 	VideoStream *vs;
 	MSWebCam *cam;
 	MSVideoSize vsize;

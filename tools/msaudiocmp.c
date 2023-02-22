@@ -23,7 +23,7 @@
 #include "mediastreamer2/mscommon.h"
 #include "mediastreamer2/msutils.h"
 
-static void completion_cb(UNUSED(void *user_data), int percentage){
+static void completion_cb(BCTBX_UNUSED(void *user_data), int percentage){
 	fprintf(stdout,"%i %% completed\r",percentage);
 	fflush(stdout);
 }

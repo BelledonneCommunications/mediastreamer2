@@ -86,7 +86,7 @@ static void alsa_resume(snd_pcm_t *handle){
 	}
 }
 
-static int alsa_set_params(snd_pcm_t *pcm_handle, int rw, UNUSED(int bits), int stereo, int rate)
+static int alsa_set_params(snd_pcm_t *pcm_handle, int rw, BCTBX_UNUSED(int bits), int stereo, int rate)
 {
 	snd_pcm_hw_params_t *hwparams=NULL;
 	snd_pcm_sw_params_t *swparams=NULL;
@@ -630,7 +630,7 @@ static MSFilter *alsa_card_create_writer(MSSndCard *card)
 }
 
 
-void alsa_error_log_handler(const char *file, int line, UNUSED(const char *function), UNUSED(int err), const char *fmt, ...) {
+void alsa_error_log_handler(const char *file, int line, BCTBX_UNUSED(const char *function), BCTBX_UNUSED(int err), const char *fmt, ...) {
 	char * format = ms_strdup_printf("alsa error in %s:%d - %s", file, line, fmt);
 	va_list args;
 	va_start (args, fmt);

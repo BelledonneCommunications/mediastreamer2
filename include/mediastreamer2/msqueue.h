@@ -72,7 +72,7 @@ static MS2_INLINE bool_t ms_queue_end(const MSQueue *q, const mblk_t *m){
 	return qend(&q->q,m);
 }
 
-static MS2_INLINE mblk_t *ms_queue_peek_next(UNUSED(MSQueue * q), mblk_t *cur){
+static MS2_INLINE mblk_t *ms_queue_peek_next(BCTBX_UNUSED(MSQueue * q), mblk_t *cur){
 	return cur->b_next;
 }
 

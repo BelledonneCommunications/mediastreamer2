@@ -182,7 +182,7 @@ static void video_manager_start(	stream_manager_t * mgr
 }
 #endif
 
-static void qos_analyzer_on_action_suggested(void *user_data, UNUSED(int datac), UNUSED(const char** datav)){
+static void qos_analyzer_on_action_suggested(void *user_data, BCTBX_UNUSED(int datac), BCTBX_UNUSED(const char** datav)){
 	stream_manager_t *mgr = (stream_manager_t*)user_data;
 	mgr->rtcp_count++;
 
@@ -313,7 +313,7 @@ static void iterate_adaptive_stream(stream_manager_t * marielle, stream_manager_
 	}
 }
 
-static void stop_adaptive_stream(stream_manager_t *marielle, stream_manager_t *margaux, UNUSED(bool_t destroy_files)){
+static void stop_adaptive_stream(stream_manager_t *marielle, stream_manager_t *margaux, BCTBX_UNUSED(bool_t destroy_files)){
 #if VIDEO_ENABLED
 	if (margaux->bw_controller) {
 		ms_bandwidth_controller_remove_stream(margaux->bw_controller, &(margaux->video_stream->ms));

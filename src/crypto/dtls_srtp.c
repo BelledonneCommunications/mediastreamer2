@@ -565,7 +565,7 @@ static int ms_dtls_srtp_rtcp_sendData (void *ctx, const unsigned char *data, siz
 	return ret;
 }
 
-static int ms_dtls_srtp_rtp_DTLSread (void *ctx, unsigned char *buf, UNUSED(size_t len)) {
+static int ms_dtls_srtp_rtp_DTLSread (void *ctx, unsigned char *buf, BCTBX_UNUSED(size_t len)) {
 	MSDtlsSrtpContext *context = (MSDtlsSrtpContext *)ctx;
 
 	/* do we have something in the incoming buffer */
@@ -583,7 +583,7 @@ static int ms_dtls_srtp_rtp_DTLSread (void *ctx, unsigned char *buf, UNUSED(size
 	}
 }
 
-static int ms_dtls_srtp_rtcp_DTLSread (void *ctx, unsigned char *buf, UNUSED(size_t len)) {
+static int ms_dtls_srtp_rtcp_DTLSread (void *ctx, unsigned char *buf, BCTBX_UNUSED(size_t len)) {
 	MSDtlsSrtpContext *context = (MSDtlsSrtpContext *)ctx;
 
 	/* do we have something in the incoming buffer */
@@ -742,10 +742,10 @@ static int ms_dtls_srtp_rtcp_process_on_receive(struct _RtpTransportModifier *t,
 	return (int)msgdsize(msg);
 }
 
-static int ms_dtls_srtp_rtp_process_on_send(UNUSED(struct _RtpTransportModifier *t), mblk_t *msg){
+static int ms_dtls_srtp_rtp_process_on_send(BCTBX_UNUSED(struct _RtpTransportModifier *t), mblk_t *msg){
 	return (int)msgdsize(msg);
 }
-static int ms_dtls_srtp_rtcp_process_on_send(UNUSED(struct _RtpTransportModifier *t), mblk_t *msg)  {
+static int ms_dtls_srtp_rtcp_process_on_send(BCTBX_UNUSED(struct _RtpTransportModifier *t), mblk_t *msg)  {
 	return (int)msgdsize(msg);
 }
 
@@ -791,7 +791,7 @@ static void ms_dtls_srtp_set_transport(MSDtlsSrtpContext *userData, RtpSession *
 	userData->rtcp_modifier = rtcp_modifier;
 }
 
-static int ms_dtls_srtp_initialise_bctbx_dtls_context(DtlsBcToolBoxContext *dtlsContext, MSDtlsSrtpParams *params, UNUSED(RtpSession *s)){
+static int ms_dtls_srtp_initialise_bctbx_dtls_context(DtlsBcToolBoxContext *dtlsContext, MSDtlsSrtpParams *params, BCTBX_UNUSED(RtpSession *s)){
 	int ret;
 	bctbx_dtls_srtp_profile_t dtls_srtp_protection_profiles[2] = {BCTBX_SRTP_AES128_CM_HMAC_SHA1_80, BCTBX_SRTP_AES128_CM_HMAC_SHA1_32};
 

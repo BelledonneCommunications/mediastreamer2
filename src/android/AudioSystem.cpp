@@ -70,12 +70,12 @@ int AudioSystem::newAudioSessionId(){
 	}
 }
 
-audio_io_handle_t AudioSystem::getInput(UNUSED(audio_source_t inputSource),
-                                    UNUSED(uint32_t samplingRate),
-                                    UNUSED(audio_format_t format),
-                                    UNUSED(uint32_t channels),
-                                    UNUSED(audio_in_acoustics_t acoustics),
-                                    UNUSED(int sessionId)){
+audio_io_handle_t AudioSystem::getInput(BCTBX_UNUSED(audio_source_t inputSource),
+                                    BCTBX_UNUSED(uint32_t samplingRate),
+                                    BCTBX_UNUSED(audio_format_t format),
+                                    BCTBX_UNUSED(uint32_t channels),
+                                    BCTBX_UNUSED(audio_in_acoustics_t acoustics),
+                                    BCTBX_UNUSED(int sessionId)){
 	ms_error("AudioSystem::getInput() not implemented.");
 	return 0;
 	//return AudioSystemImpl::get()->mGetInput.invoke(inputSource,samplingRate,format,channels,acoustics,sessionId);
@@ -205,7 +205,7 @@ RefBase::RefBase(){
 RefBase::~RefBase(){
 }
 
-void RefBase::incStrong(UNUSED(const void* id)) const{
+void RefBase::incStrong(BCTBX_UNUSED(const void* id)) const{
 	mCnt++;
 	if (isRefCounted()) {
 		ms_message("incStrong(%p)",getRealThis());
@@ -213,7 +213,7 @@ void RefBase::incStrong(UNUSED(const void* id)) const{
 	}
 }
 
-void RefBase::decStrong(UNUSED(const void* id)) const{
+void RefBase::decStrong(BCTBX_UNUSED(const void* id)) const{
 	if (isRefCounted()) {
 		ms_message("decStrong(%p)",getRealThis());
 		mImpl->mDecStrong.invoke(getRealThis(),this);

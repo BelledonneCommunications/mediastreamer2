@@ -233,7 +233,7 @@ SoundDeviceDescription genericSoundDeviceDescriptorAboveAndroid8 = { "Generic", 
 
 SoundDeviceDescription genericSoundDeviceDescriptor={"Generic", "Generic", "Generic", 0, 250, 0, 0};
 
-JNIEXPORT void JNICALL Java_org_linphone_mediastream_MediastreamerAndroidContext_addSoundDeviceDescription(JNIEnv* env, UNUSED(jobject thiz), jstring jmanufacturer, jstring jmodel, jstring jplatform, jint flags, jint delay, jint rate) {
+JNIEXPORT void JNICALL Java_org_linphone_mediastream_MediastreamerAndroidContext_addSoundDeviceDescription(JNIEnv* env, BCTBX_UNUSED(jobject thiz), jstring jmanufacturer, jstring jmodel, jstring jplatform, jint flags, jint delay, jint rate) {
 	const char *manufacturer = jmanufacturer ? (*env)->GetStringUTFChars(env, jmanufacturer, NULL) : NULL;
 	const char *model = jmodel ? (*env)->GetStringUTFChars(env, jmodel, NULL) : NULL;
 	const char *platform = jplatform ? (*env)->GetStringUTFChars(env, jplatform, NULL) : NULL;

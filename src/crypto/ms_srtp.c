@@ -162,7 +162,7 @@ static int ms_srtp_process_on_send(RtpTransportModifier *t, mblk_t *m){
 	return _process_on_send(t->session,(MSSrtpStreamContext*)t->data, m);
 }
 
-static int ms_srtp_process_dummy(UNUSED(RtpTransportModifier *t), mblk_t *m) {
+static int ms_srtp_process_dummy(BCTBX_UNUSED(RtpTransportModifier *t), mblk_t *m) {
 	return (int)msgdsize(m);
 }
 
@@ -397,7 +397,7 @@ static int ms_srtp_add_or_update_stream(srtp_t session, const srtp_policy_t *pol
 	return status;
 }
 
-static int ms_add_srtp_stream(srtp_t srtp, MSCryptoSuite suite, UNUSED(uint32_t ssrc), const char *key, size_t key_length, bool_t is_send, bool_t is_rtp) {
+static int ms_add_srtp_stream(srtp_t srtp, MSCryptoSuite suite, BCTBX_UNUSED(uint32_t ssrc), const char *key, size_t key_length, bool_t is_send, bool_t is_rtp) {
 	srtp_policy_t policy;
 	err_status_t err;
 	ssrc_t ssrc_conf;

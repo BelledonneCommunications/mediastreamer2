@@ -1614,7 +1614,7 @@ static bool_t ms_turn_rtp_endpoint_send_via_turn_relay(MSTurnContext *context, c
 	return FALSE;
 }
 
-static bool_t ms_turn_rtp_endpoint_should_be_sent_to_turn_server(MSTurnContext *context, const struct sockaddr *from, UNUSED(socklen_t fromlen)) {
+static bool_t ms_turn_rtp_endpoint_should_be_sent_to_turn_server(MSTurnContext *context, const struct sockaddr *from, BCTBX_UNUSED(socklen_t fromlen)) {
 	struct sockaddr *turn_server_sa = (struct sockaddr *)&context->turn_server_addr;
 
 	if (turn_server_sa->sa_family != from->sa_family) return FALSE;

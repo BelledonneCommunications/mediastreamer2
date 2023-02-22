@@ -83,7 +83,7 @@ typedef struct GLXVideo
 
 static bool_t x11_error = FALSE;
 
-static int x11error_handler(UNUSED(Display* d), UNUSED(XErrorEvent* ev)) {
+static int x11error_handler(BCTBX_UNUSED(Display* d), BCTBX_UNUSED(XErrorEvent* ev)) {
 	ms_error("X11 error reported.");
 	x11_error = TRUE;
 	return 0;

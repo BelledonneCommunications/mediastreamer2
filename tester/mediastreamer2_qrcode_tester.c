@@ -45,7 +45,7 @@ typedef struct struct_qrcode_callback_data {
 	char *text;
 }qrcode_callback_data;
 
-static void qrcode_found_cb(void *data, UNUSED(MSFilter *f), unsigned int event_id, void *arg) {
+static void qrcode_found_cb(void *data, BCTBX_UNUSED(MSFilter *f), unsigned int event_id, void *arg) {
 	if (event_id == MS_QRCODE_READER_QRCODE_FOUND) {
 		qrcode_callback_data *found = (qrcode_callback_data *)data;
 		found->qrcode_found = TRUE;

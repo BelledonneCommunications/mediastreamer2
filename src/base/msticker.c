@@ -319,7 +319,7 @@ static void remove_tasks_for_filter(MSTicker *ticker, MSFilter *f){
 	}
 }
 
-static uint64_t get_cur_time_ms(UNUSED(void * unused)){
+static uint64_t get_cur_time_ms(BCTBX_UNUSED(void * unused)){
 	return ms_get_cur_time_ms();
 }
 
@@ -415,7 +415,7 @@ static void unset_high_prio(int precision){
 #pragma GCC diagnostic pop
 #endif // _MSC_VER
 
-static int wait_next_tick(void *data, UNUSED(uint64_t virt_ticker_time)){
+static int wait_next_tick(void *data, BCTBX_UNUSED(uint64_t virt_ticker_time)){
 	MSTicker *s=(MSTicker*)data;
 	uint64_t realtime;
 	int64_t diff;

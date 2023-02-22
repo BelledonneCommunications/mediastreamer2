@@ -182,7 +182,7 @@ static void ms_audio_flow_control_process(MSFilter *f) {
 	ms_filter_unlock(f);
 }
 
-static void ms_audio_flow_control_postprocess(UNUSED(MSFilter *f)) {
+static void ms_audio_flow_control_postprocess(BCTBX_UNUSED(MSFilter *f)) {
 
 }
 

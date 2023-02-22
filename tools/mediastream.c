@@ -680,7 +680,7 @@ bool_t parse_args(int argc, char** argv, MediastreamDatas* out) {
 
 
 #ifdef VIDEO_ENABLED
-static void video_stream_event_cb(void *user_pointer, UNUSED(const MSFilter *f), const unsigned int event_id, UNUSED(const void *args)) {
+static void video_stream_event_cb(void *user_pointer, BCTBX_UNUSED(const MSFilter *f), const unsigned int event_id, BCTBX_UNUSED(const void *args)) {
 	MediastreamDatas *md = (MediastreamDatas *)user_pointer;
 	switch (event_id) {
 		case MS_VIDEO_DECODER_DECODING_ERRORS:
@@ -1310,7 +1310,7 @@ JNIEXPORT void JNICALL Java_org_linphone_mediastream_MediastreamerActivity_clear
 #endif
 
 // HELPER METHODS
-void stop_handler(UNUSED(int signum))
+void stop_handler(BCTBX_UNUSED(int signum))
 {
 	cond--;
 	if (cond<0) {
@@ -1367,7 +1367,7 @@ static bool_t parse_ice_addr(char *addr, char *type, size_t type_len, char *ip, 
 	return parse_addr(addr,ip,ip_len,port);
 }
 
-static void display_items(UNUSED(void *user_data), UNUSED(uint32_t csrc), rtcp_sdes_type_t t, const char *content, uint8_t content_len){
+static void display_items(BCTBX_UNUSED(void *user_data), BCTBX_UNUSED(uint32_t csrc), rtcp_sdes_type_t t, const char *content, uint8_t content_len){
 	char str[256];
 	int len=MIN(sizeof(str)-1,content_len);
 	strncpy(str,content,len);

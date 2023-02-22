@@ -644,7 +644,7 @@ static int ms_opus_enc_add_fmtp(MSFilter *f, void *arg) {
 	return 0;
 }
 
-static int ms_opus_enc_get_capabilities(UNUSED(MSFilter *f), void *arg){
+static int ms_opus_enc_get_capabilities(BCTBX_UNUSED(MSFilter *f), void *arg){
 	*(int*)arg=MS_AUDIO_ENCODER_CAP_AUTO_PTIME;
 	return 0;
 }
@@ -895,7 +895,7 @@ static int ms_opus_set_rtp_picker(MSFilter *f, void *arg) {
 	return 0;
 }
 
-static int ms_opus_dec_have_plc(UNUSED(MSFilter *f), void *arg) {
+static int ms_opus_dec_have_plc(BCTBX_UNUSED(MSFilter *f), void *arg) {
 	*((int *)arg) = 1;
 	return 0;
 }

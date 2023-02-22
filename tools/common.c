@@ -22,7 +22,7 @@
 
 #include "common.h"
 
-static PayloadType* create_custom_payload_type(const char *type, const char *subtype, const char *rate, const char *channels, UNUSED(int number)){
+static PayloadType* create_custom_payload_type(const char *type, const char *subtype, const char *rate, const char *channels, BCTBX_UNUSED(int number)){
 	PayloadType *pt=payload_type_new();
 	if (strcasecmp(type,"audio")==0){
 		pt->type=PAYLOAD_AUDIO_PACKETIZED;

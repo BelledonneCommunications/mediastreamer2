@@ -40,12 +40,12 @@ static bool_t is_vp8_key_frame(mblk_t *m){
 	return !(p[0] & 1);
 }
 
-static bool_t is_h264_key_frame(UNUSED(mblk_t *frame)){
+static bool_t is_h264_key_frame(BCTBX_UNUSED(mblk_t *frame)){
 	/*TODO*/
 	return FALSE;
 }
 
-static bool_t is_key_frame_dummy(UNUSED(mblk_t *frame)){
+static bool_t is_key_frame_dummy(BCTBX_UNUSED(mblk_t *frame)){
 	return TRUE;
 }
 
@@ -293,7 +293,7 @@ static void router_preprocess(MSFilter *f){
 	}
 }
 
-static void router_postprocess(UNUSED(MSFilter *f)){
+static void router_postprocess(BCTBX_UNUSED(MSFilter *f)){
 }
 
 static void router_process(MSFilter *f){

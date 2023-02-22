@@ -186,7 +186,7 @@ static void plumb_to_conf(MSAudioEndpoint *ep){
 	
 }
 
-static int request_volumes(UNUSED(MSFilter *filter), rtp_audio_level_t **audio_levels, void *user_data) {
+static int request_volumes(BCTBX_UNUSED(MSFilter *filter), rtp_audio_level_t **audio_levels, void *user_data) {
 	MSAudioEndpoint *ep = (MSAudioEndpoint *) user_data;
 	bctbx_list_t *it;
 
@@ -270,7 +270,7 @@ void ms_audio_conference_remove_member(MSAudioConference *obj, MSAudioEndpoint *
 	if (obj->nmembers>0) ms_ticker_attach(obj->ticker,obj->mixer);
 }
 
-void ms_audio_conference_mute_member(UNUSED(MSAudioConference *obj), MSAudioEndpoint *ep, bool_t muted){
+void ms_audio_conference_mute_member(BCTBX_UNUSED(MSAudioConference *obj), MSAudioEndpoint *ep, bool_t muted){
 	MSAudioMixerCtl ctl={0};
 	ctl.pin=ep->pin;
 	ctl.param.active=!muted;

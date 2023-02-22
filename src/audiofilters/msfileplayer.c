@@ -228,14 +228,14 @@ static int player_open(MSFilter *f, void *arg){
 	return 0;
 }
 
-static int player_start(MSFilter *f, UNUSED(void *arg)){
+static int player_start(MSFilter *f, BCTBX_UNUSED(void *arg)){
 	PlayerData *d=(PlayerData*)f->data;
 	if (d->state==MSPlayerPaused)
 		d->state=MSPlayerPlaying;
 	return 0;
 }
 
-static int player_stop(MSFilter *f, UNUSED(void *arg)){
+static int player_stop(MSFilter *f, BCTBX_UNUSED(void *arg)){
 	PlayerData *d=(PlayerData*)f->data;
 	ms_filter_lock(f);
 	if (d->state!=MSPlayerClosed){
@@ -249,7 +249,7 @@ static int player_stop(MSFilter *f, UNUSED(void *arg)){
 	return 0;
 }
 
-static int player_pause(MSFilter *f, UNUSED(void *arg)){
+static int player_pause(MSFilter *f, BCTBX_UNUSED(void *arg)){
 	PlayerData *d=(PlayerData*)f->data;
 	ms_filter_lock(f);
 	if (d->state==MSPlayerPlaying){
@@ -259,7 +259,7 @@ static int player_pause(MSFilter *f, UNUSED(void *arg)){
 	return 0;
 }
 
-static int player_close(MSFilter *f, UNUSED(void *arg)){
+static int player_close(MSFilter *f, BCTBX_UNUSED(void *arg)){
 	PlayerData *d=(PlayerData*)f->data;
 	player_stop(f,NULL);
 #ifdef HAVE_PCAP

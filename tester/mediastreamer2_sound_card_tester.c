@@ -121,7 +121,7 @@ static void dtmfgen_soundwrite(void) {
 #define LASERROCKET_16000_MONO_FILE_NAME	"sounds/laserrocket_16000_mono.wav"
 #define ARPEGGIO_8000_MONO_FILE_NAME		"sounds/arpeggio_8000_mono.wav"
 
-static void fileplay_eof(void *user_data, UNUSED(MSFilter *f), unsigned int event, UNUSED(void *event_data)) {
+static void fileplay_eof(void *user_data, BCTBX_UNUSED(MSFilter *f), unsigned int event, BCTBX_UNUSED(void *event_data)) {
 	if (event == MS_FILE_PLAYER_EOF) {
 		int *done = (int *)user_data;
 		*done = TRUE;

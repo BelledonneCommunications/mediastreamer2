@@ -37,7 +37,7 @@
 
 static int run=1;
 
-static void stop(UNUSED(int signum)){
+static void stop(BCTBX_UNUSED(int signum)){
 	run=0;
 }
 

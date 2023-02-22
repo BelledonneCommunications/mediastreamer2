@@ -246,7 +246,7 @@ void VideoToolboxEncoder::applyBitrate() {
 	}
 }
 
-void VideoToolboxEncoder::outputCb(void *outputCallbackRefCon, UNUSED(void *sourceFrameRefCon), OSStatus status, UNUSED(VTEncodeInfoFlags infoFlags), CMSampleBufferRef sampleBuffer) {
+void VideoToolboxEncoder::outputCb(void *outputCallbackRefCon, BCTBX_UNUSED(void *sourceFrameRefCon), OSStatus status, BCTBX_UNUSED(VTEncodeInfoFlags infoFlags), CMSampleBufferRef sampleBuffer) {
 	VideoToolboxEncoder *ctx = static_cast<VideoToolboxEncoder *>(outputCallbackRefCon);
 
 	try {

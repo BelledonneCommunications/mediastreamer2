@@ -72,13 +72,13 @@ int mediastreamer2_tester_set_log_file(const char *filename) {
 	return 0;
 }
 
-int silent_arg_func(UNUSED(const char * arg)) {
+int silent_arg_func(BCTBX_UNUSED(const char * arg)) {
 	bctbx_set_log_level("ortp",BCTBX_LOG_ERROR);
 	bctbx_set_log_level(BCTBX_LOG_DOMAIN,BCTBX_LOG_ERROR);
 	return 0;
 }
 
-int verbose_arg_func(UNUSED(const char * arg)) {
+int verbose_arg_func(BCTBX_UNUSED(const char * arg)) {
 	bctbx_set_log_level("ortp",BCTBX_LOG_DEBUG);
 	bctbx_set_log_level(BCTBX_LOG_DOMAIN,BCTBX_LOG_DEBUG);
 	return 0;

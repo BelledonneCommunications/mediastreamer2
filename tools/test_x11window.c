@@ -31,7 +31,7 @@
 
 #include <bctoolbox/defs.h>
 
-int main(UNUSED(int argc), UNUSED(char *argv[])){
+int main(BCTBX_UNUSED(int argc), BCTBX_UNUSED(char *argv[])){
 #ifdef HAVE_X11_XLIB_H
 	Display *display=XOpenDisplay(getenv("DISPLAY"));
 	XSetWindowAttributes wa;

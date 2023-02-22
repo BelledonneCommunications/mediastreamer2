@@ -1011,7 +1011,7 @@ int ms_factory_get_expected_bandwidth(MSFactory *f) {
 	return f->expected_video_bandwidth;
 }
 
-const char * ms_factory_get_default_video_renderer(UNUSED(MSFactory *f)) {
+const char * ms_factory_get_default_video_renderer(BCTBX_UNUSED(MSFactory *f)) {
 #if defined(MS2_WINDOWS_PHONE)
 	return "MSWP8Dis";
 #elif defined(MS2_WINDOWS_DESKTOP) || defined (MS2_WINDOWS_UWP)
@@ -1041,14 +1041,14 @@ const char * ms_factory_get_default_video_renderer(UNUSED(MSFactory *f)) {
 
 #pragma GCC diagnostic ignored "-Wint-to-pointer-cast"
 
-JNIEXPORT jint JNICALL Java_org_linphone_mediastream_Factory_enableFilterFromName(JNIEnv* env,  UNUSED(jobject obj), jlong factoryPtr, jstring jname, jboolean enable) {
+JNIEXPORT jint JNICALL Java_org_linphone_mediastream_Factory_enableFilterFromName(JNIEnv* env,  BCTBX_UNUSED(jobject obj), jlong factoryPtr, jstring jname, jboolean enable) {
 	MSFactory *factory = (MSFactory *) factoryPtr;
 	const char *name = jname ? (*env)->GetStringUTFChars(env, jname, NULL) : NULL;
 	int result = ms_factory_enable_filter_from_name(factory, name, enable);
 	(*env)->ReleaseStringUTFChars(env, jname, name);
 	return result;
 }
-JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Factory_filterFromNameEnabled(JNIEnv* env, UNUSED(jobject obj), jlong factoryPtr, jstring jname) {
+JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Factory_filterFromNameEnabled(JNIEnv* env, BCTBX_UNUSED(jobject obj), jlong factoryPtr, jstring jname) {
 	const char *name = jname ? (*env)->GetStringUTFChars(env, jname, NULL) : NULL;
 	MSFactory *factory = (MSFactory *) factoryPtr;
 	jboolean result = ms_factory_filter_from_name_enabled(factory, name);
@@ -1057,7 +1057,7 @@ JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Factory_filterFromNameE
 }
 
 
-JNIEXPORT jstring JNICALL Java_org_linphone_mediastream_Factory_getEncoderText(JNIEnv* env, UNUSED(jobject obj),
+JNIEXPORT jstring JNICALL Java_org_linphone_mediastream_Factory_getEncoderText(JNIEnv* env, BCTBX_UNUSED(jobject obj),
     jlong factoryPtr, jstring jmime) {
 	MSFactory *factory = (MSFactory*)factoryPtr;
 	const char *mime = (*env)->GetStringUTFChars(env, jmime, NULL);
@@ -1070,7 +1070,7 @@ JNIEXPORT jstring JNICALL Java_org_linphone_mediastream_Factory_getEncoderText(J
 	return jtext;
 }
 
-JNIEXPORT jstring JNICALL Java_org_linphone_mediastream_Factory_getDecoderText(JNIEnv* env, UNUSED(jobject obj),
+JNIEXPORT jstring JNICALL Java_org_linphone_mediastream_Factory_getDecoderText(JNIEnv* env, BCTBX_UNUSED(jobject obj),
     jlong factoryPtr, jstring jmime) {
 	MSFactory *factory = (MSFactory*)factoryPtr;
 	const char *mime = (*env)->GetStringUTFChars(env, jmime, NULL);
@@ -1089,7 +1089,7 @@ JNIEXPORT jstring JNICALL Java_org_linphone_mediastream_Factory_getDecoderText(J
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
 
-JNIEXPORT jint JNICALL Java_org_linphone_mediastream_MediastreamerAndroidContext_enableFilterFromNameImpl(JNIEnv* env, UNUSED(jobject obj), jstring jname, jboolean enable) {
+JNIEXPORT jint JNICALL Java_org_linphone_mediastream_MediastreamerAndroidContext_enableFilterFromNameImpl(JNIEnv* env, BCTBX_UNUSED(jobject obj), jstring jname, jboolean enable) {
 	const char *mime;
 	int result;
 	if (ms_factory_get_fallback() == NULL) {
@@ -1101,7 +1101,7 @@ JNIEXPORT jint JNICALL Java_org_linphone_mediastream_MediastreamerAndroidContext
 	(*env)->ReleaseStringUTFChars(env, jname, mime);
 	return result;
 }
-JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_MediastreamerAndroidContext_filterFromNameEnabledImpl(JNIEnv* env, UNUSED(jobject obj), jstring jname) {
+JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_MediastreamerAndroidContext_filterFromNameEnabledImpl(JNIEnv* env, BCTBX_UNUSED(jobject obj), jstring jname) {
 	const char *mime;
 	jboolean result;
 	if (ms_factory_get_fallback() == NULL) {

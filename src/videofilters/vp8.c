@@ -278,7 +278,7 @@ static uint8_t enc_get_type_of_reference_frame_to_generate(EncState *s) {
 	}
 }
 
-static void check_most_recent(EncFrameState **found, vpx_codec_pts_t *most_recent, UNUSED(vpx_ref_frame_type_t type),
+static void check_most_recent(EncFrameState **found, vpx_codec_pts_t *most_recent, BCTBX_UNUSED(vpx_ref_frame_type_t type),
 			      EncFrameState *state, bool_t is_acknoledged){
 	if (is_acknoledged && !state->acknowledged) return;
 	if (*most_recent<state->count){
@@ -719,7 +719,7 @@ static int enc_get_configuration(MSFilter *f, void *data) {
 	return 0;
 }
 
-static int enc_req_vfu(MSFilter *f, UNUSED(void *unused)) {
+static int enc_req_vfu(MSFilter *f, BCTBX_UNUSED(void *unused)) {
 	EncState *s = (EncState *)f->data;
 	s->force_keyframe = TRUE;
 	return 0;
@@ -736,7 +736,7 @@ static bool_t should_generate_key_frame(EncState *s, int min_interval){
 	return FALSE;
 }
 
-static int enc_notify_pli(MSFilter *f, UNUSED(void *data)) {
+static int enc_notify_pli(MSFilter *f, BCTBX_UNUSED(void *data)) {
 	EncState *s = (EncState *)f->data;
 	ms_message("VP8: PLI requested");
 	if (should_generate_key_frame(s,MIN_KEY_FRAME_DIST)){
@@ -1170,7 +1170,7 @@ static void dec_postprocess(MSFilter *f) {
 	ms_thread_join(s->thread, NULL);
 }
 
-static int dec_reset_first_image(MSFilter* f, UNUSED(void *data)) {
+static int dec_reset_first_image(MSFilter* f, BCTBX_UNUSED(void *data)) {
 	DecState *s = (DecState *)f->data;
 	s->first_image_decoded = FALSE;
 	return 0;
@@ -1188,7 +1188,7 @@ static int dec_freeze_on_error(MSFilter *f, void *data) {
 	return 0;
 }
 
-static int dec_reset(MSFilter *f, UNUSED(void *data)) {
+static int dec_reset(MSFilter *f, BCTBX_UNUSED(void *data)) {
 	DecState *s = (DecState *)f->data;
 	ms_message("Reseting VP8 decoder");
 	ms_filter_lock(f);

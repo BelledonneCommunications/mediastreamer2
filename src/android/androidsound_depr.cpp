@@ -44,7 +44,7 @@ static void sound_read_setup(MSFilter *f);
 #ifdef __cplusplus
 extern "C" {
 #endif
-JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasNeon(UNUSED(JNIEnv *env), UNUSED(jclass c)) {
+JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasNeon(BCTBX_UNUSED(JNIEnv *env), BCTBX_UNUSED(jclass c)) {
 	if (android_getCpuFamily() == ANDROID_CPU_FAMILY_ARM && (android_getCpuFeatures() & ANDROID_CPU_ARM_FEATURE_NEON) != 0)
 	{
 		return 1;
@@ -52,11 +52,11 @@ JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasNeon(U
 	return 0;
 }
 
-JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasZrtp(UNUSED(JNIEnv *env), UNUSED(jclass c)) {
+JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasZrtp(BCTBX_UNUSED(JNIEnv *env), BCTBX_UNUSED(jclass c)) {
 	return ms_zrtp_available();
 }
 
-JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasVideo(UNUSED(JNIEnv *env), UNUSED(jclass c)) {
+JNIEXPORT jboolean JNICALL Java_org_linphone_mediastream_Version_nativeHasVideo(BCTBX_UNUSED(JNIEnv *env), BCTBX_UNUSED(jclass c)) {
 #ifdef VIDEO_ENABLED
 	return JNI_TRUE;
 #else
@@ -95,22 +95,22 @@ static void set_high_prio(void){
  mediastreamer2 sound card functions
  */
 
-void msandroid_sound_set_level(UNUSED(MSSndCard *card), UNUSED(MSSndCardMixerElem e), UNUSED(int percent))
+void msandroid_sound_set_level(BCTBX_UNUSED(MSSndCard *card), BCTBX_UNUSED(MSSndCardMixerElem e), BCTBX_UNUSED(int percent))
 {
 }
 
-int msandroid_sound_get_level(UNUSED(MSSndCard *card), UNUSED(MSSndCardMixerElem e))
+int msandroid_sound_get_level(BCTBX_UNUSED(MSSndCard *card), BCTBX_UNUSED(MSSndCardMixerElem e))
 {
 	return 0;
 }
 
-void msandroid_sound_set_source(UNUSED(MSSndCard *card), UNUSED(MSSndCardCapture source))
+void msandroid_sound_set_source(BCTBX_UNUSED(MSSndCard *card), BCTBX_UNUSED(MSSndCardCapture source))
 {
 }
 
 static int sdk_version=0;
 
-void msandroid_sound_init(UNUSED(MSSndCard *card)){
+void msandroid_sound_init(BCTBX_UNUSED(MSSndCard *card)){
 	/*get running sdk version*/
 	JNIEnv *jni_env = ms_get_jni_env();
 	jclass version_class = jni_env->FindClass("android/os/Build$VERSION");
@@ -120,7 +120,7 @@ void msandroid_sound_init(UNUSED(MSSndCard *card)){
 	jni_env->DeleteLocalRef(version_class);
 }
 
-void msandroid_sound_uninit(UNUSED(MSSndCard *card)){
+void msandroid_sound_uninit(BCTBX_UNUSED(MSSndCard *card)){
 }
 
 void msandroid_sound_detect(MSSndCardManager *m);

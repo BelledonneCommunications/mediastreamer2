@@ -360,7 +360,7 @@ void kf_work(
         int * factors,
         const kiss_fft_cfg st,
         int N,
-        UNUSED(int s2),
+        BCTBX_UNUSED(int s2),
         int m2
         )
 {

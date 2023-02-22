@@ -107,7 +107,7 @@ static void ms_turbojpeg_dec_process(MSFilter *filter) {
 	}
 }
 
-static void ms_turbojpeg_dec_postprocess(UNUSED(MSFilter *filter)) {
+static void ms_turbojpeg_dec_postprocess(BCTBX_UNUSED(MSFilter *filter)) {
 }
 
 static void ms_turbojpeg_dec_uninit(MSFilter *filter) {

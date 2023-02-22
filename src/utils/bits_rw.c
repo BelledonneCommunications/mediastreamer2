@@ -125,7 +125,7 @@ void ms_bits_writer_init(MSBitsWriter *writer, size_t initialbufsize) {
 	memset(writer->buffer, 0, writer->buf_size);
 }
 
-int ms_bits_writer_n_bits(MSBitsWriter *writer, int count, unsigned int value, UNUSED(const char* symbol_name)) {
+int ms_bits_writer_n_bits(MSBitsWriter *writer, int count, unsigned int value, BCTBX_UNUSED(const char* symbol_name)) {
 	uint8_t swap[4];
 	int i;
 	int byte_index;
@@ -177,7 +177,7 @@ int ms_bits_writer_n_bits(MSBitsWriter *writer, int count, unsigned int value, U
 	return 0;
 }
 
-int ms_bits_writer_ue(MSBitsWriter *writer, unsigned int value, UNUSED(const char* symbol_name)) {
+int ms_bits_writer_ue(MSBitsWriter *writer, unsigned int value, BCTBX_UNUSED(const char* symbol_name)) {
 	int size_in_bits = 0;
 	int tmp_val = value + 1;
 

@@ -26,10 +26,10 @@
 
 #include "mediastreamer2/msextdisplay.h"
 
-static void ext_display_init(UNUSED(MSFilter *f)){
+static void ext_display_init(BCTBX_UNUSED(MSFilter *f)){
 }
 
-static void ext_display_uninit(UNUSED(MSFilter *f)){
+static void ext_display_uninit(BCTBX_UNUSED(MSFilter *f)){
 }
 
 static void ext_display_process(MSFilter *f){

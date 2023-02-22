@@ -166,7 +166,7 @@ void video_stream_free(VideoStream *stream) {
 	ms_free(stream);
 }
 
-static void source_event_cb(void *ud, MSFilter* f, unsigned int event, UNUSED(void *eventdata)){
+static void source_event_cb(void *ud, MSFilter* f, unsigned int event, BCTBX_UNUSED(void *eventdata)){
 	VideoStream *st=(VideoStream*)ud;
 	MSVideoSize size;
 	switch (event) {// Allow a source to reinitialize all tree formats
@@ -181,7 +181,7 @@ static void source_event_cb(void *ud, MSFilter* f, unsigned int event, UNUSED(vo
 	}
 }
 
-static void preview_source_event_cb(void* ud, MSFilter* f, unsigned int event, UNUSED(void* eventdata)) {
+static void preview_source_event_cb(void* ud, MSFilter* f, unsigned int event, BCTBX_UNUSED(void* eventdata)) {
 	VideoStream* st = (VideoStream*)ud;
 	MSVideoSize size;
 	switch (event) {// Allow a source to reinitialize all tree formats
@@ -203,7 +203,7 @@ static void event_cb(void *ud, MSFilter* f, unsigned int event, void *eventdata)
 	}
 }
 
-static void internal_event_cb(void *ud, UNUSED(MSFilter *f), unsigned int event, void *eventdata) {
+static void internal_event_cb(void *ud, BCTBX_UNUSED(MSFilter *f), unsigned int event, void *eventdata) {
 	VideoStream *stream = (VideoStream *)ud;
 	const MSVideoCodecSLI *sli;
 	const MSVideoCodecRPSI *rpsi;
@@ -237,7 +237,7 @@ static void internal_event_cb(void *ud, UNUSED(MSFilter *f), unsigned int event,
 	}
 }
 
-static void video_stream_process_encoder_control(VideoStream *stream, unsigned int method_id, void *arg, UNUSED(void * user_data)){
+static void video_stream_process_encoder_control(VideoStream *stream, unsigned int method_id, void *arg, BCTBX_UNUSED(void * user_data)){
 	ms_filter_call_method(stream->ms.encoder, method_id, arg);
 }
 
@@ -657,7 +657,7 @@ MSVideoContent video_stream_get_content(const VideoStream *vs){
 }
 
 
-static void ext_display_cb(void *ud, UNUSED(MSFilter* f), UNUSED(unsigned int event), void *eventdata){
+static void ext_display_cb(void *ud, BCTBX_UNUSED(MSFilter* f), BCTBX_UNUSED(unsigned int event), void *eventdata){
 	MSExtDisplayOutput *output=(MSExtDisplayOutput*)eventdata;
 	VideoStream *st=(VideoStream*)ud;
 	if (st->rendercb!=NULL){
@@ -967,7 +967,7 @@ int video_stream_start (VideoStream *stream, RtpProfile *profile, const char *re
 	return video_stream_start_from_io(stream, profile, rem_rtp_ip, rem_rtp_port, rem_rtcp_ip, rem_rtcp_port, payload, &io);
 }
 
-void video_recorder_handle_event(void *userdata, UNUSED(MSFilter * f), unsigned int event, UNUSED(void * event_args)){
+void video_recorder_handle_event(void *userdata, BCTBX_UNUSED(MSFilter * f), unsigned int event, BCTBX_UNUSED(void * event_args)){
 	VideoStream *stream = (VideoStream*) userdata;
 	switch (event){
 		case MS_RECORDER_NEEDS_FIR:
@@ -1166,7 +1166,7 @@ static MSPixFmt mime_type_to_pix_format(const char *mime_type) {
 	return MS_PIX_FMT_UNKNOWN;
 }
 
-static void csrc_event_cb(void *ud, UNUSED(MSFilter * f), unsigned int event, void *eventdata) {
+static void csrc_event_cb(void *ud, BCTBX_UNUSED(MSFilter * f), unsigned int event, void *eventdata) {
 	VideoStream *stream = (VideoStream *)ud;
 
 	switch(event) {
@@ -2193,7 +2193,7 @@ void video_preview_stream_update_video_params(VideoStream* stream) {
 	video_preview_stream_change_camera(stream, stream->cam);
 }
 
-bool_t video_preview_qrcode_enabled(UNUSED(VideoPreview *stream)) {
+bool_t video_preview_qrcode_enabled(BCTBX_UNUSED(VideoPreview *stream)) {
 #ifdef QRCODE_ENABLED
 	return stream->enable_qrcode_decoder;
 #else

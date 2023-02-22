@@ -18,6 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
 
 #ifdef HAVE_CONFIG_H
 #include "mediastreamer-config.h"
@@ -25,7 +26,7 @@
 
 #include "mediastreamer2/msvideo.h"
 
-mblk_t *jpeg2yuv(uint8_t *jpgbuf, int bufsize, MSVideoSize *reqsize){
+mblk_t *jpeg2yuv(BCTBX_UNUSED(uint8_t *jpgbuf), BCTBX_UNUSED(int bufsize), BCTBX_UNUSED(MSVideoSize *reqsize)){
 	ms_warning("jpeg2yuv() stubbed, no jpg decoder implementation compiled with mediastreamer2.");
 	return NULL;
 }

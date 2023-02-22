@@ -29,15 +29,15 @@
 #include "mediastreamer2/dtmfgen.h"
 #include "mediastreamer2/msticker.h"
 
-static void tone_detected_cb(UNUSED(void *data), UNUSED(MSFilter *f), UNUSED(unsigned int event_id), MSToneDetectorEvent *ev){
+static void tone_detected_cb(BCTBX_UNUSED(void *data), BCTBX_UNUSED(MSFilter *f), BCTBX_UNUSED(unsigned int event_id), MSToneDetectorEvent *ev){
 	ms_message("Tone detected  at time %u",(unsigned int)ev->tone_start_time);
 }
 
-static void tone_sent_cb(UNUSED(void *data), UNUSED(MSFilter *f), UNUSED(unsigned int event_id), MSDtmfGenEvent *ev){
+static void tone_sent_cb(BCTBX_UNUSED(void *data), BCTBX_UNUSED(MSFilter *f), BCTBX_UNUSED(unsigned int event_id), MSDtmfGenEvent *ev){
 	ms_message("Tone sent at time %u",(unsigned int)ev->tone_start_time);
 }
 
-int main(UNUSED(int argc), UNUSED(char *argv[])){
+int main(BCTBX_UNUSED(int argc), BCTBX_UNUSED(char *argv[])){
 	MSFilter *src, *gen, *det, *rec;
 	MSTicker *ticker;
 	MSFactory *factory ;

@@ -35,7 +35,7 @@ static int get_packetization_mode(const char* fmtp) {
 /*
  * To start with, only implement case where a remote contains an H264 payload type with  packetization-mode=1. In such case, if mime type match, answer packetization-mode=1 regardless of the local configuration.
  */
-static PayloadType * h264_match(UNUSED(MSOfferAnswerContext *ctx), const bctbx_list_t *local_payloads, const PayloadType *refpt, const bctbx_list_t *remote_payloads, UNUSED(bool_t reading_response)){
+static PayloadType * h264_match(BCTBX_UNUSED(MSOfferAnswerContext *ctx), const bctbx_list_t *local_payloads, const PayloadType *refpt, const bctbx_list_t *remote_payloads, BCTBX_UNUSED(bool_t reading_response)){
 	PayloadType *pt = NULL;
 	const bctbx_list_t *it;
 	PayloadType *local_h264_with_packetization_mode_1_pt = NULL;

@@ -85,7 +85,7 @@ static void msbcg729_decoder_uninit(MSFilter *f){
 	ms_free(f->data);
 }
 
-static int msbcg729_decoder_have_plc(UNUSED(MSFilter *f), void *arg){
+static int msbcg729_decoder_have_plc(BCTBX_UNUSED(MSFilter *f), void *arg){
 	*((int *)arg) = 1;
 	return 0;
 }

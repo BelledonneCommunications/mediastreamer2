@@ -51,7 +51,7 @@ static const int flow_control_interval = 5000; // ms
 static const int flow_control_threshold = 40; // ms
 
 
-static void context_state_notify_cb(pa_context *ctx, UNUSED(void *userdata)){
+static void context_state_notify_cb(pa_context *ctx, BCTBX_UNUSED(void *userdata)){
 	const char *sname="";
 	pa_context_state_t state=pa_context_get_state(ctx);
 	switch (state){
@@ -119,7 +119,7 @@ static void uninit_pulse_context(void){
 	}
 }
 
-static void pulse_card_unload(UNUSED(MSSndCardManager *m)) {
+static void pulse_card_unload(BCTBX_UNUSED(MSSndCardManager *m)) {
 	uninit_pulse_context();
 }
 
@@ -149,7 +149,7 @@ MSSndCardDesc pulse_card_desc={
 	.unload=pulse_card_unload
 };
 
-void pa_sinklist_cb(UNUSED(pa_context *c), const pa_sink_info *l, int eol, void *userdata) {
+void pa_sinklist_cb(BCTBX_UNUSED(pa_context *c), const pa_sink_info *l, int eol, void *userdata) {
 	bctbx_list_t **pa_devicelist = userdata;
 	pa_device_t *pa_device;
 
@@ -167,7 +167,7 @@ end:
 	pa_threaded_mainloop_signal(the_pa_loop, FALSE);
 }
 
-void pa_sourcelist_cb(UNUSED(pa_context *c), const pa_source_info *l, int eol, void *userdata) {
+void pa_sourcelist_cb(BCTBX_UNUSED(pa_context *c), const pa_source_info *l, int eol, void *userdata) {
 	bctbx_list_t **pa_devicelist = userdata;
 	pa_device_t *pa_device;
 
@@ -392,17 +392,17 @@ static size_t stream_play(Stream *s, size_t nbytes) {
 	return nbytes;
 }
 
-static void stream_write_request_cb(UNUSED(pa_stream *p), size_t nbytes, void *user_data) {
+static void stream_write_request_cb(BCTBX_UNUSED(pa_stream *p), size_t nbytes, void *user_data) {
 	Stream *s = (Stream *)user_data;
 	stream_play(s, nbytes);
 }
 
-static void stream_buffer_overflow_notification(UNUSED(pa_stream *p), void *user_data) {
+static void stream_buffer_overflow_notification(BCTBX_UNUSED(pa_stream *p), void *user_data) {
 	Stream *st = (Stream*)user_data;
 	st->overflow_notifs++;
 }
 
-static void stream_buffer_underflow_notification(UNUSED(pa_stream *p), void *user_data) {
+static void stream_buffer_underflow_notification(BCTBX_UNUSED(pa_stream *p), void *user_data) {
 	Stream *st = (Stream*)user_data;
 	st->underflow_notifs++;
 }
@@ -494,7 +494,7 @@ static void stream_disconnect(Stream *s) {
 }
 
 
-static void stream_set_volume_cb(UNUSED(pa_context *c), int success, void *user_data) {
+static void stream_set_volume_cb(BCTBX_UNUSED(pa_context *c), int success, void *user_data) {
 	*(int *)user_data = success;
 	pa_threaded_mainloop_signal(the_pa_loop, FALSE);
 }
@@ -531,14 +531,14 @@ static bool_t stream_set_volume(Stream *s, double volume) {
 	return success;
 }
 
-static void stream_get_source_volume_cb(UNUSED(pa_context *c), const pa_source_output_info *i, UNUSED(int eol), void *user_data) {
+static void stream_get_source_volume_cb(BCTBX_UNUSED(pa_context *c), const pa_source_output_info *i, BCTBX_UNUSED(int eol), void *user_data) {
 	if(i) {
 		*(double *)user_data = volume_to_scale(pa_cvolume_avg(&i->volume));
 	}
 	pa_threaded_mainloop_signal(the_pa_loop, FALSE);
 }
 
-static void stream_get_sink_volume_cb(UNUSED(pa_context *c), const pa_sink_input_info *i, UNUSED(int eol), void *user_data) {
+static void stream_get_sink_volume_cb(BCTBX_UNUSED(pa_context *c), const pa_sink_input_info *i, BCTBX_UNUSED(int eol), void *user_data) {
 	if(i) {
 		*(double *)user_data = volume_to_scale(pa_cvolume_avg(&i->volume));
 	}

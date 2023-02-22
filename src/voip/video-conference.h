@@ -71,7 +71,7 @@ public:
 	virtual void removeMember(VideoEndpoint *ep) = 0;
 	virtual void addMember(VideoEndpoint *ep) = 0;
 	virtual VideoEndpoint *getVideoPlaceholderMember() const;
-	virtual void setFocus(UNUSED(VideoEndpoint* ep)) {};
+	virtual void setFocus(BCTBX_UNUSED(VideoEndpoint* ep)) {};
 	virtual void setProfile(RtpProfile *prof) {mLocalDummyProfile=prof;};
 
 	virtual MSFilter *getMixer() const;
@@ -81,13 +81,13 @@ public:
 	virtual void notifySli(int pin) = 0;
 	virtual VideoEndpoint *getMemberAtInputPin(int pin) const;
 	virtual VideoEndpoint *getMemberAtOutputPin(int pin) const;
-	virtual void unconfigureOutput(UNUSED(int pin)) {};
+	virtual void unconfigureOutput(BCTBX_UNUSED(int pin)) {};
 	virtual bool allToAllEnabled() const = 0;
 
 protected:
 	virtual void addVideoPlaceholderMember() {};
-	virtual void setPin(UNUSED(VideoEndpoint * ep)) {};
-	virtual void configureOutput(UNUSED(VideoEndpoint * ep)) {};
+	virtual void setPin(BCTBX_UNUSED(VideoEndpoint * ep)) {};
+	virtual void configureOutput(BCTBX_UNUSED(VideoEndpoint * ep)) {};
 	virtual void applyNewBitrateRequest();
 
 	MSVideoConferenceParams mCfparams;

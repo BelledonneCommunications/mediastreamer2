@@ -65,7 +65,7 @@ int EncodingFilterWrapper::onEnableAvpfCall(MSFilter *f, void *arg) {
 	}
 }
 
-int EncodingFilterWrapper::onRequestVfuCall(MSFilter *f, UNUSED(void *arg)) {
+int EncodingFilterWrapper::onRequestVfuCall(MSFilter *f, BCTBX_UNUSED(void *arg)) {
 	try {
 		static_cast<EncoderFilter *>(f->data)->requestVfu();
 		return 0;
@@ -74,7 +74,7 @@ int EncodingFilterWrapper::onRequestVfuCall(MSFilter *f, UNUSED(void *arg)) {
 	}
 }
 
-int EncodingFilterWrapper::onNotifyPliCall(MSFilter *f, UNUSED(void *arg)) {
+int EncodingFilterWrapper::onNotifyPliCall(MSFilter *f, BCTBX_UNUSED(void *arg)) {
 	try {
 		static_cast<EncoderFilter *>(f->data)->notifyPli();
 		return 0;
@@ -83,7 +83,7 @@ int EncodingFilterWrapper::onNotifyPliCall(MSFilter *f, UNUSED(void *arg)) {
 	}
 }
 
-int EncodingFilterWrapper::onNotifyFirCall(MSFilter *f, UNUSED(void *arg)) {
+int EncodingFilterWrapper::onNotifyFirCall(MSFilter *f, BCTBX_UNUSED(void *arg)) {
 	try {
 		static_cast<EncoderFilter *>(f->data)->notifyFir();
 		return 0;

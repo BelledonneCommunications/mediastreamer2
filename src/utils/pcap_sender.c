@@ -46,7 +46,7 @@ static void ms_pcap_stop(MSPCAPSender *s) {
 	ms_message("Done");
 }
 
-static void reader_notify_cb(void *user_data, UNUSED(MSFilter *f), unsigned int event, UNUSED(void *eventdata))
+static void reader_notify_cb(void *user_data, BCTBX_UNUSED(MSFilter *f), unsigned int event, BCTBX_UNUSED(void *eventdata))
 {
 	if (event == MS_PLAYER_EOF) {
 		ms_message("Reached end of file, stopping PCAP Sender");

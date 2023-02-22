@@ -76,7 +76,7 @@ static void qrcode_uninit(MSFilter *f) {
 	ms_free(qrc);
 }
 
-static int reset_search(MSFilter *f, UNUSED(void *arg)) {
+static int reset_search(MSFilter *f, BCTBX_UNUSED(void *arg)) {
 	QRCodeReaderStruct *qrc = (QRCodeReaderStruct *)f->data;
 	qrc->searchQRCode = TRUE;
 	return 0;

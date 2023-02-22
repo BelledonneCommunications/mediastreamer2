@@ -448,7 +448,7 @@ static mblk_t *h264_module_processing(void *data, mblk_t *nalus, ms_bool_t *isKe
 	return frame;
 }
 
-static void h264_module_reverse(UNUSED(MSFactory* factory), void *data, mblk_t *input, MSQueue *output, ms_bool_t isFirstFrame, const uint8_t *codecPrivateData, UNUSED(size_t codecPrivateSize)) {
+static void h264_module_reverse(BCTBX_UNUSED(MSFactory* factory), void *data, mblk_t *input, MSQueue *output, ms_bool_t isFirstFrame, const uint8_t *codecPrivateData, BCTBX_UNUSED(size_t codecPrivateSize)) {
 	mblk_t *buffer = NULL, *bufferFrag = NULL;
 	H264Module *obj = (H264Module *)data;
 	MSQueue queue;
@@ -513,7 +513,7 @@ static void h264_module_get_private_data(const void *o, uint8_t **data, size_t *
 	}
 }
 
-static void h264_module_load_private_data(void *o, const uint8_t *data, UNUSED(size_t size)) {
+static void h264_module_load_private_data(void *o, const uint8_t *data, BCTBX_UNUSED(size_t size)) {
 	H264Module *obj = (H264Module *)o;
 	obj->codecPrivate = H264Private_new();
 	H264Private_load(obj->codecPrivate, data);
@@ -546,7 +546,7 @@ typedef struct _Vp8Module {
 	uint16_t cseq;
 } Vp8Module;
 
-static void *vp8_module_new(UNUSED(MSFactory *factory)) {
+static void *vp8_module_new(BCTBX_UNUSED(MSFactory *factory)) {
 	Vp8Module *obj = (Vp8Module *)ms_new0(Vp8Module, 1);
 	vp8rtpfmt_unpacker_init(&obj->unpacker, NULL, FALSE, TRUE, FALSE);
 	vp8rtpfmt_packer_init(&obj->packer);
@@ -567,14 +567,14 @@ static int vp8_module_preprocess(void *obj, MSQueue *input, MSQueue *output) {
 	return vp8rtpfmt_unpacker_get_frame(unpacker, output, &infos);
 }
 
-static mblk_t *vp8_module_process(UNUSED(void *obj), mblk_t *buffer, ms_bool_t *isKeyFrame, ms_bool_t *isVisible, UNUSED(uint8_t **codecPrivateData), UNUSED(size_t *codecPrivateSize)) {
+static mblk_t *vp8_module_process(BCTBX_UNUSED(void *obj), mblk_t *buffer, ms_bool_t *isKeyFrame, ms_bool_t *isVisible, BCTBX_UNUSED(uint8_t **codecPrivateData), BCTBX_UNUSED(size_t *codecPrivateSize)) {
 	uint8_t first_byte = *buffer->b_rptr;
 	*isKeyFrame = !(first_byte & 0x01);
 	*isVisible = first_byte & 0x10;
 	return buffer;
 }
 
-static void vp8_module_reverse(MSFactory * f, void *obj, mblk_t *input, MSQueue *output, UNUSED(ms_bool_t isFirstFrame), UNUSED(const uint8_t *codecPrivateData), UNUSED(size_t codecPrivateSize)) {
+static void vp8_module_reverse(MSFactory * f, void *obj, mblk_t *input, MSQueue *output, BCTBX_UNUSED(ms_bool_t isFirstFrame), BCTBX_UNUSED(const uint8_t *codecPrivateData), BCTBX_UNUSED(size_t codecPrivateSize)) {
 	Vp8Module *mod = (Vp8Module *)obj;
 	bctbx_list_t *packer_input = NULL;
 	Vp8RtpFmtPacket *packet = ms_new0(Vp8RtpFmtPacket, 1);
@@ -662,7 +662,7 @@ static void wav_private_load(WavPrivate *obj, const uint8_t *data, size_t size) 
 }
 
 /* µLaw module */
-static void *mu_law_module_new(UNUSED(MSFactory *factory)) {
+static void *mu_law_module_new(BCTBX_UNUSED(MSFactory *factory)) {
 	return ms_new0(WavPrivate, 1);
 }
 
@@ -751,12 +751,12 @@ static void opus_codec_private_serialize(const OpusCodecPrivate *obj, uint8_t **
 	memcpy((*data) + 8, obj, 11);
 }
 
-static void opus_codec_private_load(OpusCodecPrivate *obj, const uint8_t *data, UNUSED(size_t size)) {
+static void opus_codec_private_load(OpusCodecPrivate *obj, const uint8_t *data, BCTBX_UNUSED(size_t size)) {
 	memcpy(obj, data + 8, 11);
 }
 
 // OpusModule
-static void *opus_module_new(UNUSED(MSFactory *factory)) {
+static void *opus_module_new(BCTBX_UNUSED(MSFactory *factory)) {
 	OpusCodecPrivate *obj = ms_new0(OpusCodecPrivate, 1);
 	opus_codec_private_init(obj);
 	return obj;
@@ -1058,7 +1058,7 @@ static int ebml_reading_profile(ebml_master *head) {
 	return profile;
 }
 
-static ms_bool_t matroska_create_file(Matroska *obj, UNUSED(const char path[])) {
+static ms_bool_t matroska_create_file(Matroska *obj, BCTBX_UNUSED(const char path[])) {
 	obj->header = (ebml_master *)EBML_ElementCreate(obj->p, &EBML_ContextHead, TRUE, NULL);
 	obj->segment = (ebml_master *)EBML_ElementCreate(obj->p, &MATROSKA_ContextSegment, TRUE, NULL);
 	obj->metaSeek = (ebml_master *)EBML_MasterAddElt(obj->segment, &MATROSKA_ContextSeekHead, FALSE);
@@ -1630,7 +1630,7 @@ timecode_t matroska_get_current_cluster_timestamp(const Matroska *obj) {
 	return (timecode_t)EBML_IntegerValue((ebml_integer *)EBML_MasterGetChild(obj->cluster, &MATROSKA_ContextTimecode));
 }
 
-static matroska_block *matroska_write_block(Matroska *obj, const matroska_frame *m_frame, uint16_t trackNum, ms_bool_t isKeyFrame, UNUSED(ms_bool_t isVisible), const uint8_t *codecPrivateData, size_t codecPrivateDataSize) {
+static matroska_block *matroska_write_block(Matroska *obj, const matroska_frame *m_frame, uint16_t trackNum, ms_bool_t isKeyFrame, BCTBX_UNUSED(ms_bool_t isVisible), const uint8_t *codecPrivateData, size_t codecPrivateDataSize) {
 	matroska_block *block = NULL;
 	ebml_master *blockGroup = NULL;
 	timecode_t clusterTimecode;
@@ -1965,7 +1965,7 @@ static void recorder_request_fir(MSFilter *f, MKVRecorder *obj) {
 	}
 }
 
-static int recorder_start(MSFilter *f, UNUSED(void *arg)) {
+static int recorder_start(MSFilter *f, BCTBX_UNUSED(void *arg)) {
 	MKVRecorder *obj = (MKVRecorder *)f->data;
 	int i;
 
@@ -2031,7 +2031,7 @@ fail:
 	return -1;
 }
 
-static int recorder_stop(MSFilter *f, UNUSED(void *arg)) {
+static int recorder_stop(MSFilter *f, BCTBX_UNUSED(void *arg)) {
 	MKVRecorder *obj = (MKVRecorder *)f->data;
 	ms_filter_lock(f);
 	switch(obj->state) {
@@ -2132,7 +2132,7 @@ static void recorder_process(MSFilter *f) {
 	ms_filter_unlock(f);
 }
 
-static int recorder_close(MSFilter *f, UNUSED(void *arg)) {
+static int recorder_close(MSFilter *f, BCTBX_UNUSED(void *arg)) {
 	MKVRecorder *obj = (MKVRecorder *)f->data;
 	int i;
 
@@ -2672,7 +2672,7 @@ end:
 	ms_filter_unlock(f);
 }
 
-static int player_close(MSFilter *f, UNUSED(void *arg)) {
+static int player_close(MSFilter *f, BCTBX_UNUSED(void *arg)) {
 	int i;
 	MKVPlayer *obj = (MKVPlayer *)f->data;
 	ms_filter_lock(f);
@@ -2699,7 +2699,7 @@ static int player_seek_ms(MSFilter *f, void *arg) {
 	return res;
 }
 
-static int player_start(MSFilter *f, UNUSED(void *arg)) {
+static int player_start(MSFilter *f, BCTBX_UNUSED(void *arg)) {
 	MKVPlayer *obj = (MKVPlayer *)f->data;
 	ms_filter_lock(f);
 	if(obj->state == MSPlayerClosed) {
@@ -2714,7 +2714,7 @@ fail:
 	return -1;
 }
 
-static int player_stop(MSFilter *f, UNUSED(void *arg)) {
+static int player_stop(MSFilter *f, BCTBX_UNUSED(void *arg)) {
 	MKVPlayer *obj = (MKVPlayer *)f->data;
 	ms_filter_lock(f);
 	if(obj->state == MSPlayerPlaying) {

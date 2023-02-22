@@ -213,7 +213,7 @@ static int sender_set_session(MSFilter * f, void *arg)
 	return 0;
 }
 
-static int sender_mute(MSFilter * f, UNUSED(void *arg))
+static int sender_mute(MSFilter * f, BCTBX_UNUSED(void *arg))
 {
 	SenderData *d = (SenderData *) f->data;
 	ms_filter_lock(f);
@@ -222,7 +222,7 @@ static int sender_mute(MSFilter * f, UNUSED(void *arg))
 	return 0;
 }
 
-static int sender_unmute(MSFilter * f, UNUSED(void *arg))
+static int sender_unmute(MSFilter * f, BCTBX_UNUSED(void *arg))
 {
 	SenderData *d = (SenderData *) f->data;
 	ms_filter_lock(f);
@@ -481,7 +481,7 @@ static void check_stun_sending(MSFilter *f) {
 	}
 }
 
-static mblk_t *create_packet_with_volume_data_at_intervals(MSFilter *f, UNUSED(size_t header_size), const uint8_t *payload, size_t payload_size) {
+static mblk_t *create_packet_with_volume_data_at_intervals(MSFilter *f, BCTBX_UNUSED(size_t header_size), const uint8_t *payload, size_t payload_size) {
 	SenderData *d = (SenderData *) f->data;
 	RtpSession *s = d->session;
 	rtp_audio_level_t *audio_levels = NULL;
@@ -903,7 +903,7 @@ static int receiver_get_ch(MSFilter *f, void *arg) {
 	return 0;
 }
 
-static int receiver_reset_jitter_buffer(MSFilter *f, UNUSED(void *arg)) {
+static int receiver_reset_jitter_buffer(MSFilter *f, BCTBX_UNUSED(void *arg)) {
 	ReceiverData *d = (ReceiverData *)f->data;
 	d->reset_jb = TRUE;
 	return 0;

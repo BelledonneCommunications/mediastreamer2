@@ -204,7 +204,7 @@ static void enc_preprocess ( MSFilter *f ) {
 }
 
 
-static OSStatus encoderCallback ( UNUSED(AudioConverterRef inAudioConverter), UInt32 *ioNumberDataPackets, AudioBufferList *ioData,
+static OSStatus encoderCallback ( BCTBX_UNUSED(AudioConverterRef inAudioConverter), UInt32 *ioNumberDataPackets, AudioBufferList *ioData,
 								  AudioStreamPacketDescription **outDataPacketDescription,void *inUserData ) {
 	/* Get the current encoder state from the inUserData parameter */
 	struct EncState *s= ( struct EncState* ) inUserData;
@@ -320,7 +320,7 @@ static void enc_process ( MSFilter *f ) {
 	ms_filter_unlock ( f );
 }
 
-static void enc_postprocess ( UNUSED(MSFilter *f) ) {
+static void enc_postprocess ( BCTBX_UNUSED(MSFilter *f) ) {
 }
 
 static void enc_uninit ( MSFilter *f ) {
@@ -637,7 +637,7 @@ static void dec_preprocess ( MSFilter *f ) {
 
 
 /* decoder Callback function: feed the decoder with input data */
-static OSStatus decoderCallback ( UNUSED(AudioConverterRef inAudioConverter),
+static OSStatus decoderCallback ( BCTBX_UNUSED(AudioConverterRef inAudioConverter),
 								  UInt32 *ioNumberDataPackets,
 								  AudioBufferList *ioData,
 								  AudioStreamPacketDescription **outDataPacketDescription,
@@ -769,7 +769,7 @@ static void dec_process ( MSFilter *f ) {
 	}
 }
 
-static void dec_postprocess ( UNUSED(MSFilter *f) ) {
+static void dec_postprocess ( BCTBX_UNUSED(MSFilter *f) ) {
 
 }
 
@@ -830,7 +830,7 @@ static int dec_get_sr ( MSFilter *f, void *arg ) {
 }
 
 /* decoder support PLC, allow Mediastreamer2 to know about it */
-static int dec_have_plc ( UNUSED(MSFilter *f), void *arg ) {
+static int dec_have_plc ( BCTBX_UNUSED(MSFilter *f), void *arg ) {
 	* ( ( int * ) arg ) = 1;
 	return 0;
 }

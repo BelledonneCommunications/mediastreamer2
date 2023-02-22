@@ -234,7 +234,7 @@ MSFileFormat ms_media_recorder_get_file_format(const MSMediaRecorder *obj) {
 	return obj->format;
 }
 
-void ms_media_recorder_remove_file(UNUSED(MSMediaRecorder *obj), const char *filepath) {
+void ms_media_recorder_remove_file(BCTBX_UNUSED(MSMediaRecorder *obj), const char *filepath) {
 	ms_message("Removing %s.", filepath);
 	if(access(filepath, F_OK | W_OK) == 0) {
 		remove(filepath);
@@ -445,7 +445,7 @@ static void _unlink_all(MSMediaRecorder *obj) {
 	}
 }
 
-static void _recorder_callback(void *ud, UNUSED(MSFilter *f), UNUSED(unsigned int id), UNUSED(void *arg)) {
+static void _recorder_callback(void *ud, BCTBX_UNUSED(MSFilter *f), BCTBX_UNUSED(unsigned int id), BCTBX_UNUSED(void *arg)) {
 	MSMediaRecorder *obj = (MSMediaRecorder *)ud;
 	ms_filter_call_method_noarg(obj->video_encoder, MS_VIDEO_ENCODER_REQ_VFU);
 }

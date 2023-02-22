@@ -700,7 +700,7 @@ void TurnClient::connect() {
 	}
 }
 
-int TurnClient::recvfrom(mblk_t *msg, UNUSED(int flags), struct sockaddr *from, socklen_t *fromlen) {
+int TurnClient::recvfrom(mblk_t *msg, BCTBX_UNUSED(int flags), struct sockaddr *from, socklen_t *fromlen) {
 	std::unique_ptr<Packet> p = nullptr;
 
 	mTurnConnection->mReceivingLock.lock();
@@ -733,7 +733,7 @@ int TurnClient::recvfrom(mblk_t *msg, UNUSED(int flags), struct sockaddr *from, 
 	return 0;
 }
 
-int TurnClient::sendto(mblk_t *msg, UNUSED(int flags), const struct sockaddr *, socklen_t) {
+int TurnClient::sendto(mblk_t *msg, BCTBX_UNUSED(int flags), const struct sockaddr *, socklen_t) {
 	if (!mTurnConnection->isRunning()) {
 		return -1;
 	}

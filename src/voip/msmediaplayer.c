@@ -581,7 +581,7 @@ static void _unlink_all(MSMediaPlayer *obj) {
 	}
 }
 
-static void _eof_filter_notify_cb(void *userdata, struct _MSFilter *f, unsigned int id, UNUSED(void *arg)) {
+static void _eof_filter_notify_cb(void *userdata, struct _MSFilter *f, unsigned int id, BCTBX_UNUSED(void *arg)) {
 	MSMediaPlayer *obj = (MSMediaPlayer *)userdata;
 	ms_mutex_lock(&obj->cb_access);
 	if(f == obj->player && id == MS_PLAYER_EOF && obj->eof_cb != NULL) {

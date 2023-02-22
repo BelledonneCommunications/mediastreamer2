@@ -36,7 +36,7 @@ int DecodingFilterWrapper::onAddFmtpCall(MSFilter *f, void *arg) {
 	}
 }
 
-int DecodingFilterWrapper::onResetFirstImageCall(MSFilter *f, UNUSED(void *arg)) {
+int DecodingFilterWrapper::onResetFirstImageCall(MSFilter *f, BCTBX_UNUSED(void *arg)) {
 	try {
 		static_cast<DecoderFilter *>(f->data)->resetFirstImage();
 		return 0;

@@ -270,7 +270,7 @@ int ms_discover_mtu(const char *host){
 
 #else
 
-int ms_discover_mtu(UNUSED(const char*host)){
+int ms_discover_mtu(BCTBX_UNUSED(const char*host)){
 	ms_warning("mtu discovery not implemented.");
 	return -1;
 }

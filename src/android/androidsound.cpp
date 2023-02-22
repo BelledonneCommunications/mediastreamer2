@@ -290,7 +290,7 @@ static void android_snd_card_detect(MSSndCardManager *m) {
 	ms_message("Native android sound support is NOT available.");
 }
 
-static void android_native_snd_card_init(UNUSED(MSSndCard *card)) {
+static void android_native_snd_card_init(BCTBX_UNUSED(MSSndCard *card)) {
 
 }
 

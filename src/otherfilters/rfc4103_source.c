@@ -188,7 +188,7 @@ static void ms_rtt_4103_source_init(MSFilter *f) {
 	f->data = s;
 }
 
-static void ms_rtt_4103_source_preprocess(UNUSED(MSFilter *f)) {
+static void ms_rtt_4103_source_preprocess(BCTBX_UNUSED(MSFilter *f)) {
 	
 }
 
@@ -205,7 +205,7 @@ static void ms_rtt_4103_source_process(MSFilter *f) {
 	ms_filter_unlock(f);
 }
 
-static void ms_rtt_4103_source_postprocess(UNUSED(MSFilter *f)) {
+static void ms_rtt_4103_source_postprocess(BCTBX_UNUSED(MSFilter *f)) {
 	
 }
 

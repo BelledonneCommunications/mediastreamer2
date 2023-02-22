@@ -139,7 +139,7 @@ void media_stream_add_tmmbr_handler(MediaStream *stream, void (*on_tmmbr_receive
 								, user_data);
 }
 
-void media_stream_remove_tmmbr_handler(MediaStream *stream, void (*on_tmmbr_received)(const OrtpEventData *evd, void *), UNUSED(void * user_data)){
+void media_stream_remove_tmmbr_handler(MediaStream *stream, void (*on_tmmbr_received)(const OrtpEventData *evd, void *), BCTBX_UNUSED(void * user_data)){
 	ortp_ev_dispatcher_disconnect(stream->evd
 							, ORTP_EVENT_RTCP_PACKET_RECEIVED
 							, RTCP_RTPFB
@@ -762,13 +762,13 @@ bool_t ms_media_stream_io_is_consistent(const MSMediaStreamIO *io){
 
 /*stubs*/
 #ifndef VIDEO_ENABLED
-void video_stream_open_player(UNUSED(VideoStream *stream), UNUSED(MSFilter *sink)){
+void video_stream_open_player(BCTBX_UNUSED(VideoStream *stream), BCTBX_UNUSED(MSFilter *sink)){
 }
 
-void video_stream_close_player(UNUSED(VideoStream *stream)){
+void video_stream_close_player(BCTBX_UNUSED(VideoStream *stream)){
 }
 
-void video_stream_enable_recording(UNUSED(VideoStream *stream), UNUSED(bool_t enabled)) {}
+void video_stream_enable_recording(BCTBX_UNUSED(VideoStream *stream), BCTBX_UNUSED(bool_t enabled)) {}
 
 MSWebCamDesc *ms_mire_webcam_desc_get(void){
 	return NULL;

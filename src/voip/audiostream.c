@@ -104,7 +104,7 @@ static void audio_stream_free(AudioStream *stream) {
 
 static int dtmf_tab[16]={'0','1','2','3','4','5','6','7','8','9','*','#','A','B','C','D'};
 
-static void on_dtmf_received(UNUSED(RtpSession *s), uint32_t dtmf, void *user_data)
+static void on_dtmf_received(BCTBX_UNUSED(RtpSession *s), uint32_t dtmf, void *user_data)
 {
 	AudioStream *stream=(AudioStream*)user_data;
 	if (dtmf>15){
@@ -259,7 +259,7 @@ static void audio_stream_configure_resampler(AudioStream *st, MSFilter *resample
 	);
 }
 
-static void audio_stream_process_rtcp(UNUSED(MediaStream *media_stream), UNUSED(mblk_t *m)){
+static void audio_stream_process_rtcp(BCTBX_UNUSED(MediaStream *media_stream), BCTBX_UNUSED(mblk_t *m)){
 
 }
 
@@ -296,7 +296,7 @@ bool_t audio_stream_started(AudioStream *stream){
 	return media_stream_started(&stream->ms);
 }
 
-static void write_callback(void *ud, MSFilter *f, unsigned int id, UNUSED(void *arg)){
+static void write_callback(void *ud, MSFilter *f, unsigned int id, BCTBX_UNUSED(void *arg)){
 	AudioStream *stream=(AudioStream *)ud;
 	switch(id){
 		case MS_FILTER_OUTPUT_FMT_CHANGED:
@@ -311,7 +311,7 @@ static void write_callback(void *ud, MSFilter *f, unsigned int id, UNUSED(void *
 	}
 }
 
-static void read_callback(void *ud, MSFilter *f, unsigned int id, UNUSED(void *arg)){
+static void read_callback(void *ud, MSFilter *f, unsigned int id, BCTBX_UNUSED(void *arg)){
 	AudioStream *stream=(AudioStream *)ud;
 	switch(id){
 		case MS_FILTER_OUTPUT_FMT_CHANGED:
@@ -355,7 +355,7 @@ void audio_stream_prepare_sound(AudioStream *stream, MSSndCard *playcard, MSSndC
 	stream->ms.state=MSStreamPreparing;
 }
 
-static void _audio_stream_unprepare_sound(AudioStream *stream, UNUSED(bool_t keep_sound_resources)){
+static void _audio_stream_unprepare_sound(AudioStream *stream, BCTBX_UNUSED(bool_t keep_sound_resources)){
 	if (stream->ms.state==MSStreamPreparing){
 		stop_preload_graph(stream);
 #if TARGET_OS_IPHONE
@@ -374,7 +374,7 @@ void audio_stream_unprepare_sound(AudioStream *stream){
 	_audio_stream_unprepare_sound(stream,FALSE);
 }
 
-static void player_callback(void *ud, MSFilter *f, unsigned int id, UNUSED(void *arg)){
+static void player_callback(void *ud, MSFilter *f, unsigned int id, BCTBX_UNUSED(void *arg)){
 	AudioStream *stream=(AudioStream *)ud;
 	int sr=0;
 	int channels=0;
@@ -682,7 +682,7 @@ void audio_stream_close_remote_play(AudioStream *stream){
 	if (stream->videostream) video_stream_close_player(stream->videostream);
 }
 
-static void video_input_updated(void *stream, UNUSED(MSFilter *f), unsigned int event_id, UNUSED(void *arg)){
+static void video_input_updated(void *stream, BCTBX_UNUSED(MSFilter *f), unsigned int event_id, BCTBX_UNUSED(void *arg)){
 	if (event_id==MS_FILTER_OUTPUT_FMT_CHANGED){
 		ms_message("Video ITC source updated.");
 		configure_av_recorder((AudioStream*)stream);
@@ -794,7 +794,7 @@ static void setup_recorder(AudioStream *stream, int sample_rate, int nchannels){
 	setup_av_recorder(stream,sample_rate,nchannels);
 }
 
-static void on_silence_detected(void *data, UNUSED(MSFilter *f), unsigned int event_id, void *event_arg){
+static void on_silence_detected(void *data, BCTBX_UNUSED(MSFilter *f), unsigned int event_id, void *event_arg){
 	AudioStream *as=(AudioStream*)data;
 	if (as->ms.rtpsend){
 		switch(event_id){
@@ -811,7 +811,7 @@ static void on_silence_detected(void *data, UNUSED(MSFilter *f), unsigned int ev
 	}
 }
 
-static void on_cn_received(void *data, UNUSED(MSFilter *f), unsigned int event_id, void *event_arg){
+static void on_cn_received(void *data, BCTBX_UNUSED(MSFilter *f), unsigned int event_id, void *event_arg){
 	AudioStream *as=(AudioStream*)data;
 	if (event_id == MS_RTP_RECV_GENERIC_CN_RECEIVED && as->plc){
 		ms_message("CN packet received, given to MSGenericPlc filter.");
@@ -874,7 +874,7 @@ static int get_usable_telephone_event(RtpProfile *profile, int clock_rate){
 	return fallback_pt;
 }
 
-static void ms_audio_flow_control_event_handler(void *user_data, UNUSED(MSFilter *source), unsigned int event, void *eventdata) {
+static void ms_audio_flow_control_event_handler(void *user_data, BCTBX_UNUSED(MSFilter *source), unsigned int event, void *eventdata) {
 	if (event == MS_AUDIO_FLOW_CONTROL_DROP_EVENT) {
 		MSFilter *flow_controller = (MSFilter *)user_data;
 		MSAudioFlowControlDropEvent *ev = (MSAudioFlowControlDropEvent *)eventdata;
@@ -892,7 +892,7 @@ void audio_stream_set_is_muted_callback (AudioStream *s, AudioStreamIsMutedCallb
 	s->user_pointer=user_pointer;
 }
 
-static void on_volumes_received(void *data, UNUSED(MSFilter *f), unsigned int event_id, void *event_arg) {
+static void on_volumes_received(void *data, BCTBX_UNUSED(MSFilter *f), unsigned int event_id, void *event_arg) {
 	AudioStream *as=(AudioStream*)data;
 	rtp_audio_level_t *volumes = (rtp_audio_level_t *)event_arg;
 	int new_volume;
@@ -959,7 +959,7 @@ static void on_volumes_received(void *data, UNUSED(MSFilter *f), unsigned int ev
 	}
 }
 
-static int request_stream_volume(UNUSED(MSFilter *filter), void* user_data) {
+static int request_stream_volume(BCTBX_UNUSED(MSFilter *filter), void* user_data) {
 	AudioStream *as = (AudioStream *)user_data;
 	MSFilter *volume_filter = as->volsend;
 	float ret;
@@ -977,7 +977,7 @@ void audio_stream_set_audio_route_changed_callback (AudioStream *s, MSAudioRoute
 	s->audio_route_changed_cb_user_data = audio_route_changed_cb_user_data;
 }
 
-static void on_audio_route_changed_received(void *data, UNUSED(MSFilter *f), unsigned int event_id, void *event_arg) {
+static void on_audio_route_changed_received(void *data, BCTBX_UNUSED(MSFilter *f), unsigned int event_id, void *event_arg) {
 	AudioStream *as=(AudioStream*)data;
 	
 	switch(event_id) {

@@ -134,7 +134,7 @@ static int mire_set_fps(MSFilter *f, void* data){
 	return 0;
 }
 
-static int mire_get_fmt(UNUSED(MSFilter *f), void* data){
+static int mire_get_fmt(BCTBX_UNUSED(MSFilter *f), void* data){
 	*(MSPixFmt*)data=MS_YUV420P;
 	return 0;
 }

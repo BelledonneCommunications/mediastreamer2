@@ -171,7 +171,7 @@ static float volume_agc_process(MSFilter *f, mblk_t *om){
 }
 #else
 
-static float volume_agc_process(MSFilter *f, UNUSED(mblk_t *om)) {
+static float volume_agc_process(MSFilter *f, BCTBX_UNUSED(mblk_t *om)) {
 	Volume *v = (Volume*) f->data;
 	static int counter;
 	// target is: 1

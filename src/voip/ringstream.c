@@ -25,7 +25,7 @@
 #include "mediastreamer2/msfileplayer.h"
 #include "private.h"
 
-static void ring_player_event_handler(void *ud, UNUSED(MSFilter *f), unsigned int evid, UNUSED(void *arg)){
+static void ring_player_event_handler(void *ud, BCTBX_UNUSED(MSFilter *f), unsigned int evid, BCTBX_UNUSED(void *arg)){
 	RingStream *stream=(RingStream*)ud;
 
 	if (evid==MS_FILTER_OUTPUT_FMT_CHANGED){

@@ -291,7 +291,7 @@ int static_image_get_vsize(MSFilter *f, void* data) {
 	return 0;
 }
 
-int static_image_get_pix_fmt(UNUSED(MSFilter *f), void *data) {
+int static_image_get_pix_fmt(BCTBX_UNUSED(MSFilter *f), void *data) {
 	*(MSPixFmt*)data = MS_YUV420P;
 	return 0;
 }

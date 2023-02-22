@@ -1089,11 +1089,11 @@ void ogl_destroy_window(EGLNativeWindowType *window, void ** window_id){
 	}
 }
 #else
-bool_t ogl_create_window(UNUSED(EGLNativeWindowType *window), UNUSED(void ** window_id)){
+bool_t ogl_create_window(BCTBX_UNUSED(EGLNativeWindowType *window), BCTBX_UNUSED(void ** window_id)){
 	ms_error("[ogl_display] Ceating a Window is not supported for the current platform");
 	return FALSE;
 }
-void ogl_destroy_window(UNUSED(EGLNativeWindowType *window), UNUSED(void ** window_id)){
+void ogl_destroy_window(BCTBX_UNUSED(EGLNativeWindowType *window), BCTBX_UNUSED(void ** window_id)){
 }
 #endif
 
@@ -1538,12 +1538,12 @@ void ogl_display_enable_mirroring_to_preview(struct opengles_display *gldisp, bo
 // -----------------------------------------------------------------------------
 
 #ifdef __ANDROID__
-JNIEXPORT void JNICALL Java_org_linphone_mediastream_video_display_OpenGLESDisplay_init (UNUSED(JNIEnv * env), UNUSED(jobject obj), jlong ptr, jint width, jint height) {
+JNIEXPORT void JNICALL Java_org_linphone_mediastream_video_display_OpenGLESDisplay_init (BCTBX_UNUSED(JNIEnv * env), BCTBX_UNUSED(jobject obj), jlong ptr, jint width, jint height) {
 	struct opengles_display* d = (struct opengles_display*) ptr;
 	ogl_display_init(d, NULL, width, height);
 }
 
-JNIEXPORT void JNICALL Java_org_linphone_mediastream_video_display_OpenGLESDisplay_render (UNUSED(JNIEnv * env), UNUSED(jobject obj), jlong ptr) {
+JNIEXPORT void JNICALL Java_org_linphone_mediastream_video_display_OpenGLESDisplay_render (BCTBX_UNUSED(JNIEnv * env), BCTBX_UNUSED(jobject obj), jlong ptr) {
 	struct opengles_display* d = (struct opengles_display*) ptr;
 	ogl_display_render(d, 0, MSVideoDisplayBlackBars);
 }

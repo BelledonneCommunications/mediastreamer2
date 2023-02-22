@@ -627,7 +627,7 @@ static void stateful_analyzer_suggest_action(MSQosAnalyzer *objbase, MSRateContr
 	}
 }
 
-static bool_t stateful_analyzer_has_improved(UNUSED(MSQosAnalyzer *objbase)){
+static bool_t stateful_analyzer_has_improved(BCTBX_UNUSED(MSQosAnalyzer *objbase)){
 	/*never tell the controller that situation has improved to avoid 'Stable' state
 	which is not necessary for this analyzer*/
 	return FALSE;

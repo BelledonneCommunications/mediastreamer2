@@ -146,7 +146,7 @@ static void android_display_uninit(MSFilter *f){
 	ms_free(ad);
 }
 
-static void android_display_preprocess(UNUSED(MSFilter *f)){
+static void android_display_preprocess(BCTBX_UNUSED(MSFilter *f)){
 
 }
 

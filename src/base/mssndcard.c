@@ -547,12 +547,12 @@ MSSndCardStreamType ms_snd_card_get_stream_type(MSSndCard *obj) {
 
 #ifdef __linux__
 #ifndef __ALSA_ENABLED__
-MSSndCard * ms_alsa_card_new_custom(UNUSED(const char *pcmdev), UNUSED(const char *mixdev)){
+MSSndCard * ms_alsa_card_new_custom(BCTBX_UNUSED(const char *pcmdev), BCTBX_UNUSED(const char *mixdev)){
 	ms_warning("Alsa support not available in this build of mediastreamer2");
 	return NULL;
 }
 
-void ms_alsa_card_set_forced_sample_rate(UNUSED(int samplerate)){
+void ms_alsa_card_set_forced_sample_rate(BCTBX_UNUSED(int samplerate)){
 	ms_warning("Alsa support not available in this build of mediastreamer2");
 }
 #endif

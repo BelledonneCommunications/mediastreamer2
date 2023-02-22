@@ -44,7 +44,7 @@ public:
 	MSVideoSize getVideoSize() const override;
 	float getFps() const override;
 	const MSFmtDescriptor *getOutputFmt() const override;
-	void addFmtp(UNUSED(const char *fmtp))  override {}
+	void addFmtp(BCTBX_UNUSED(const char *fmtp))  override {}
 
 	void enableAvpf(bool enable) override;
 

@@ -102,12 +102,12 @@ static int enc_add_attr(MSFilter *f, void *arg){
 	return 0;
 }
 
-static int enc_get_sample_rate(UNUSED(MSFilter *f), void *arg) {
+static int enc_get_sample_rate(BCTBX_UNUSED(MSFilter *f), void *arg) {
 	*((int *)arg) = 8000;
 	return 0;
 }
 
-static int get_channels(UNUSED(MSFilter *f), void *arg) {
+static int get_channels(BCTBX_UNUSED(MSFilter *f), void *arg) {
 	*((int *)arg) = 1;
 	return 0;
 }
@@ -302,12 +302,12 @@ static int dec_enable_plc(MSFilter *f, void* arg ){
 	return 0;
 }
 
-static int dec_have_plc(UNUSED(MSFilter *f), void *arg){
+static int dec_have_plc(BCTBX_UNUSED(MSFilter *f), void *arg){
 	*((int *)arg) = 1;
 	return 0;
 }
 
-static int dec_get_sample_rate(UNUSED(MSFilter *f), void *arg) {
+static int dec_get_sample_rate(BCTBX_UNUSED(MSFilter *f), void *arg) {
 	*((int *)arg) = 8000;
 	return 0;
 }
