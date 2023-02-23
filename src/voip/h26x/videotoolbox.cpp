@@ -18,6 +18,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bctoolbox/defs.h>
+
 #include "filter-wrapper/encoding-filter-wrapper.h"
 #include "filter-wrapper/decoding-filter-wrapper.h"
 #include "h26x/h26x-decoder-filter.h"
@@ -88,7 +90,7 @@ MS_ENCODING_FILTER_WRAPPER_DESCRIPTION_DECLARATION(VideoToolboxH265Encoder, MS_V
 MS_DECODING_FILTER_WRAPPER_METHODS_DECLARATION(VideoToolboxH265Decoder);
 MS_DECODING_FILTER_WRAPPER_DESCRIPTION_DECLARATION(VideoToolboxH265Decoder, MS_VT_H265_DEC_ID, "H265 hardware decoder for iOS and MacOSX", "H265", MS_FILTER_IS_PUMP);
 
-extern "C" void _register_videotoolbox_if_supported(MSFactory *factory) {
+extern "C" void _register_videotoolbox_if_supported(BCTBX_UNUSED(MSFactory *factory)) {
 #if TARGET_OS_SIMULATOR
 	ms_message("VideoToolbox H264 codec is not supported on simulators");
 #else
