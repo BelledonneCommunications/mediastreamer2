@@ -92,6 +92,7 @@ MS_DECODING_FILTER_WRAPPER_DESCRIPTION_DECLARATION(VideoToolboxH265Decoder, MS_V
 
 extern "C" void _register_videotoolbox_if_supported(BCTBX_UNUSED(MSFactory *factory)) {
 #if TARGET_OS_SIMULATOR
+	(void)factory;
 	ms_message("VideoToolbox H264 codec is not supported on simulators");
 #else
 	if (kCFCoreFoundationVersionNumber >= 744.00) { // MacOS >= 10.8 or iOS >= 8.0
