@@ -363,6 +363,7 @@ static void video_stream_track_fps_changes(VideoStream *stream){
 
 						ms_filter_call_method(stream->ms.encoder,MS_VIDEO_ENCODER_GET_CONFIGURATION,&vconf);
 						vconf.fps = stream->real_fps;
+						stream->configured_fps = vconf.fps;
 						ms_filter_call_method(stream->ms.encoder,MS_VIDEO_ENCODER_SET_CONFIGURATION,&vconf);
 					}
 				}
