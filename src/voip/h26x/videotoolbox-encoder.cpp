@@ -294,7 +294,7 @@ void VideoToolboxEncoder::outputCb(void *outputCallbackRefCon, BCTBX_UNUSED(void
 			}
 
 			ms_mutex_lock(&ctx->_mutex);
-			ctx->_encodedFrames.push_back(move(encodedFrame));
+			ctx->_encodedFrames.push_back(std::move(encodedFrame));
 			ms_mutex_unlock(&ctx->_mutex);
 		}
 	} catch (const runtime_error &e) {
