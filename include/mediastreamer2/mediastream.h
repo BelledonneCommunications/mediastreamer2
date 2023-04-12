@@ -458,6 +458,7 @@ struct _AudioStream
 	MSAudioRoute audio_route;
 	bool_t play_dtmfs;
 	bool_t use_ec;
+	bool_t force_software_ec;
 	bool_t use_gc;
 	bool_t use_agc;
 
@@ -656,11 +657,16 @@ MS2_PUBLIC void audio_stream_enable_automatic_gain_control(AudioStream *stream, 
  *  */
 MS2_PUBLIC void audio_stream_set_echo_canceller_params(AudioStream *st, int tail_len_ms, int delay_ms, int framesize);
 
-
 /**
  * to be done before start
  *  */
 MS2_PUBLIC void audio_stream_enable_echo_canceller(AudioStream *st, bool_t enabled);
+
+/**
+ * Forces the use of a software echo canceller if available instead of hardwared/built-in one.
+*/
+MS2_PUBLIC void audio_stream_force_software_echo_canceller(AudioStream *st, bool_t force);
+
 /**
  * enable adaptive rate control
  * */
