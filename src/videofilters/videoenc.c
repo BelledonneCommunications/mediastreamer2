@@ -206,7 +206,7 @@ static int enc_add_fmtp(MSFilter *f,void *arg){
 	return 0;
 }
 
-static int enc_req_vfu(MSFilter *f, void *unused){
+static int enc_req_vfu(MSFilter *f, BCTBX_UNUSED(void *unused)){
 	EncState *s=(EncState*)f->data;
 	s->req_vfu=TRUE;
 	return 0;
@@ -610,7 +610,7 @@ struct jpeghdr_qtable {
  */
 
 static void mjpeg_fragment_and_send(MSFilter *f,EncState *s,mblk_t *frame, uint32_t timestamp,
-							 uint8_t type,	uint8_t typespec, int dri,
+							 uint8_t type,	BCTBX_UNUSED(uint8_t typespec), int dri,
 							 uint8_t q, mblk_t *lqt, mblk_t *cqt) {
 	struct jpeghdr jpghdr;
 	struct jpeghdr_rst rsthdr;

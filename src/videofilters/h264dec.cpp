@@ -377,7 +377,7 @@ static int dec_add_fmtp(MSFilter *f, void *arg){
 	return 0;
 }
 
-static int reset_first_image(MSFilter* f, void *data) {
+static int reset_first_image(MSFilter* f, BCTBX_UNUSED(void *data)) {
 	DecData *d=(DecData*)f->data;
 	d->first_image_decoded = FALSE;
 	return 0;
