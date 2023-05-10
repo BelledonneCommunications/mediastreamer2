@@ -691,6 +691,15 @@ static void video_stream_event_cb(void *user_pointer, BCTBX_UNUSED(const MSFilte
 			break;
 	}
 }
+static void video_stream_display_cb(BCTBX_UNUSED(void *user_pointer),
+                                  const unsigned int event_id,
+                                  BCTBX_UNUSED(const void *args)) {
+	switch (event_id) {
+		case MS_VIDEO_DISPLAY_ERROR_OCCURRED:
+			ms_message("Video stream cannot be rendered");
+			break;
+	}
+}
 #endif
 
 static MSSndCard *get_sound_card(MSSndCardManager *manager, const char* card_name) {
@@ -977,6 +986,7 @@ void setup_media_streams(MediastreamDatas* args) {
 		//ms_set_cpu_count(cpucount);
 #endif
 		video_stream_set_event_callback(args->video,video_stream_event_cb, args);
+		video_stream_set_display_callback(args->video, video_stream_display_cb, args);
 		video_stream_set_freeze_on_error(args->video,args->freeze_on_error);
 		video_stream_enable_adaptive_bitrate_control(args->video, args->rc_algo == RCAlgoSimple);
 		if (args->camera)

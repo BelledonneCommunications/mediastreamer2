@@ -237,7 +237,14 @@ static void internal_event_cb(void *ud, BCTBX_UNUSED(MSFilter *f), unsigned int 
 	}
 }
 
-static void video_stream_process_encoder_control(VideoStream *stream, unsigned int method_id, void *arg, BCTBX_UNUSED(void * user_data)){
+static void display_cb(void *ud, BCTBX_UNUSED(MSFilter *f), unsigned int event, void *eventdata) {
+	VideoStream *st = (VideoStream *)ud;
+	if (st->displaycb != NULL) {
+		st->displaycb(st->display_pointer, event, eventdata);
+	}
+}
+
+static void video_stream_process_encoder_control(VideoStream *stream, unsigned int method_id, void *arg, BCTBX_UNUSED(void *user_data)) {
 	ms_filter_call_method(stream->ms.encoder, method_id, arg);
 }
 
@@ -618,9 +625,15 @@ void video_stream_set_render_callback (VideoStream *s, VideoStreamRenderCallback
 	s->render_pointer=user_pointer;
 }
 
-void video_stream_set_event_callback (VideoStream *s, VideoStreamEventCallback cb, void *user_pointer){
-	s->eventcb=cb;
-	s->event_pointer=user_pointer;
+
+void video_stream_set_display_callback(VideoStream *s, VideoStreamDisplayCallback cb, void *user_pointer) {
+	s->displaycb = cb;
+	s->display_pointer = user_pointer;
+}
+
+void video_stream_set_event_callback(VideoStream *s, VideoStreamEventCallback cb, void *user_pointer) {
+	s->eventcb = cb;
+	s->event_pointer = user_pointer;
 }
 
 void video_stream_set_camera_not_working_callback(VideoStream *s, VideoStreamCameraNotWorkingCallback cb, void *user_pointer) {
@@ -1305,9 +1318,10 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 				ms_filter_call_method(stream->ms.encoder,MS_FILTER_ADD_FMTP,pt->send_fmtp);
 			}
 			ms_filter_call_method(stream->ms.encoder, MS_VIDEO_ENCODER_ENABLE_AVPF, &avpf_enabled);
-			if (stream->use_preview_window){
-				if (stream->rendercb==NULL){
-					stream->output2=ms_factory_create_filter_from_name(stream->ms.factory, stream->display_name);
+			if (stream->use_preview_window) {
+				if (stream->rendercb == NULL) {
+					stream->output2 = ms_factory_create_filter_from_name(stream->ms.factory, stream->display_name);
+					ms_filter_add_notify_callback(stream->output2, display_cb, stream, FALSE);
 				}
 			}
 			configure_video_source(stream, FALSE, TRUE);
@@ -1370,11 +1384,12 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 		}
 
 		/* display logic */
-		if (stream->rendercb!=NULL){
-			/* rendering logic delegated to user suppsourcelied callback */
-			stream->output=ms_factory_create_filter(stream->ms.factory, MS_EXT_DISPLAY_ID);
-			ms_filter_add_notify_callback(stream->output,ext_display_cb,stream,TRUE);
-		}else{
+		if (stream->rendercb != NULL) {
+			/* rendering logic delegated to user supplied callback */
+			stream->output = ms_factory_create_filter(stream->ms.factory, MS_EXT_DISPLAY_ID);
+			ms_filter_add_notify_callback(stream->output, ext_display_cb, stream, TRUE);
+			ms_filter_add_notify_callback(stream->output, display_cb, stream, FALSE);
+		} else {
 			/* no user supplied callback -> create filter */
 			MSVideoDisplayDecodingSupport decoding_support;
 
@@ -1396,6 +1411,7 @@ static int video_stream_start_with_source_and_output(VideoStream *stream, RtpPro
 			} else {
 				/* Create default display filter */
 				stream->output = ms_factory_create_filter_from_name(stream->ms.factory, stream->display_name);
+				ms_filter_add_notify_callback(stream->output, display_cb, stream, FALSE);
 			}
 		}
 
@@ -2111,6 +2127,7 @@ void video_preview_start(VideoPreview *stream, MSWebCam *device) {
 #if defined(__ANDROID__)
 	// On Android the capture filter doesn't need a display filter to render the preview
 	stream->output2 = ms_factory_create_filter(stream->ms.factory, MS_VOID_SINK_ID);
+	ms_filter_add_notify_callback(stream->output2, display_cb, stream, FALSE);
 #else
 	{
 		MSPixFmt format = MS_YUV420P; /* Display format */
@@ -2120,6 +2137,7 @@ void video_preview_start(VideoPreview *stream, MSWebCam *device) {
 
 		if (displaytype) {
 			stream->output2=ms_factory_create_filter_from_name(stream->ms.factory, displaytype);
+			ms_filter_add_notify_callback(stream->output2, display_cb, stream, FALSE);
 			ms_filter_call_method(stream->output2, MS_FILTER_SET_PIX_FMT, &format);
 			ms_filter_call_method(stream->output2, MS_FILTER_SET_VIDEO_SIZE, &disp_size);
 			ms_filter_call_method(stream->output2, MS_VIDEO_DISPLAY_SET_LOCAL_VIEW_MODE, &corner);

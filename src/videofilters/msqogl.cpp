@@ -290,7 +290,8 @@ static int qogl_call_render (MSFilter *f, void *arg) {
 		}
 		ogl_display_render(data->display, 0, data->mode);
 	}
-	
+
+	ogl_display_notify_errors(data->display, f);
 	ms_filter_unlock(f);
 	
 	return 0;

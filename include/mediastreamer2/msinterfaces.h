@@ -113,6 +113,9 @@ struct _MSVideoDisplayDecodingSupport {
 #define MS_VIDEO_DISPLAY_CREATE_NATIVE_WINDOW_ID \
 	MS_FILTER_METHOD(MSFilterVideoDisplayInterface,13,void*)
 
+/**triggered whenever the filter API throws errors*/
+#define MS_VIDEO_DISPLAY_ERROR_OCCURRED	MS_FILTER_EVENT(MSFilterVideoDisplayInterface, 0, int)
+
 /**
   * Interface definitions for players
 **/

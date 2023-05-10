@@ -287,12 +287,11 @@ static void glxvideo_process(MSFilter *f){
 	ogl_display_render(obj->glhelper, orientation, obj->mode);
 	glXSwapBuffers ( obj->display, obj->subwindow );
 
-	end:
-		ms_filter_unlock(f);
-		if (f->inputs[0]!=NULL)
-			ms_queue_flush(f->inputs[0]);
-		if (f->inputs[1]!=NULL)
-			ms_queue_flush(f->inputs[1]);
+end:
+	ogl_display_notify_errors(obj->glhelper, f);
+	ms_filter_unlock(f);
+	if (f->inputs[0] != NULL) ms_queue_flush(f->inputs[0]);
+	if (f->inputs[1] != NULL) ms_queue_flush(f->inputs[1]);
 }
 
 static int glxvideo_set_vsize(MSFilter *f,void *arg){
