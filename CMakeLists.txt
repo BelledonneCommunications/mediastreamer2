@@ -750,8 +750,12 @@ else()
 	set(PACKAGE_DATA_DIR "${CMAKE_INSTALL_DATADIR}")
 endif()
 
+set(libdir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+set(includedir ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR})
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/mediastreamer-config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/mediastreamer-config.h)
 set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/mediastreamer-config.h PROPERTIES GENERATED ON)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/mediastreamer.pc.in ${CMAKE_CURRENT_BINARY_DIR}/mediastreamer.pc)
+set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/mediastreamer.pc PROPERTIES GENERATED ON)
 add_definitions("-DHAVE_CONFIG_H")
 
 if(ENABLE_DOC)
@@ -778,6 +782,11 @@ configure_package_config_file(cmake/Mediastreamer2Config.cmake.in
 	"${CMAKE_CURRENT_BINARY_DIR}/Mediastreamer2Config.cmake"
 	INSTALL_DESTINATION ${CONFIG_PACKAGE_LOCATION}
 	NO_SET_AND_CHECK_MACRO
+)
+
+install(FILES
+	"${CMAKE_CURRENT_BINARY_DIR}/mediastreamer.pc"
+	DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
 )
 
 install(EXPORT ${EXPORT_TARGETS_NAME}Targets
