@@ -23,7 +23,6 @@
 #define msvideorouter_h
 
 #include "mediastreamer2/msfilter.h"
-#include "mediastreamer2/msvideoswitcher.h"
 
 
 #define ROUTER_MAX_CHANNELS 20
@@ -35,6 +34,12 @@ typedef struct _MSVideoRouterPinData{
 	int output;
 	int link_source;
 }MSVideoRouterPinData;
+
+typedef struct _MSVideoConferenceFilterPinControl {
+	int pin;
+	int enabled;
+} MSVideoConferenceFilterPinControl;
+
 #define MS_VIDEO_ROUTER_CONFIGURE_OUTPUT MS_FILTER_METHOD(MS_VIDEO_ROUTER_ID,0,MSVideoRouterPinData)
 #define MS_VIDEO_ROUTER_UNCONFIGURE_OUTPUT MS_FILTER_METHOD(MS_VIDEO_ROUTER_ID,1,int)
 #define MS_VIDEO_ROUTER_SET_FOCUS MS_FILTER_METHOD(MS_VIDEO_ROUTER_ID,2,int)

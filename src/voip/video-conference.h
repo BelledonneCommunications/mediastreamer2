@@ -25,7 +25,6 @@
 #include <bctoolbox/defs.h>
 
 #include "mediastreamer2/msconference.h"
-#include "mediastreamer2/msvideoswitcher.h"
 #include "mediastreamer2/msvideorouter.h"
 #include "private.h"
 
