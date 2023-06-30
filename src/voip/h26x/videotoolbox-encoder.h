@@ -30,7 +30,7 @@ namespace mediastreamer {
 
 class VideoToolboxEncoder: public H26xEncoder {
 public:
-	VideoToolboxEncoder(const std::string &mime);
+	VideoToolboxEncoder(const std::string &mime, int maxPayloadSize);
 	~VideoToolboxEncoder() {if (_session) CFRelease(_session);}
 
 	MSVideoSize getVideoSize() const override {return _vsize;}
@@ -70,6 +70,7 @@ private:
 	void applyBitrate();
 	static void outputCb(void *outputCallbackRefCon, void *sourceFrameRefCon, OSStatus status, VTEncodeInfoFlags infoFlags, CMSampleBufferRef sampleBuffer);
 
+	int _payloadMaxSize = 1460;
 	MSVideoSize _vsize;
 	float _framerate = 0.0f;
 	int _bitrate = 0;

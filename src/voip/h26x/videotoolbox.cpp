@@ -40,13 +40,13 @@ const MSVideoConfiguration vth264enc_video_confs[] = {
 	 * TODO: enable use of higher profiles to use formats above 720P.
 	 */
 #if 0
-	MS_VIDEO_CONF(1536000,  3000000, SXGA_MINUS, 25, 2),
+	MS_VIDEO_CONF(1536000,  3000000, SXGA_MINUS, 30, 2),
 #endif
-	MS_VIDEO_CONF(1024000,  2048000,       720P, 25, 2),
-	MS_VIDEO_CONF( 850000,  2048000,        XGA, 25, 2),
-	MS_VIDEO_CONF( 750000,  1500000,       SVGA, 25, 2),
-	MS_VIDEO_CONF( 600000,  3000000,        VGA, 30, 2),
-	MS_VIDEO_CONF( 400000,   800000,        VGA, 15, 1),
+	MS_VIDEO_CONF(1024000,  2048000,       720P, 30, 2),
+	MS_VIDEO_CONF( 850000,  2048000,        XGA, 30, 2),
+	MS_VIDEO_CONF( 750000,  1500000,       SVGA, 30, 2),
+	MS_VIDEO_CONF( 600000,  2000000,        VGA, 30, 2),
+	MS_VIDEO_CONF( 400000,   800000,        VGA, 20, 1),
 	MS_VIDEO_CONF( 200000,   350000,        CIF, 18, 1),
 	MS_VIDEO_CONF( 150000,   200000,       QVGA, 15, 1),
 	MS_VIDEO_CONF( 100000,   150000,       QVGA, 10, 1),
@@ -56,7 +56,7 @@ const MSVideoConfiguration vth264enc_video_confs[] = {
 
 class VideoToolboxH264EncoderFilterImpl: public H26xEncoderFilter {
 public:
-	VideoToolboxH264EncoderFilterImpl(MSFilter *f): H26xEncoderFilter(f, new VideoToolboxEncoder("video/avc"), vth264enc_video_confs) {}
+	VideoToolboxH264EncoderFilterImpl(MSFilter *f): H26xEncoderFilter(f, new VideoToolboxEncoder("video/avc", ms_factory_get_payload_max_size(f->factory)), vth264enc_video_confs) {}
 };
 
 class VideoToolboxH264DecoderFilterImpl: public H26xDecoderFilter {
@@ -66,7 +66,7 @@ public:
 
 class VideoToolboxH265EncoderFilterImpl: public H26xEncoderFilter {
 public:
-	VideoToolboxH265EncoderFilterImpl(MSFilter *f): H26xEncoderFilter(f, new VideoToolboxEncoder("video/hevc"), vth264enc_video_confs) {}
+	VideoToolboxH265EncoderFilterImpl(MSFilter *f): H26xEncoderFilter(f, new VideoToolboxEncoder("video/hevc", ms_factory_get_payload_max_size(f->factory)), vth264enc_video_confs) {}
 };
 
 class VideoToolboxH265DecoderFilterImpl: public H26xDecoderFilter {
