@@ -81,6 +81,8 @@ extern unsigned char ms_tester_tone_detected;
 #define VP8_PAYLOAD_TYPE 96
 #define H264_PAYLOAD_TYPE 102
 #define MP4V_PAYLOAD_TYPE 104
+#define UNSUPPORTED_PAYLOAD_TYPE 119
+#define DUMMY_PAYLOAD_TYPE 120
 #define OPUS_PAYLOAD_TYPE 121
 #define SPEEX_PAYLOAD_TYPE 122
 #define SPEEX16_PAYLOAD_TYPE 123

@@ -136,6 +136,37 @@ static void codecs_manager_test_all_combinations(const CodecsManager *cm, CodecM
 	codecs_manager_enable_all_codecs(cm, MS_FILTER_DECODER, TRUE);
 }
 
+PayloadType payload_type_dummy={
+	.type = PAYLOAD_VIDEO,
+	.clock_rate = 90000,
+	.bits_per_sample = 0,
+	.zero_pattern = NULL,
+	.pattern_length = 0,
+	.normal_bitrate = 6000,
+	.mime_type = "DUMMY" ,
+	.channels = 0,
+	.recv_fmtp = NULL,
+	.send_fmtp = NULL,
+	.avpf = {PAYLOAD_TYPE_AVPF_NONE, 0},
+	.flags = 0
+};
+
+PayloadType payload_type_unsupported={
+	.type = PAYLOAD_VIDEO,
+	.clock_rate = 90000,
+	.bits_per_sample = 0,
+	.zero_pattern = NULL,
+	.pattern_length = 0,
+	.normal_bitrate = 6000,
+	.mime_type = "UNSUPPORTED" ,
+	.channels = 0,
+	.recv_fmtp = NULL,
+	.send_fmtp = NULL,
+	.avpf = {PAYLOAD_TYPE_AVPF_NONE, 0},
+	.flags = 0
+};
+
+
 static int tester_before_all(void) {
 	MSWebCamManager *cam_manager = NULL;
 	MSWebCam *mire = ms_web_cam_new(ms_mire_webcam_desc_get());
@@ -147,6 +178,8 @@ static int tester_before_all(void) {
 	rtp_profile_set_payload(&rtp_profile, VP8_PAYLOAD_TYPE, &payload_type_vp8);
 	rtp_profile_set_payload(&rtp_profile, H264_PAYLOAD_TYPE, &payload_type_h264);
 	rtp_profile_set_payload(&rtp_profile, MP4V_PAYLOAD_TYPE, &payload_type_mp4v);
+	rtp_profile_set_payload(&rtp_profile, DUMMY_PAYLOAD_TYPE, &payload_type_dummy);
+	rtp_profile_set_payload(&rtp_profile, UNSUPPORTED_PAYLOAD_TYPE, &payload_type_unsupported);
 
 	_h264_codecs_manager = codecs_manager_new(_factory, "h264");
 
@@ -203,6 +236,7 @@ typedef struct _video_stream_tester_t {
 	int local_rtcp;
 	MSWebCam * cam;
 	int payload_type;
+	bool_t fallback_to_dummy_codec;
 } video_stream_tester_t;
 
 void video_stream_tester_set_local_ip(video_stream_tester_t* obj,const char*ip) {
@@ -221,6 +255,7 @@ video_stream_tester_t* video_stream_tester_new(void) {
 	vst->vconf = ms_new0(MSVideoConfiguration, 1);
 	vst->vconf->vsize = MS_VIDEO_SIZE_VGA;
 	vst->vconf->required_bitrate = 500000;
+	vst->fallback_to_dummy_codec = FALSE;
 #endif
 	return  vst;
 }
@@ -371,6 +406,7 @@ static void create_video_stream(video_stream_tester_t *vst, int payload_type) {
 		video_stream_set_sent_video_size(vst->vs, vst->vconf->vsize);
 	}
 	vst->payload_type = payload_type;
+	video_stream_set_fallback_to_dummy_codec(vst->vs, vst->fallback_to_dummy_codec);
 }
 
 static void destroy_video_stream(video_stream_tester_t *vst) {
@@ -456,7 +492,7 @@ static void basic_video_stream_base(int payload_type) {
 	video_stream_tester_t* marielle=video_stream_tester_new();
 	video_stream_tester_t* margaux=video_stream_tester_new();
 
-    init_video_streams(marielle, margaux, FALSE, FALSE, NULL, payload_type, FALSE, FALSE);
+	init_video_streams(marielle, margaux, FALSE, FALSE, NULL, payload_type, FALSE, FALSE);
 
 	BC_ASSERT_TRUE(wait_for_until_with_parse_events(&marielle->vs->ms,
 													&margaux->vs->ms,
@@ -468,7 +504,7 @@ static void basic_video_stream_base(int payload_type) {
 	video_stream_get_local_rtp_stats(marielle->vs, &marielle->stats.rtp);
 	video_stream_get_local_rtp_stats(margaux->vs, &margaux->stats.rtp);
 
-    uninit_video_streams(marielle, margaux);
+	uninit_video_streams(marielle, margaux);
 
 	video_stream_tester_destroy(margaux);
 	video_stream_tester_destroy(marielle);
@@ -487,6 +523,39 @@ static void basic_video_stream_h264(void) {
 		basic_video_stream_base(H264_PAYLOAD_TYPE);
 	} else {
 		ms_error("H264 codec is not supported!");
+	}
+}
+
+static void basic_video_stream_dummy(void) {
+	if(ms_factory_codec_supported(_factory, "dummy")) {
+		// Just init a video stream asking for dummy codec, do not run it, we just need to check we are able to initialise a stream
+		// directly asking for the dummy codec, it shall pass
+		video_stream_tester_t* marielle=video_stream_tester_new();
+		video_stream_tester_t* margaux=video_stream_tester_new();
+		init_video_streams(marielle, margaux, FALSE, FALSE, NULL, DUMMY_PAYLOAD_TYPE, FALSE, FALSE);
+		uninit_video_streams(marielle, margaux);
+		video_stream_tester_destroy(margaux);
+		video_stream_tester_destroy(marielle);
+		// ask for unsupported codec, but enable fallback to dummy, it shall pass
+		marielle=video_stream_tester_new();
+		margaux=video_stream_tester_new();
+		marielle->fallback_to_dummy_codec=TRUE;
+		margaux->fallback_to_dummy_codec=TRUE;
+		init_video_streams(marielle, margaux, FALSE, FALSE, NULL, UNSUPPORTED_PAYLOAD_TYPE, FALSE, FALSE);
+		uninit_video_streams(marielle, margaux);
+		video_stream_tester_destroy(margaux);
+		// ask for unsupported codec, but disable fallback to dummy, it shall fail
+		marielle=video_stream_tester_new();
+		margaux=video_stream_tester_new();
+		marielle->fallback_to_dummy_codec=FALSE;
+		margaux->fallback_to_dummy_codec=FALSE;
+		create_video_stream(marielle, UNSUPPORTED_PAYLOAD_TYPE);
+		create_video_stream(margaux, UNSUPPORTED_PAYLOAD_TYPE);
+		BC_ASSERT_EQUAL(video_stream_start(marielle->vs, &rtp_profile, margaux->local_ip, margaux->local_rtp, margaux->local_ip, margaux->local_rtcp, UNSUPPORTED_PAYLOAD_TYPE, 50, marielle->cam), -1,int,"%d");
+		video_stream_tester_destroy(marielle);
+
+	} else {
+		BC_FAIL("Dummy codec is not supported!");
 	}
 }
 
@@ -1504,6 +1573,7 @@ end:
 
 static test_t tests[] = {
 	TEST_NO_TAG("Basic video stream VP8"                     , basic_video_stream_vp8),
+	TEST_NO_TAG("Basic video stream dummy"                   , basic_video_stream_dummy),
 	TEST_NO_TAG("Basic video stream H264"                    , basic_video_stream_all_h264_codec_combinations),
 	TEST_NO_TAG("Multicast video stream"                     , multicast_video_stream),
 	TEST_NO_TAG("Basic one-way video stream"                 , basic_one_way_video_stream),
