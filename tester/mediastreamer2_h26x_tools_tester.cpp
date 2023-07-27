@@ -160,6 +160,7 @@ extern "C" {
 		nullptr,
 		nullptr,
 		sizeof(tests)/sizeof(test_t),
-		tests
+		tests,
+		0
 	};
 }

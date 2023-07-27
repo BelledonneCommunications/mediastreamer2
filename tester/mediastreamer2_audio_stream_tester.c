@@ -760,5 +760,6 @@ test_suite_t audio_stream_test_suite = {
 	NULL,
 	NULL,
 	sizeof(tests) / sizeof(tests[0]),
-	tests
+	tests,
+	0
 };

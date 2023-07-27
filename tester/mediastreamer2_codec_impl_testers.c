@@ -230,5 +230,6 @@ test_suite_t codec_impl_test_suite = {
 	NULL,
 	NULL,
 	sizeof(tests) / sizeof(tests[0]),
-	tests
+	tests,
+	0
 };

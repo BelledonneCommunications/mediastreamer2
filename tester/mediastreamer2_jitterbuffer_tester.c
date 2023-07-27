@@ -646,6 +646,7 @@ test_suite_t jitterbuffer_test_suite = {
 	NULL,
 	NULL,
 	sizeof(tests) / sizeof(tests[0]),
-	tests
+	tests,
+	0
 };
 

@@ -1538,7 +1538,8 @@ test_suite_t video_stream_test_suite = {
 	NULL,
 	NULL,
 	sizeof(tests) / sizeof(tests[0]),
-	tests
+	tests,
+	0
 };
 #else
 test_suite_t video_stream_test_suite = {
@@ -1546,6 +1547,7 @@ test_suite_t video_stream_test_suite = {
 	NULL,
 	NULL,
 	0,
-	NULL
+	NULL,
+	0
 };
 #endif

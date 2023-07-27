@@ -559,5 +559,6 @@ test_suite_t sound_card_test_suite = {
 	NULL,
 	NULL,
 	sizeof(sound_card_tests) / sizeof(sound_card_tests[0]),
-	sound_card_tests
+	sound_card_tests,
+	0
 };

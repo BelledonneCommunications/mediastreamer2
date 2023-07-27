@@ -278,7 +278,8 @@ test_suite_t neon_test_suite = {
 	NULL,
 	NULL,
 	sizeof(tests)/sizeof(test_t),
-	tests
+	tests,
+	0
 };
 
 #endif // ARM NEON
