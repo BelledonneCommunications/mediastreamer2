@@ -909,38 +909,38 @@ int ms_zrtp_back_to_secure_mode(MSZrtpContext *ctx){
 
 #else /* HAVE_ZRTP */
 
-MSZrtpContext* ms_zrtp_context_new(MSMediaStreamSessions *sessions, MSZrtpParams *params){
+MSZrtpContext* ms_zrtp_context_new(BCTBX_UNUSED(MSMediaStreamSessions *sessions), BCTBX_UNUSED(MSZrtpParams *params)){
 	ms_message("ZRTP is disabled");
 	return NULL;
 }
 
-MSZrtpContext* ms_zrtp_multistream_new(MSMediaStreamSessions *sessions, MSZrtpContext* activeContext) {
+MSZrtpContext* ms_zrtp_multistream_new(BCTBX_UNUSED(MSMediaStreamSessions *sessions), BCTBX_UNUSED(MSZrtpContext* activeContext)) {
 	ms_message("ZRTP is disabled - not adding stream");
 	return NULL;
 }
 
-void ms_zrtp_enable_go_clear(MSZrtpContext *ctx, bool_t enable) {};
-int ms_zrtp_channel_start(MSZrtpContext *ctx) { return 0;}
+void ms_zrtp_enable_go_clear(BCTBX_UNUSED(MSZrtpContext *ctx), BCTBX_UNUSED(bool_t enable)) {};
+int ms_zrtp_channel_start(BCTBX_UNUSED(MSZrtpContext *ctx)) { return 0;}
 bool_t ms_zrtp_available(){return FALSE;}
-void ms_zrtp_sas_verified(MSZrtpContext* ctx){}
-void ms_zrtp_sas_reset_verified(MSZrtpContext* ctx){}
-MSZrtpPeerStatus ms_zrtp_get_peer_status(void *db, const char *peerUri, bctbx_mutex_t *dbMutex) {return MS_ZRTP_PEER_STATUS_UNKNOWN;}
-void ms_zrtp_context_destroy(MSZrtpContext *ctx){}
-void ms_zrtp_reset_transmition_timer(MSZrtpContext* ctx) {};
-int ms_zrtp_transport_modifier_new(MSZrtpContext* ctx, RtpTransportModifier **rtpt, RtpTransportModifier **rtcpt ) {return 0;}
-void ms_zrtp_transport_modifier_destroy(RtpTransportModifier *tp)  {}
-void ms_zrtp_set_stream_sessions(MSZrtpContext *zrtp_context, MSMediaStreamSessions *stream_sessions) {}
-int ms_zrtp_getHelloHash(MSZrtpContext* ctx, uint8_t *output, size_t outputLength) {return 0;}
-int ms_zrtp_setAuxiliarySharedSecret(MSZrtpContext *ctx, const uint8_t *auxSharedSecret, size_t auxSharedSecretLength) {return 0;}
-uint8_t ms_zrtp_getAuxiliarySharedSecretMismatch(MSZrtpContext *ctx) {return 0;}
-int ms_zrtp_setPeerHelloHash(MSZrtpContext *ctx, uint8_t *peerHelloHashHexString, size_t peerHelloHashHexStringLength) {return 0;}
-int ms_zrtp_initCache(void *db, bctbx_mutex_t *dbMutex){return 0;}
-int ms_zrtp_cache_migration(void *cacheXmlPtr, void *cacheSqlite, const char *selfURI) {return 0;}
-uint8_t ms_zrtp_available_key_agreement(MSZrtpKeyAgreement algos[256]) { return 0;}
+void ms_zrtp_sas_verified(BCTBX_UNUSED(MSZrtpContext* ctx)){}
+void ms_zrtp_sas_reset_verified(BCTBX_UNUSED(MSZrtpContext* ctx)){}
+MSZrtpPeerStatus ms_zrtp_get_peer_status(BCTBX_UNUSED(void *db), BCTBX_UNUSED(const char *peerUri), BCTBX_UNUSED(bctbx_mutex_t *dbMutex)) {return MS_ZRTP_PEER_STATUS_UNKNOWN;}
+void ms_zrtp_context_destroy(BCTBX_UNUSED(MSZrtpContext *ctx)){}
+void ms_zrtp_reset_transmition_timer(BCTBX_UNUSED(MSZrtpContext* ctx)) {};
+int ms_zrtp_transport_modifier_new(BCTBX_UNUSED(MSZrtpContext* ctx), BCTBX_UNUSED(RtpTransportModifier **rtpt), BCTBX_UNUSED(RtpTransportModifier **rtcpt)) {return 0;}
+void ms_zrtp_transport_modifier_destroy(BCTBX_UNUSED(RtpTransportModifier *tp))  {}
+void ms_zrtp_set_stream_sessions(BCTBX_UNUSED(MSZrtpContext *zrtp_context), BCTBX_UNUSED(MSMediaStreamSessions *stream_sessions)) {}
+int ms_zrtp_getHelloHash(BCTBX_UNUSED(MSZrtpContext* ctx), BCTBX_UNUSED(uint8_t *output), BCTBX_UNUSED(size_t outputLength)) {return 0;}
+int ms_zrtp_setAuxiliarySharedSecret(BCTBX_UNUSED(MSZrtpContext *ctx), BCTBX_UNUSED(const uint8_t *auxSharedSecret), BCTBX_UNUSED(size_t auxSharedSecretLength)) {return 0;}
+uint8_t ms_zrtp_getAuxiliarySharedSecretMismatch(BCTBX_UNUSED(MSZrtpContext *ctx)) {return 0;}
+int ms_zrtp_setPeerHelloHash(BCTBX_UNUSED(MSZrtpContext *ctx), BCTBX_UNUSED(uint8_t *peerHelloHashHexString), BCTBX_UNUSED(size_t peerHelloHashHexStringLength)) {return 0;}
+int ms_zrtp_initCache(BCTBX_UNUSED(void *db), BCTBX_UNUSED(bctbx_mutex_t *dbMutex)){return 0;}
+int ms_zrtp_cache_migration(BCTBX_UNUSED(void *cacheXmlPtr), BCTBX_UNUSED(void *cacheSqlite), BCTBX_UNUSED(const char *selfURI)) {return 0;}
+uint8_t ms_zrtp_available_key_agreement(BCTBX_UNUSED(MSZrtpKeyAgreement algos[256])) { return 0;}
 bool_t ms_zrtp_is_PQ_available(void) { return FALSE;}
-int ms_zrtp_send_go_clear(MSZrtpContext *ctx){return 0;}
-int ms_zrtp_confirm_go_clear(MSZrtpContext *ctx){return 0;}
-int ms_zrtp_back_to_secure_mode(MSZrtpContext *ctx){return 0;}
+int ms_zrtp_send_go_clear(BCTBX_UNUSED(MSZrtpContext *ctx)){return 0;}
+int ms_zrtp_confirm_go_clear(BCTBX_UNUSED(MSZrtpContext *ctx)){return 0;}
+int ms_zrtp_back_to_secure_mode(BCTBX_UNUSED(MSZrtpContext *ctx)){return 0;}
 #endif /* HAVE_ZRTP */
 
 #define STRING_COMPARE_RETURN(string, value)\
