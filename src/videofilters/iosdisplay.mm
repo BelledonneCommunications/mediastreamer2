@@ -141,7 +141,7 @@
 	/* OpenGL calls in an application in background cause internal crash in the libGL implementation of iPhone 6.
 	 * However, using OpenGL is permitted in an app extension, where no notion of background/foreground exists. */
 	auto &iOSUtils = bctoolbox::IOSUtils::getUtils();
-	if (iOSUtils.isApp() && !iOSUtils.isApplicationStateActive()) return;
+	if (!@available(iOS 15.0, *) && iOSUtils.isApp() && !iOSUtils.isApplicationStateActive()) return;
 	
 	if([lock tryLock]) {
 		if(context == nil) {
