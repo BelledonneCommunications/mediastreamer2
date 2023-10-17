@@ -192,7 +192,8 @@ static int32_t ms_zrtp_srtpSecretsAvailable(void* clientData, const bzrtpSrtpSec
 
 
 	// Get authentication and cipher algorithms in srtp format
-	if ((secrets->authTagAlgo != ZRTP_AUTHTAG_HS32) && ((secrets->authTagAlgo != ZRTP_AUTHTAG_HS80))) {
+	if ((secrets->authTagAlgo != ZRTP_AUTHTAG_HS32) && ((secrets->authTagAlgo != ZRTP_AUTHTAG_HS80))
+		&& ((secrets->authTagAlgo != ZRTP_AUTHTAG_GCM))	) {
 		ms_fatal("unsupported authentication algorithm by srtp");
 	}
 
@@ -204,7 +205,7 @@ static int32_t ms_zrtp_srtpSecretsAvailable(void* clientData, const bzrtpSrtpSec
 
 
 	if (part==ZRTP_SRTP_SECRETS_FOR_RECEIVER) {
-		uint8_t *key = (uint8_t *)ms_malloc0((secrets->peerSrtpKeyLength+secrets->peerSrtpSaltLength+16)*sizeof(uint8_t));
+		uint8_t *key = (uint8_t *)ms_malloc0((secrets->peerSrtpKeyLength+secrets->peerSrtpSaltLength)*sizeof(uint8_t));
 		memcpy(key, secrets->peerSrtpKey, secrets->peerSrtpKeyLength);
 		memcpy(key + secrets->peerSrtpKeyLength, secrets->peerSrtpSalt, secrets->peerSrtpSaltLength);
 
@@ -220,7 +221,13 @@ static int32_t ms_zrtp_srtpSecretsAvailable(void* clientData, const bzrtpSrtpSec
 			}else{
 				ms_media_stream_sessions_set_srtp_recv_key(userData->stream_sessions, MS_AES_128_SHA1_80, (const char *)key, (secrets->peerSrtpKeyLength+secrets->peerSrtpSaltLength), MSSRTP_ALL_STREAMS);
 			}
-		}else{
+		}else if (secrets->authTagAlgo == ZRTP_AUTHTAG_GCM){
+			if (secrets->cipherAlgo == ZRTP_CIPHER_AES3){
+				ms_media_stream_sessions_set_srtp_recv_key(userData->stream_sessions, MS_AEAD_AES_256_GCM, (const char *)key, (secrets->peerSrtpKeyLength+secrets->peerSrtpSaltLength), MSSRTP_ALL_STREAMS);
+			}else{
+				ms_media_stream_sessions_set_srtp_recv_key(userData->stream_sessions, MS_AEAD_AES_128_GCM, (const char *)key, (secrets->peerSrtpKeyLength+secrets->peerSrtpSaltLength), MSSRTP_ALL_STREAMS);
+			}
+		} else {
 			ms_fatal("unsupported auth tag");
 		}
 		ms_free(key);
@@ -242,6 +249,12 @@ static int32_t ms_zrtp_srtpSecretsAvailable(void* clientData, const bzrtpSrtpSec
 				ms_media_stream_sessions_set_srtp_send_key(userData->stream_sessions, MS_AES_256_SHA1_80, (const char *)key, (secrets->selfSrtpKeyLength+secrets->selfSrtpSaltLength), MSSRTP_ALL_STREAMS);
 			}else{
 				ms_media_stream_sessions_set_srtp_send_key(userData->stream_sessions, MS_AES_128_SHA1_80, (const char *)key, (secrets->selfSrtpKeyLength+secrets->selfSrtpSaltLength), MSSRTP_ALL_STREAMS);
+			}
+		}else if (secrets->authTagAlgo == ZRTP_AUTHTAG_GCM){
+			if (secrets->cipherAlgo == ZRTP_CIPHER_AES3){
+				ms_media_stream_sessions_set_srtp_send_key(userData->stream_sessions, MS_AEAD_AES_256_GCM, (const char *)key, (secrets->selfSrtpKeyLength+secrets->selfSrtpSaltLength), MSSRTP_ALL_STREAMS);
+			}else{
+				ms_media_stream_sessions_set_srtp_send_key(userData->stream_sessions, MS_AEAD_AES_128_GCM, (const char *)key, (secrets->selfSrtpKeyLength+secrets->selfSrtpSaltLength), MSSRTP_ALL_STREAMS);
 			}
 		}else{
 			ms_fatal("unsupported auth tag");
@@ -280,6 +293,7 @@ static int ms_zrtp_getAlgoId(uint8_t algo) {
 		case(ZRTP_AUTHTAG_HS80): return MS_ZRTP_AUTHTAG_HS80;
 		case(ZRTP_AUTHTAG_SK32): return MS_ZRTP_AUTHTAG_SK32;
 		case(ZRTP_AUTHTAG_SK64): return MS_ZRTP_AUTHTAG_SK64;
+		case(ZRTP_AUTHTAG_GCM): return MS_ZRTP_AUTHTAG_GCM;
 
 		case(ZRTP_KEYAGREEMENT_DH2k): return MS_ZRTP_KEY_AGREEMENT_DH2K;
 		case(ZRTP_KEYAGREEMENT_EC25): return MS_ZRTP_KEY_AGREEMENT_EC25;
@@ -589,6 +603,7 @@ static void set_auth_tag_suites(bzrtpContext_t *ctx, const MSZrtpAuthTag *authTa
 			case MS_ZRTP_AUTHTAG_HS80:    bzrtpAuthTags[bzrtpCount++] = ZRTP_AUTHTAG_HS80; break;
 			case MS_ZRTP_AUTHTAG_SK32:    bzrtpAuthTags[bzrtpCount++] = ZRTP_AUTHTAG_SK32; break;
 			case MS_ZRTP_AUTHTAG_SK64:    bzrtpAuthTags[bzrtpCount++] = ZRTP_AUTHTAG_SK64; break;
+			case MS_ZRTP_AUTHTAG_GCM:     bzrtpAuthTags[bzrtpCount++] = ZRTP_AUTHTAG_GCM; break;
 		}
 	}
 
@@ -1003,6 +1018,7 @@ MS2_PUBLIC MSZrtpAuthTag ms_zrtp_auth_tag_from_string(const char* str) {
 	STRING_COMPARE_RETURN(str, MS_ZRTP_AUTHTAG_HS80);
 	STRING_COMPARE_RETURN(str, MS_ZRTP_AUTHTAG_SK32);
 	STRING_COMPARE_RETURN(str, MS_ZRTP_AUTHTAG_SK64);
+	STRING_COMPARE_RETURN(str, MS_ZRTP_AUTHTAG_GCM);
 	return MS_ZRTP_AUTHTAG_INVALID;
 }
 
@@ -1013,6 +1029,7 @@ MS2_PUBLIC const char* ms_zrtp_auth_tag_to_string(const MSZrtpAuthTag authTag) {
 		CASE_RETURN_STRING(MS_ZRTP_AUTHTAG_HS80);\
 		CASE_RETURN_STRING(MS_ZRTP_AUTHTAG_SK32);\
 		CASE_RETURN_STRING(MS_ZRTP_AUTHTAG_SK64);\
+		CASE_RETURN_STRING(MS_ZRTP_AUTHTAG_GCM);\
 	);
 }
 
