@@ -414,7 +414,7 @@ int TurnSocket::connect() {
 		close();
 		return -1;
 	} else if (optVal != 0) {
-		ms_error("TurnSocket [%p]: failed to connect to server (%d): %s", this, optVal, getSocketErrorWithCode(optVal));
+		ms_error("TurnSocket [%p]: failed to connect to server (%d): %s", this, optVal, getSocketError());
 		close();
 		return -1;
 	}
