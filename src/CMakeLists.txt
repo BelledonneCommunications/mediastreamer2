@@ -85,7 +85,6 @@ set(VOIP_SOURCE_FILES_C
 	audiofilters/tonedetector.c
 	audiofilters/ulaw.c
 	audiofilters/waveheader.h
-	crypto/dtls_srtp.c
 	crypto/zrtp.c
 	otherfilters/msrtp.c
 	utils/_kiss_fft_guts.h
@@ -128,6 +127,7 @@ set(VOIP_SOURCE_FILES_C
 	voip/private.h
 )
 set(VOIP_SOURCE_FILES_CXX
+	crypto/dtls_srtp.cpp
 	utils/filter-wrapper/decoding-filter-wrapper.cpp
 	utils/filter-wrapper/encoding-filter-wrapper.cpp
 	voip/audiostreamvolumes.cpp
