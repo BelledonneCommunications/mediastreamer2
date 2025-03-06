@@ -271,10 +271,13 @@ void RouterOutput::rewritePacketInformation(mblk_t *source, mblk_t *output) {
 
 	// We need to set sequence number for what we send out, otherwise the decoder won't be able
 	// to verify the integrity of the stream
-
 	mblk_set_timestamp_info(output, mAdjustedOutTimestamp);
 	mblk_set_cseq(output, mOutSeqNumber++);
+
+	// Set flags as the source
 	mblk_set_marker_info(output, mblk_get_marker_info(source));
+	mblk_set_independent_flag(output, mblk_get_independent_flag(source));
+	mblk_set_discardable_flag(output, mblk_get_discardable_flag(source));
 }
 
 void RouterOutput::rewriteExtensionIds(mblk_t *output, int inputIds[16], int outputIds[16]) {
