@@ -3309,7 +3309,7 @@ IceCandidate *ice_add_remote_candidate(IceCheckList *cl,
 	bctbx_list_t *elem;
 	IceCandidate *candidate;
 
-	if (bctbx_list_size(cl->local_candidates) >= ICE_MAX_NB_CANDIDATES) {
+	if (bctbx_list_size(cl->remote_candidates) >= ICE_MAX_NB_CANDIDATES) {
 		ms_error("ice: Candidate list limited to %d candidates", ICE_MAX_NB_CANDIDATES);
 		return NULL;
 	}
