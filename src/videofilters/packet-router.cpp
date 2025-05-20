@@ -220,8 +220,8 @@ void RouterVideoInput::update() {
 
 		if (mKeyFrameRequested) {
 			if (!mSeqNumberSet || mCurrentTimestamp != newTimestamp) {
-				// Possibly a beginning of frame !
-				if (mKeyFrameIndicator->isKeyFrame(m)) {
+				// Possibly a beginning of frame!
+				if (isKeyFrame(m)) {
 					PackerRouterLogContextualizer prlc(mRouter);
 					ms_message("Key frame detected on pin %i", mPin);
 					mState = State::Running;
@@ -243,6 +243,22 @@ void RouterVideoInput::update() {
 			mRouter->notifyFir(mPin);
 		}
 	}
+}
+
+bool RouterVideoInput::isKeyFrame(mblk_t *packet) const {
+	// If full packet mode is enabled and end-to-end encryption is not, then we need to pass the payload to the key
+	// frame indicator since it will not check for header extension.
+	if (mRouter->isFullPacketModeEnabled() && !mRouter->isEndToEndEncryptionEnabled()) {
+		// Small hack to avoid duplicating the mblk_t packet since isKeyFrame only accepts a const.
+		mblk_t payload;
+		rtp_get_payload(packet, &payload.b_rptr);
+		payload.b_wptr = packet->b_wptr;
+		payload.b_cont = packet->b_cont;
+
+		return mKeyFrameIndicator->isKeyFrame(&payload);
+	}
+
+	return mKeyFrameIndicator->isKeyFrame(packet);
 }
 #endif
 
