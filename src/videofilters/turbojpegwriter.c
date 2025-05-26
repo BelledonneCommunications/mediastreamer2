@@ -78,6 +78,7 @@ static bool_t open_file(JpegWriter *obj, const char *filename) {
 }
 
 static void jpg_init(MSFilter *f) {
+ms_message("%s - DEBUG DEBUG init filter %p", __func__, f);
 	JpegWriter *s = ms_new0(JpegWriter, 1);
 	s->f = f;
 	s->turboJpeg = tjInitCompress();
@@ -108,12 +109,16 @@ static int take_snapshot(MSFilter *f, void *arg) {
 	JpegWriter *s = (JpegWriter *)f->data;
 	const char *filename = (const char *)arg;
 	int err = 0;
+ms_message("%s - DEBUG DEBUG filter %p file %p before lock", __func__, f, s->file);
 	ms_filter_lock(f);
+ms_message("%s - DEBUG DEBUG filter %p file %p after lock", __func__, f, s->file);
 	if (s->file != NULL) {
 		close_file(s, FALSE);
 	}
 	if (!open_file(s, filename)) err = -1;
+ms_message("%s - DEBUG DEBUG filter %p file %p err %0d before unlock ", __func__, f, s->file, err);
 	ms_filter_unlock(f);
+ms_message("%s - DEBUG DEBUG filter %p file %p err %0d after unlock ", __func__, f, s->file, err);
 	return err;
 }
 
@@ -135,9 +140,13 @@ static bool_t jpg_process_frame_task(void *obj) {
 	bool_t success = FALSE;
 	mblk_t *m = NULL;
 
+ms_message("%s - DEBUG DEBUG filter %p getq before lock", __func__, f);
 	ms_filter_lock(f);
+ms_message("%s - DEBUG DEBUG filter %p getq after lock", __func__, f);
 	m = getq(&s->entry_q);
+ms_message("%s - DEBUG DEBUG filter %p getq before unlock", __func__, f);
 	ms_filter_unlock(f);
+ms_message("%s - DEBUG DEBUG filter %p getq after unlock", __func__, f);
 
 	if (ms_yuv_buf_init_from_mblk(&yuvbuf, m) != 0) goto end;
 
@@ -153,14 +162,18 @@ static bool_t jpg_process_frame_task(void *obj) {
 		goto end;
 	}
 
+ms_message("%s - DEBUG DEBUG filter %p file %p write before lock", __func__, f, s->file);
 	ms_filter_lock(f);
+ms_message("%s - DEBUG DEBUG filter %p file %p write after lock", __func__, f, s->file);
 	if (s->file != NULL && bctbx_file_write2(s->file, jpegBuffer, jpegSize) != BCTBX_VFS_ERROR) {
 		ms_message("Snapshot done with turbojpeg");
 		success = TRUE;
 	} else {
 		ms_error("Error writing snapshot.");
 	}
+ms_message("%s - DEBUG DEBUG filter %p write before unlock", __func__, f);
 	ms_filter_unlock(f);
+ms_message("%s - DEBUG DEBUG filter %p write after unlock", __func__, f);
 
 	tjFree(jpegBuffer);
 
@@ -173,9 +186,12 @@ end:
 static void jpg_process(MSFilter *f) {
 	JpegWriter *s = (JpegWriter *)f->data;
 
+ms_message("%s - DEBUG DEBUG filter %p file %p turbo JPEG %p before lock", __func__, f, s->file, s->turboJpeg);
 	ms_filter_lock(f);
+ms_message("%s - DEBUG DEBUG filter %p file %p turbo JPEG %p after lock", __func__, f, s->file, s->turboJpeg);
 	if (s->file != NULL && s->turboJpeg != NULL) {
 		mblk_t *img = ms_queue_peek_last(f->inputs[0]);
+ms_message("%s - DEBUG DEBUG filter %p file %p turbo JPEG %p img %p", __func__, f, s->file, s->turboJpeg, img);
 
 		if (img != NULL) {
 			ms_queue_remove(f->inputs[0], img);

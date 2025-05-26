@@ -231,6 +231,7 @@ void ms_filter_process(MSFilter *f) {
 	uint64_t elapsed_time;
 
 	ms_debug("Executing process of filter %s:%p", f->desc->name, f);
+	ms_message("%s - DEBUG DEBUG Executing process of filter %s:%p", __func__, f->desc->name, f);
 
 	if (f->stats) ms_get_cur_time(&start);
 
