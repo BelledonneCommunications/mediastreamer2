@@ -34,10 +34,9 @@
 #include "mediastreamer2/msvideo.h"
 #include "mediastreamer2/msvideoout.h"
 #include "mediastreamer2/msvideopresets.h"
+#include "mediastreamer2/video-aggregator.h"
 #include "mediastreamer2/zrtp.h"
 #include "private.h"
-
-#include <mediastreamer2/video-aggregator.h>
 
 #if __APPLE__
 #include "TargetConditionals.h"

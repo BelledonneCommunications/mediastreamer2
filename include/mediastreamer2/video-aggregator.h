@@ -20,6 +20,6 @@
 
 #pragma once
 
-#include <mediastreamer2/msfilter.h>
+#include "mediastreamer2/msfilter.h"
 
 #define MS_VIDEO_AGGREGATOR_INPUT_CHANGED MS_FILTER_EVENT(MS_VIDEO_AGGREGATOR_ID, 0, int)

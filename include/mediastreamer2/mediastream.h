@@ -1272,9 +1272,9 @@ typedef struct _MediastreamVideoStat MediaStreamVideoStat;
 
 typedef enum _MSVideoContent { MSVideoContentDefault, MSVideoContentSpeaker, MSVideoContentThumbnail } MSVideoContent;
 
-// 9 because the aggregator filter has a max of 10 and the first pin is used for the RtpRecv used by default in the
-// stream
-#define VIDEO_STREAM_MAX_BRANCHES 9
+// This number should not be higher than 9 since the VideoAggregator filter only has 10 inputs.
+// The main RtpSession always takes the first input.
+#define VIDEO_STREAM_MAX_BRANCHES 3
 
 /**
  * Structure to store an input branch added to a videostream upon reception of a new stream
