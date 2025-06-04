@@ -43,6 +43,7 @@ typedef struct {
 	MSFilter *f;
 	MSWorkerThread *process_thread;
 	queue_t entry_q;
+	bool_t snapshot_requested;
 } JpegWriter;
 
 static void close_file(JpegWriter *obj, bool_t doRenaming) {
@@ -55,7 +56,7 @@ static void close_file(JpegWriter *obj, bool_t doRenaming) {
 		if (rename(obj->tmpFilename, obj->filename) != 0) {
 			ms_error("Could not rename %s into %s", obj->tmpFilename, obj->filename);
 		} else {
-			strncpy(eventData.filePath, obj->filename, sizeof(eventData) - 1);
+			strncpy(eventData.filePath, obj->filename, sizeof(eventData.filePath) - 1);
 			ms_filter_notify(obj->f, MS_JPEG_WRITER_SNAPSHOT_TAKEN, &eventData);
 		}
 	}
@@ -72,13 +73,12 @@ static bool_t open_file(JpegWriter *obj, const char *filename) {
 	obj->file = bctbx_file_open2(bctbx_vfs_get_default(), obj->tmpFilename, O_WRONLY | O_CREAT | O_BINARY);
 	if (!obj->file) {
 		ms_error("Could not open %s for write", obj->tmpFilename);
-		close_file(obj, FALSE);
+		return FALSE;
 	}
 	return TRUE;
 }
 
 static void jpg_init(MSFilter *f) {
-ms_message("%s - DEBUG DEBUG init filter %p", __func__, f);
 	JpegWriter *s = ms_new0(JpegWriter, 1);
 	s->f = f;
 	s->turboJpeg = tjInitCompress();
@@ -109,16 +109,16 @@ static int take_snapshot(MSFilter *f, void *arg) {
 	JpegWriter *s = (JpegWriter *)f->data;
 	const char *filename = (const char *)arg;
 	int err = 0;
-ms_message("%s - DEBUG DEBUG filter %p file %p before lock", __func__, f, s->file);
+
 	ms_filter_lock(f);
-ms_message("%s - DEBUG DEBUG filter %p file %p after lock", __func__, f, s->file);
 	if (s->file != NULL) {
 		close_file(s, FALSE);
+		s->snapshot_requested = FALSE;
 	}
-	if (!open_file(s, filename)) err = -1;
-ms_message("%s - DEBUG DEBUG filter %p file %p err %0d before unlock ", __func__, f, s->file, err);
+	if (open_file(s, filename)) {
+		s->snapshot_requested = TRUE;
+	} else err = -1;
 	ms_filter_unlock(f);
-ms_message("%s - DEBUG DEBUG filter %p file %p err %0d after unlock ", __func__, f, s->file, err);
 	return err;
 }
 
@@ -140,15 +140,14 @@ static bool_t jpg_process_frame_task(void *obj) {
 	bool_t success = FALSE;
 	mblk_t *m = NULL;
 
-ms_message("%s - DEBUG DEBUG filter %p getq before lock", __func__, f);
 	ms_filter_lock(f);
-ms_message("%s - DEBUG DEBUG filter %p getq after lock", __func__, f);
 	m = getq(&s->entry_q);
-ms_message("%s - DEBUG DEBUG filter %p getq before unlock", __func__, f);
 	ms_filter_unlock(f);
-ms_message("%s - DEBUG DEBUG filter %p getq after unlock", __func__, f);
 
+	ms_message("%s: got image to encode to jpeg.", f->desc->name);
 	if (ms_yuv_buf_init_from_mblk(&yuvbuf, m) != 0) goto end;
+
+	if (s->turboJpeg == NULL) goto end;
 
 	error = tjCompressFromYUVPlanes(
 	    s->turboJpeg,
@@ -158,26 +157,21 @@ ms_message("%s - DEBUG DEBUG filter %p getq after unlock", __func__, f);
 
 	if (error != 0) {
 		ms_error("tjCompressFromYUVPlanes() failed: %s", tjGetErrorStr());
-		if (jpegBuffer != NULL) tjFree(jpegBuffer);
 		goto end;
 	}
-
-ms_message("%s - DEBUG DEBUG filter %p file %p write before lock", __func__, f, s->file);
 	ms_filter_lock(f);
-ms_message("%s - DEBUG DEBUG filter %p file %p write after lock", __func__, f, s->file);
 	if (s->file != NULL && bctbx_file_write2(s->file, jpegBuffer, jpegSize) != BCTBX_VFS_ERROR) {
-		ms_message("Snapshot done with turbojpeg");
 		success = TRUE;
+	}
+	ms_filter_unlock(f);
+
+	if (success) {
+		ms_message("Snapshot done with turbojpeg");
 	} else {
 		ms_error("Error writing snapshot.");
 	}
-ms_message("%s - DEBUG DEBUG filter %p write before unlock", __func__, f);
-	ms_filter_unlock(f);
-ms_message("%s - DEBUG DEBUG filter %p write after unlock", __func__, f);
-
-	tjFree(jpegBuffer);
-
 end:
+	if (jpegBuffer) tjFree(jpegBuffer);
 	freemsg(m);
 	cleanup(s, success);
 	return success;
@@ -185,21 +179,27 @@ end:
 
 static void jpg_process(MSFilter *f) {
 	JpegWriter *s = (JpegWriter *)f->data;
+	bool_t img_queued = FALSE;
 
-ms_message("%s - DEBUG DEBUG filter %p file %p turbo JPEG %p before lock", __func__, f, s->file, s->turboJpeg);
 	ms_filter_lock(f);
-ms_message("%s - DEBUG DEBUG filter %p file %p turbo JPEG %p after lock", __func__, f, s->file, s->turboJpeg);
-	if (s->file != NULL && s->turboJpeg != NULL) {
+
+	if (s->snapshot_requested) {
 		mblk_t *img = ms_queue_peek_last(f->inputs[0]);
-ms_message("%s - DEBUG DEBUG filter %p file %p turbo JPEG %p img %p", __func__, f, s->file, s->turboJpeg, img);
 
 		if (img != NULL) {
 			ms_queue_remove(f->inputs[0], img);
 			putq(&s->entry_q, img);
-			ms_worker_thread_add_task(s->process_thread, jpg_process_frame_task, (void *)f);
+			s->snapshot_requested = FALSE;
+			img_queued = TRUE;
 		}
 	}
 	ms_filter_unlock(f);
+	/* avoid taking the filter mutex to post the task, since the start of the task
+	 * on the worker thread will require to take the mutex. */
+	if (img_queued) {
+		ms_worker_thread_add_task(s->process_thread, jpg_process_frame_task, (void *)f);
+		ms_message("%s: Snapshot request submitted to worker thread.", f->desc->name);
+	}
 
 	ms_queue_flush(f->inputs[0]);
 }
