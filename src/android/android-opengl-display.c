@@ -67,7 +67,7 @@ static void android_display_uninit(MSFilter *f) {
 	if (ad->ogl) {
 		/* clear native ptr, to prevent rendering to occur now that ptr is invalid */
 		if (ad->android_video_window)
-			(*jenv)->CallVoidMethod(jenv, ad->android_video_window, ad->set_opengles_display_id, 0);
+			(*jenv)->CallVoidMethod(jenv, ad->android_video_window, ad->set_opengles_display_id, (jlong)0);
 		ogl_display_uninit(ad->ogl, FALSE);
 		ms_free(ad->ogl);
 	}
@@ -126,7 +126,7 @@ static int android_display_set_window(MSFilter *f, void *arg) {
 	if (ad->android_video_window) {
 		ms_message("Clearing old opengles_display (%p)", ad->ogl);
 		/* clear native ptr, to prevent rendering to occur now that ptr is invalid */
-		(*jenv)->CallVoidMethod(jenv, ad->android_video_window, ad->set_opengles_display_id, 0);
+		(*jenv)->CallVoidMethod(jenv, ad->android_video_window, ad->set_opengles_display_id, (jlong)0);
 		/* when context is lost GL resources are freed by Android */
 		ogl_display_uninit(ad->ogl, FALSE);
 		ms_free(ad->ogl);
