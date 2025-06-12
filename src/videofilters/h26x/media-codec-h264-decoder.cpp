@@ -223,7 +223,9 @@ const std::vector<const MediaCodecH264Decoder::DeviceInfo> MediaCodecH264Decoder
     {"rockchip", "rk3399pro", "rk3399pro"},
     {"rockchip", "rk3368", "rk3368"},
     {"rockchip", "Sasincomm S09", "rk3126c"},
-    {"freescale", "Control4-imx8mm", "imx8"}};
+    {"freescale", "Control4-imx8mm", "imx8"},
+    {"Aiks", "C10", "ceres"},
+    {"Allwinner", "A10", "ceres"}};
 
 } // namespace mediastreamer
 
