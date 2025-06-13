@@ -193,27 +193,7 @@ static void *ms_worker_thread_run(void *d) {
 				/* If there are no tasks left at all, go to sleep until new tasks are queued.*/
 				ms_debug("msasync.c: worker thread has no tasks.");
 				obj->inwait = TRUE;
-#ifdef __GLIBC__
-				/*
-				 * Workaround for suspected occurence of bug https://sourceware.org/bugzilla/show_bug.cgi?id=25847 .
-				 * In rare cases, we observe on rocky 8 that pthread_cond_signal() does not wakeup
-				 * the worker thread alseep in pthread_cond_wait().
-				 * To mitigate this issue, we use pthread_cond_timedwait(). THe event will be treated
-				 * with delay, which is better than never.
-				 */
-				{
-					struct timespec ts;
-					int err;
-					ts.tv_sec = 0;
-					ts.tv_nsec = 100 * 1000 * 1000UL;
-					err = pthread_cond_timedwait(&obj->cond, &obj->mutex, &ts);
-					if (obj->tasks && err == ETIMEDOUT) {
-						ms_warning("msasync.c: worker thread pthread_cond_wait() bug workaround.");
-					}
-				}
-#else
 				ms_cond_wait(&obj->cond, &obj->mutex);
-#endif
 				obj->inwait = FALSE;
 			}
 		} else {
