@@ -505,10 +505,14 @@ static int audio_stream_configure_output_snd_card(AudioStream *stream) {
 	if (stream->soundwrite) {
 		if (ms_filter_implements_interface(stream->soundwrite, MSFilterAudioPlaybackInterface)) {
 			if (ms_filter_has_method(stream->soundwrite, MS_AUDIO_PLAYBACK_SET_INTERNAL_ID)) {
-				ms_filter_call_method(stream->soundwrite, MS_AUDIO_PLAYBACK_SET_INTERNAL_ID, card);
-				ms_message("[AudioStream] set output sound card for %s:%p to %s",
-				           ms_filter_get_name(stream->soundwrite), stream->soundwrite, card->id);
-				ok = 0;
+				ok = ms_filter_call_method(stream->soundwrite, MS_AUDIO_PLAYBACK_SET_INTERNAL_ID, card);
+				if (ok == 0) {
+					ms_message("[AudioStream] set output sound card for %s:%p to %s",
+					           ms_filter_get_name(stream->soundwrite), stream->soundwrite, card->id);
+				} else {
+					ms_error("[AudioStream] Failed to set output sound card for %s:%p to %s",
+					         ms_filter_get_name(stream->soundwrite), stream->soundwrite, card->id);
+				}
 			} else {
 				ms_warning("[AudioStream] MS_AUDIO_PLAYBACK_SET_INTERNAL_ID is not implemented, cannot set output card "
 				           "for %s:%p to %s",
@@ -1333,7 +1337,8 @@ int audio_stream_start_from_io(AudioStream *stream,
 
 	rtp_session_signal_connect(rtps, "telephone-event", (RtpCallback)on_dtmf_received, stream);
 	if (stream->ms.transfer_mode == FALSE) {
-		rtp_session_signal_connect(rtps, "payload_type_changed", (RtpCallback)audio_stream_payload_type_changed, stream);
+		rtp_session_signal_connect(rtps, "payload_type_changed", (RtpCallback)audio_stream_payload_type_changed,
+		                           stream);
 	}
 
 	if (stream->ms.state == MSStreamPreparing) {
