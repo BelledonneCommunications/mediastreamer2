@@ -54,6 +54,7 @@ struct _FilterData {
 	MSFilter *parent;      // Used to call render with the Filter in order to use lock mecanisms
 	// Must be a pointer because of C-initialization.
 	std::mutex *link_lock; // Avoid to use MSFilter lock when freeing data
+	QThread * mRenderingThread = nullptr;// If not null, use it to clean data
 };
 typedef struct _FilterData FilterData;
 
@@ -72,6 +73,7 @@ protected:
 
 private:
 	QQuickWindow *mWindow = nullptr;
+
 };
 
 #endif //_MS_QOGL_H
