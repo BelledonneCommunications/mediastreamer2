@@ -144,7 +144,7 @@ bool MsScreenSharing_win::ScreenProcessor::initDisplay() {
 		}
 	}
 	if (FAILED(hr)) {
-		ms_error("[MsScreenSharing_win] Cannot create Direct3D device [%x]", hr);
+		ms_error("[MsScreenSharing_win] Cannot create Direct3D device [0x%X]", hr);
 		clean();
 		return false;
 	}
@@ -152,7 +152,7 @@ bool MsScreenSharing_win::ScreenProcessor::initDisplay() {
 	IDXGIDevice *dxgiDevice;
 	hr = mDevice->QueryInterface(IID_PPV_ARGS(&dxgiDevice));
 	if (FAILED(hr)) {
-		ms_error("[MsScreenSharing_win] Cannot get DXGI Device [%x]", hr);
+		ms_error("[MsScreenSharing_win] Cannot get DXGI Device [0x%X]", hr);
 		toRelease(dxgiDevice);
 		return false;
 	}
@@ -161,7 +161,7 @@ bool MsScreenSharing_win::ScreenProcessor::initDisplay() {
 	hr = dxgiDevice->GetParent(__uuidof(IDXGIAdapter), reinterpret_cast<void **>(&dxgiAdapter));
 	dxgiDevice->Release();
 	if (FAILED(hr)) {
-		ms_error("[MsScreenSharing_win] Cannot get DXGI Adapter [%x]", hr);
+		ms_error("[MsScreenSharing_win] Cannot get DXGI Adapter [0x%X]", hr);
 		toRelease(dxgiAdapter);
 		return false;
 	}
@@ -180,7 +180,7 @@ bool MsScreenSharing_win::ScreenProcessor::initDisplay() {
 		DXGI_OUTPUT_DESC outputDesc;
 		hr = dxgiOutput->GetDesc(&outputDesc);
 		if (FAILED(hr)) {
-			ms_warning("[MsScreenSharing_win] Couldn't get description for the screen %d [%x]", i, hr);
+			ms_warning("[MsScreenSharing_win] Couldn't get description for the screen %d [0x%X]", i, hr);
 			toRelease(dxgiOutput);
 			continue;
 		} else
@@ -192,7 +192,7 @@ bool MsScreenSharing_win::ScreenProcessor::initDisplay() {
 
 		hr = dxgiOutput->QueryInterface(IID_PPV_ARGS(&dxgiOutput1));
 		if (FAILED(hr)) {
-			ms_warning("[MsScreenSharing_win] Cannot get DXGI Output1 for screen %d [%x]", i, hr);
+			ms_warning("[MsScreenSharing_win] Cannot get DXGI Output1 for screen %d [0x%X]", i, hr);
 			toRelease(dxgiOutput);
 			continue;
 		}
@@ -201,7 +201,7 @@ bool MsScreenSharing_win::ScreenProcessor::initDisplay() {
 		hr = dxgiOutput1->DuplicateOutput(mDevice, &deskDupl);
 
 		if (FAILED(hr)) {
-			ms_warning("[MsScreenSharing_win] Cannot Duplicate screen %d [%x]", i, hr);
+			ms_warning("[MsScreenSharing_win] Cannot Duplicate screen %d [0x%X]", i, hr);
 			toRelease(dxgiOutput, dxgiOutput1);
 			continue;
 		}
@@ -326,7 +326,7 @@ bool MsScreenSharing_win::ScreenProcessor::prepareImage() {
 	hr = mScreenDuplications[mParent->mLastFormat.mScreenIndex].mDuplication->AcquireNextFrame(0, &frameInfo,
 	                                                                                           &desktopResource);
 	if (FAILED(hr)) {
-		// ms_warning("[MsScreenSharing_win] Cannot acquire frame [%x]", hr);
+		// ms_warning("[MsScreenSharing_win] Cannot acquire frame [0x%X]", hr);
 		return false;
 	}
 
